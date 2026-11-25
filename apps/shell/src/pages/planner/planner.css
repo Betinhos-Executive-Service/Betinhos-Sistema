@@ -3155,28 +3155,11 @@
 @keyframes projects-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes projects-pop { 0% { transform: scale(.95); opacity: .5; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
 @keyframes projects-launch { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(20,122,75,.28); } 40% { transform: scale(1.03); box-shadow: 0 0 0 8px rgba(20,122,75,.10); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(20,122,75,0); } }
-@keyframes projects-rocket { 0% { transform: translate(0, 0); } 40% { transform: translate(3px, -3px); } 100% { transform: translate(0, 0); } }
 :where(.planner-page, .planner-portal) .projects-page { display: grid; align-content: start; gap: 16px; max-width: 1500px; margin: 0 auto; --stage-color: var(--bt-color-text-primary); --stage-soft: var(--line); }
 :where(.planner-page, .planner-portal) .projects-page .page-header { margin-bottom: 0; }
 :where(.planner-page, .planner-portal) .projects-page .is-idea { --stage-color: var(--bt-color-text-primary); --stage-soft: var(--line); }
-:where(.planner-page, .planner-portal) .projects-page .is-design { --stage-color: var(--bt-color-action); --stage-soft: var(--bt-color-action-soft); }
 :where(.planner-page, .planner-portal) .projects-page .is-build { --stage-color: var(--bt-color-warning); --stage-soft: var(--bt-color-warning-soft); }
 :where(.planner-page, .planner-portal) .projects-page .is-live { --stage-color: var(--bt-color-success); --stage-soft: var(--bt-color-success-soft); }
-:where(.planner-page, .planner-portal) .projects-pipeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-:where(.planner-page, .planner-portal) .projects-pipeline-step { position: relative; display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 88px; padding: 14px 16px 18px; border: 1px solid rgba(0,26,61,.08); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-surface); overflow: hidden; animation: projects-rise 300ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 50ms); }
-:where(.planner-page, .planner-portal) .projects-pipeline-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--radius-md); background: var(--stage-soft); color: var(--stage-color); }
-:where(.planner-page, .planner-portal) .projects-pipeline-copy { display: grid; gap: 2px; min-width: 0; }
-:where(.planner-page, .planner-portal) .projects-pipeline-copy small { color: var(--muted); font-size: 12px; font-weight: 700; }
-:where(.planner-page, .planner-portal) .projects-count { display: inline-block; justify-self: start; color: var(--ink); font-size: 26px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; animation: projects-pop 300ms var(--ease-out); }
-:where(.planner-page, .planner-portal) .projects-pipeline-bar { position: absolute; left: 16px; right: 16px; bottom: 9px; height: 3px; border-radius: 999px; background: var(--surface-soft); overflow: hidden; }
-:where(.planner-page, .planner-portal) .projects-pipeline-bar span { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--stage-color); transform-origin: left center; transition: transform 300ms var(--ease-out); }
-:where(.planner-page, .planner-portal) .projects-composer { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; align-items: end; gap: 12px; padding: 16px; animation: projects-rise 300ms var(--ease-out) both; animation-delay: 160ms; }
-:where(.planner-page, .planner-portal) .projects-field { display: grid; gap: 6px; min-width: 0; }
-:where(.planner-page, .planner-portal) .projects-field span { color: var(--muted); font-size: 12px; font-weight: 800; }
-:where(.planner-page, .planner-portal) .projects-field input { height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--neutral); color: var(--ink); font: inherit; font-size: 13px; transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out); }
-:where(.planner-page, .planner-portal) .projects-field input:focus { outline: none; border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33,89,210,.11); }
-:where(.planner-page, .planner-portal) .projects-add { height: 40px; white-space: nowrap; }
-:where(.planner-page, .planner-portal) .projects-alert { margin: 0; padding: 12px 16px; border-radius: var(--radius-md); background: var(--bt-color-danger-soft); color: var(--ink); font-size: 13px; font-weight: 600; }
 :where(.planner-page, .planner-portal) .projects-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
 :where(.planner-page, .planner-portal) .projects-column { display: grid; align-content: start; min-width: 0; gap: 10px; min-height: 240px; padding: 12px; border: 1px solid rgba(0,26,61,.08); border-radius: var(--radius-lg); background: var(--neutral); transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out), transform 160ms var(--ease-out); animation: projects-rise 300ms var(--ease-out) both; animation-delay: calc(200ms + var(--i, 0) * 60ms); }
 :where(.planner-page, .planner-portal) .projects-column.is-drop-target { border-color: var(--bt-color-action); border-style: dashed; background: var(--bt-color-action-soft); transform: translateY(-1px); }
@@ -3190,8 +3173,6 @@
 :where(.planner-page, .planner-portal) .projects-card { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid rgba(0,26,61,.08); border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 2px 6px rgba(0,26,61,.04); cursor: grab; animation: projects-rise 260ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 35ms); transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), opacity 160ms var(--ease-out); }
 :where(.planner-page, .planner-portal) .projects-card:active { cursor: grabbing; }
 :where(.planner-page, .planner-portal) .projects-card.is-dragging { opacity: .45; border-color: var(--bt-color-action); }
-:where(.planner-page, .planner-portal) .projects-card.is-launched { animation: projects-launch 900ms var(--ease-out); border-color: var(--bt-color-success); }
-:where(.planner-page, .planner-portal) .projects-card.is-launched .projects-live-tag svg { animation: projects-rocket 600ms var(--ease-out) 2; }
 :where(.planner-page, .planner-portal) .projects-card h3 { margin: 0; color: var(--ink); font-size: 13px; font-weight: 800; line-height: 18px; overflow-wrap: anywhere; }
 :where(.planner-page, .planner-portal) .projects-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 17px; overflow-wrap: anywhere; }
 :where(.planner-page, .planner-portal) .projects-progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
@@ -3211,7 +3192,6 @@
 :where(.planner-page, .planner-portal) .projects-chip-button.is-danger { background: var(--bt-color-danger); }
 :where(.planner-page, .planner-portal) .projects-icon-button:active, :where(.planner-page, .planner-portal) .projects-chip-button:active { transform: scale(.97); }
 :where(.planner-page, .planner-portal) .projects-icon-button:focus-visible, :where(.planner-page, .planner-portal) .projects-chip-button:focus-visible { outline: 2px solid var(--bt-color-action); outline-offset: 2px; }
-:where(.planner-page, .planner-portal) .projects-live-tag { display: inline-flex; align-items: center; gap: 4px; height: 23px; padding: 0 8px; border-radius: 999px; background: var(--bt-color-success-soft); color: var(--bt-color-success); font-size: 11px; font-weight: 800; }
 :where(.planner-page, .planner-portal) .projects-footnote { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
 :where(.planner-page, .planner-portal) .more-action-icon-projects { color: var(--blue); background: var(--blue-soft); }
 @media (hover: hover) and (pointer: fine) {
@@ -3221,6 +3201,70 @@
   :where(.planner-page, .planner-portal) .projects-chip-button:hover svg { transform: translateX(2px); }
   :where(.planner-page, .planner-portal) .projects-chip-button.is-danger:hover { background: #9f2940; }
 }
-@media (max-width: 1120px) { :where(.planner-page, .planner-portal) .projects-pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } :where(.planner-page, .planner-portal) .projects-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 820px) { :where(.planner-page, .planner-portal) .projects-composer { grid-template-columns: minmax(0, 1fr); } :where(.planner-page, .planner-portal) .projects-add { width: 100%; height: 44px; } :where(.planner-page, .planner-portal) .projects-field input { height: 44px; } :where(.planner-page, .planner-portal) .projects-icon-button, :where(.planner-page, .planner-portal) .projects-chip-button { height: 44px; } :where(.planner-page, .planner-portal) .projects-icon-button { width: 44px; } }
-@media (max-width: 560px) { :where(.planner-page, .planner-portal) .projects-board { grid-template-columns: minmax(0, 1fr); } :where(.planner-page, .planner-portal) .projects-column { min-height: 0; } :where(.planner-page, .planner-portal) .projects-pipeline-step { padding: 12px 12px 16px; grid-template-columns: 36px minmax(0, 1fr); gap: 8px; } :where(.planner-page, .planner-portal) .projects-pipeline-icon { width: 36px; height: 36px; } }
+:where(.planner-page, .planner-portal) .projects-page .is-review { --stage-color: var(--bt-color-warning); --stage-soft: var(--bt-color-warning-soft); }
+:where(.planner-page, .planner-portal) .projects-page .is-paused { --stage-color: var(--muted); --stage-soft: var(--surface-soft); }
+:where(.planner-page, .planner-portal) .projects-page .is-build { --stage-color: var(--bt-color-action); --stage-soft: var(--bt-color-action-soft); }
+:where(.planner-page, .planner-portal) .projects-board { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+:where(.planner-page, .planner-portal) .projects-card-code { justify-self: start; padding: 0 6px; border-radius: 999px; background: var(--stage-soft); color: var(--stage-color); font-size: 11px; font-weight: 800; line-height: 20px; font-variant-numeric: tabular-nums; }
+:where(.planner-page, .planner-portal) .projects-card-next { font-size: 11px; }
+:where(.planner-page, .planner-portal) .projects-card-next strong { color: var(--ink); font-weight: 800; }
+:where(.planner-page, .planner-portal) .projects-card p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+:where(.planner-page, .planner-portal) .projects-card.is-moving { opacity: .6; }
+:where(.planner-page, .planner-portal) .projects-card.is-fresh { animation: projects-launch 1100ms var(--ease-out); border-color: var(--stage-color); }
+:where(.planner-page, .planner-portal) .projects-card-media { display: inline-flex; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .projects-card-media span { display: inline-flex; align-items: center; gap: 3px; }
+:where(.planner-page, .planner-portal) a.projects-icon-button { text-decoration: none; }
+:where(.planner-page, .planner-portal) .projects-card-skeleton { display: block; height: 92px; border-radius: var(--radius-md); background: var(--surface-soft); animation: projects-shimmer 1.2s ease-in-out infinite; }
+@keyframes projects-shimmer { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+:where(.planner-page, .planner-portal) .projects-drawer-foot { display: flex; justify-content: flex-end; gap: 8px; width: 100%; }
+:where(.planner-page, .planner-portal) .projects-new-idea { position: relative; display: grid; gap: 16px; min-height: 100%; }
+:where(.planner-page, .planner-portal) .projects-recorder { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--neutral); transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out); }
+:where(.planner-page, .planner-portal) .projects-recorder.is-recording { border-color: #f2c2cc; background: var(--bt-color-danger-soft); }
+:where(.planner-page, .planner-portal) .projects-recorder-button { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border: 0; border-radius: 999px; background: var(--navy); color: #fff; cursor: pointer; transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out); }
+:where(.planner-page, .planner-portal) .projects-recorder-button:active { transform: scale(.97); }
+:where(.planner-page, .planner-portal) .projects-recorder-button:focus-visible { outline: 2px solid var(--bt-color-action); outline-offset: 3px; }
+:where(.planner-page, .planner-portal) .projects-recorder-button:disabled { opacity: .55; cursor: not-allowed; }
+:where(.planner-page, .planner-portal) .projects-recorder.is-recording .projects-recorder-button { background: var(--bt-color-danger); }
+:where(.planner-page, .planner-portal) .projects-recorder.is-recording .projects-recorder-button::after { content: ""; position: absolute; inset: -4px; border-radius: inherit; border: 2px solid var(--bt-color-danger); opacity: 0; animation: projects-ring 1.4s var(--ease-out) infinite; }
+@keyframes projects-ring { 0% { transform: scale(.95); opacity: .6; } 100% { transform: scale(1.25); opacity: 0; } }
+:where(.planner-page, .planner-portal) .projects-recorder-body { display: grid; gap: 2px; min-width: 0; }
+:where(.planner-page, .planner-portal) .projects-recorder-body strong { color: var(--ink); font-size: 13px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .projects-recorder-body small { color: var(--muted); font-size: 12px; font-weight: 600; }
+:where(.planner-page, .planner-portal) .projects-recorder-wave { display: flex; align-items: center; gap: 3px; height: 28px; }
+:where(.planner-page, .planner-portal) .projects-recorder-wave span { flex: 1; max-width: 6px; height: 100%; border-radius: 999px; background: var(--bt-color-danger); transform-origin: center; transition: transform 90ms linear; }
+:where(.planner-page, .planner-portal) .projects-recorder-time { color: var(--ink); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+:where(.planner-page, .planner-portal) .projects-dropzone { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 16px; border: 1px dashed #c7d2e2; border-radius: var(--radius-md); background: var(--neutral); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out), transform 160ms var(--ease-out); }
+:where(.planner-page, .planner-portal) .projects-dropzone:active { transform: scale(.99); }
+:where(.planner-page, .planner-portal) .projects-dropzone:focus-visible { outline: 2px solid var(--bt-color-action); outline-offset: 2px; }
+:where(.planner-page, .planner-portal) .projects-dropzone:disabled { opacity: .55; cursor: not-allowed; }
+:where(.planner-page, .planner-portal) .projects-dropzone-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--bt-color-action-soft); color: var(--bt-color-action); }
+:where(.planner-page, .planner-portal) .projects-dropzone strong { display: block; font-size: 13px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .projects-dropzone small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 600; line-height: 18px; }
+:where(.planner-page, .planner-portal) .projects-dropzone kbd { padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); font: inherit; font-size: 11px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .projects-dropzone-plus { color: var(--muted); }
+:where(.planner-page, .planner-portal) .projects-new-idea.is-dragging .projects-dropzone { border-color: var(--bt-color-action); background: var(--bt-color-action-soft); transform: translateY(-1px); }
+:where(.planner-page, .planner-portal) .projects-drop-overlay { position: absolute; inset: -8px; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 8px; border: 2px dashed var(--bt-color-action); border-radius: var(--radius-lg); background: rgba(237,243,255,.94); color: var(--bt-color-action); font-size: 14px; pointer-events: none; animation: projects-overlay-in 160ms var(--ease-out); }
+@keyframes projects-overlay-in { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
+:where(.planner-page, .planner-portal) .projects-attachments { display: grid; gap: 8px; }
+:where(.planner-page, .planner-portal) .projects-attachments h3 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+:where(.planner-page, .planner-portal) .projects-attachments h3 span { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--bt-color-action-soft); color: var(--bt-color-action); line-height: 18px; text-align: center; letter-spacing: 0; }
+:where(.planner-page, .planner-portal) .projects-attachments ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+:where(.planner-page, .planner-portal) .projects-attachment { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); animation: projects-rise 220ms var(--ease-out) both; }
+:where(.planner-page, .planner-portal) .projects-attachment.is-audio { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "copy remove" "media media"; }
+:where(.planner-page, .planner-portal) .projects-attachment.is-audio .projects-attachment-media { grid-area: media; width: 100%; height: auto; background: none; }
+:where(.planner-page, .planner-portal) .projects-attachment.is-audio .projects-attachment-copy { grid-area: copy; }
+:where(.planner-page, .planner-portal) .projects-attachment-media { display: grid; place-items: center; width: 56px; height: 56px; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-soft); color: var(--muted); }
+:where(.planner-page, .planner-portal) .projects-attachment-media img, :where(.planner-page, .planner-portal) .projects-attachment-media video { width: 100%; height: 100%; object-fit: cover; }
+:where(.planner-page, .planner-portal) .projects-attachment-media audio { width: 100%; height: 36px; }
+:where(.planner-page, .planner-portal) .projects-attachment-copy { display: grid; gap: 2px; min-width: 0; }
+:where(.planner-page, .planner-portal) .projects-attachment-copy strong { overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+:where(.planner-page, .planner-portal) .projects-attachment-copy small { color: var(--muted); font-size: 11px; font-weight: 700; }
+@media (hover: hover) and (pointer: fine) {
+  :where(.planner-page, .planner-portal) .projects-dropzone:hover:not(:disabled) { border-color: var(--bt-color-action); background: var(--surface-soft); }
+  :where(.planner-page, .planner-portal) .projects-recorder-button:hover:not(:disabled) { background: var(--navy-hover); }
+  :where(.planner-page, .planner-portal) .projects-recorder.is-recording .projects-recorder-button:hover { background: #9f2940; }
+}
+@media (max-width: 1280px) { :where(.planner-page, .planner-portal) .projects-board { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 820px) { :where(.planner-page, .planner-portal) .projects-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } :where(.planner-page, .planner-portal) .projects-recorder-button { width: 52px; height: 52px; } :where(.planner-page, .planner-portal) .projects-recorder { grid-template-columns: 52px minmax(0, 1fr); } }
+@media (max-width: 560px) { :where(.planner-page, .planner-portal) .projects-board { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 820px) { :where(.planner-page, .planner-portal) .projects-icon-button, :where(.planner-page, .planner-portal) .projects-chip-button { height: 44px; } :where(.planner-page, .planner-portal) .projects-icon-button { width: 44px; } }

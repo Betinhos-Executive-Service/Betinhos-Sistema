@@ -22,6 +22,7 @@ import CentralView from './views/CentralView'
 import ContactsView from './views/ContactsView'
 import IdeasView from './views/IdeasView'
 import ProjectsView from './views/ProjectsView'
+import type { Host } from '../../host'
 import { ListView } from './views/ListView'
 import ManagementView from './views/ManagementView'
 import { MoreView } from './views/MoreView'
@@ -40,7 +41,7 @@ import { useQuoteAttachments } from './components/quotes/useQuoteAttachments'
 export const LazyQualityView = lazy(() => Promise.resolve({ default: QualityView }));
 export const LazySettingsView = lazy(() => Promise.resolve({ default: SettingsView }));
 
-export function PlannerApp() {
+export function PlannerApp({ host }: { host?: Host } = {}) {
   const {
     active,
     readyView,
@@ -225,7 +226,7 @@ export function PlannerApp() {
     if (active === "management")
       return <ManagementView state={viewState} currentEmployee={currentEmployee} onOpenTask={openTask} onCollect={collectTask} onRegisterWaitingReturn={openWaitingReturn} />;
     if (active === "ideas") return <IdeasView store={store} />;
-    if (active === "projects") return <ProjectsView currentUserName={currentEmployee?.name} />;
+    if (active === "projects") return <ProjectsView host={host} />;
     if (active === "contacts")
       return (
         <ContactsView

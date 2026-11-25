@@ -1,21 +1,28 @@
-// Projetos: gestão simples de ideias e produção de software, em quatro etapas.
+// Projetos no Planner: quadro dos projetos do módulo #/projetos (cr40f_projeto), por situação.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, ChevronLeft, FolderKanban, Lightbulb, PenTool, Plus, Rocket, Trash2, Wrench, X } from "lucide-react";
+import { Alert, Button, ToastProvider, useToast } from "@betinhos/ui";
+import { ArrowRight, ChevronLeft, CircleCheck, ExternalLink, Film, Image as ImageIcon, Lightbulb, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
 import PageHeader from '../components/PageHeader';
-import {
-  PROJECT_STAGES,
-  createProject,
-  moveProjectTo,
-  readProjects,
-  shiftProject,
-  stageIndex,
-  writeProjects,
-  type Project,
-  type ProjectStage,
-} from '../domain/projects';
+import { NewProjectDrawer, type CreatedProject } from '../components/NewProjectDrawer';
+import type { Host } from '../../../host';
+import { hrefFor } from '../../../nav/useHashRoute';
+import { createSource, reasonText } from '../../projetos/data/source';
+import { useProjetos } from '../../projetos/useProjetos';
+import { STATUS } from '../../projetos/domain/choices';
+import { codigoEtapa1 } from '../../projetos/domain/regras';
+import type { Perfil } from '../../projetos/domain/types';
+import { BOARD_COLUMNS, attachmentKind, cardsByStatus, moveError, projectCards, type ProjectCard } from '../domain/projectsBoard';
 
-const STAGE_ICONS: Record<ProjectStage, any> = { idea: Lightbulb, design: PenTool, build: Wrench, live: Rocket };
-const DATE_FORMATTER = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
+const COLUMN_STYLE: Record<number, { key: string; icon: any; hint: string }> = {
+  [STATUS.ideia]: { key: "idea", icon: Lightbulb, hint: "Anotada, ainda sem forma" },
+  [STATUS.andamento]: { key: "build", icon: Wrench, hint: "Em construção" },
+  [STATUS.validacao]: { key: "review", icon: Eye, hint: "Pronta para conferir" },
+  [STATUS.concluida]: { key: "live", icon: CircleCheck, hint: "Entregue e em uso" },
+  [STATUS.pausada]: { key: "paused", icon: PauseCircle, hint: "Parada por enquanto" },
+};
+// Ordem do fluxo para avançar e voltar; Pausado fica fora da sequência.
+const FLOW = [STATUS.ideia, STATUS.andamento, STATUS.validacao, STATUS.concluida];
+const labelOf = (status: number) => BOARD_COLUMNS.find((c) => c.value === status)?.label ?? "Ideia";
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -36,10 +43,7 @@ function useFlip(listKey: string) {
       const dx = before.left - rect.left;
       const dy = before.top - rect.top;
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-      node.animate(
-        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
-        { duration: 280, easing: "cubic-bezier(.23, 1, .32, 1)" },
-      );
+      node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }], { duration: 280, easing: "cubic-bezier(.23, 1, .32, 1)" });
     });
     rects.current = next;
   }, [listKey]);
@@ -49,196 +53,181 @@ function useFlip(listKey: string) {
   };
 }
 
-export default function ProjectsView({ currentUserName = "" }: { currentUserName?: string }) {
-  const [projects, setProjects] = useState<Project[]>(() => readProjects());
-  const [title, setTitle] = useState("");
-  const [note, setNote] = useState("");
-  const [saveFailed, setSaveFailed] = useState(false);
+function AttachmentCounts({ card }: { card: ProjectCard }) {
+  const counts = { audio: 0, image: 0, video: 0 };
+  for (const anexo of card.anexos) {
+    const kind = attachmentKind(anexo.tipo);
+    if (kind in counts) counts[kind as keyof typeof counts] += 1;
+  }
+  const items = [
+    { n: counts.audio, Icon: Mic, label: "áudio" },
+    { n: counts.image, Icon: ImageIcon, label: "foto" },
+    { n: counts.video, Icon: Film, label: "vídeo" },
+  ].filter((item) => item.n > 0);
+  if (!items.length) return null;
+  return (
+    <span className="projects-card-media" aria-label={items.map((i) => `${i.n} ${i.label}${i.n > 1 ? "s" : ""}`).join(", ")}>
+      {items.map(({ n, Icon, label }) => <span key={label}><Icon size={13} aria-hidden="true" />{n}</span>)}
+    </span>
+  );
+}
+
+function Board({ host }: { host?: Host }) {
+  const source = useMemo(() => createSource(host ?? { mode: "mock" }), [host]);
+  const data = useProjetos(source);
+  const toast = useToast();
+  const [perfil, setPerfil] = useState<Perfil>("gestor");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [dragId, setDragId] = useState("");
-  const [dropStage, setDropStage] = useState<ProjectStage | "">("");
-  const [confirmId, setConfirmId] = useState("");
-  const [launchedId, setLaunchedId] = useState("");
+  const [dropStatus, setDropStatus] = useState<number | null>(null);
+  const [movingId, setMovingId] = useState("");
+  const [freshId, setFreshId] = useState("");
   const [announcement, setAnnouncement] = useState("");
-  const titleRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setSaveFailed(!writeProjects(projects)); }, [projects]);
+  useEffect(() => { let alive = true; void source.perfil().then((p) => { if (alive) setPerfil(p); }); return () => { alive = false; }; }, [source]);
   useEffect(() => {
-    if (!launchedId) return undefined;
-    const timer = window.setTimeout(() => setLaunchedId(""), 900);
+    if (!freshId) return undefined;
+    const timer = window.setTimeout(() => setFreshId(""), 1200);
     return () => window.clearTimeout(timer);
-  }, [launchedId]);
+  }, [freshId]);
 
-  const byStage = useMemo(() => {
-    const groups: Record<ProjectStage, Project[]> = { idea: [], design: [], build: [], live: [] };
-    [...projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).forEach((project) => groups[project.stage].push(project));
-    return groups;
-  }, [projects]);
-  const flipKey = projects.map((project) => `${project.id}:${project.stage}`).join("|");
-  const flipRef = useFlip(flipKey);
-  const total = projects.length;
+  const cards = useMemo(() => projectCards(data.projetos, data.etapas, data.atualizacoes), [data.projetos, data.etapas, data.atualizacoes]);
+  const columns = useMemo(() => cardsByStatus(cards), [cards]);
+  const flipRef = useFlip(cards.map((c) => `${c.projeto.id}:${c.status}`).join("|"));
+  const canMove = perfil === "renan";
 
-  const announceStage = (project: Project | undefined, stage: ProjectStage) => {
-    if (!project) return;
-    const label = PROJECT_STAGES[stageIndex(stage)].label;
-    setAnnouncement(`${project.title} agora em ${label}.`);
-    if (stage === "live") setLaunchedId(project.id);
-  };
+  async function move(card: ProjectCard, novo: number) {
+    if (movingId) return;
+    const erro = moveError(card, novo, perfil, data.atualizacoes);
+    if (erro) { toast({ tone: "warning", message: erro }); return; }
+    if (novo === card.status) return;
+    setMovingId(card.projeto.id);
+    try {
+      if (card.etapa) {
+        await source.updateEtapa(card.etapa.id, { cr40f_status: novo });
+        data.upsertEtapa({ ...card.etapa, status: novo });
+      } else {
+        const codigo = codigoEtapa1(card.projeto.codigo);
+        const id = await source.createEtapa({ cr40f_status: novo }, { projetoId: card.projeto.id, numero: 1, codigo });
+        data.upsertEtapa({ id, projetoId: card.projeto.id, numero: 1, codigo, nome: "", status: novo, prazo: null, andamento: 0, linkPr: "", publicadoProd: null });
+      }
+      setAnnouncement(`${card.projeto.nome} agora em ${labelOf(novo)}.`);
+      if (novo === STATUS.concluida) setFreshId(card.projeto.id);
+    } catch (reason) {
+      toast({ tone: "danger", message: `Não foi possível mover ${card.projeto.codigo}. ${reasonText(reason)}` });
+    } finally {
+      setMovingId("");
+    }
+  }
 
-  const addProject = (event: any) => {
-    event.preventDefault();
-    const project = createProject(title, note, currentUserName);
-    if (!project) { titleRef.current?.focus(); return; }
-    setProjects((list) => [project, ...list]);
-    setTitle("");
-    setNote("");
-    setAnnouncement(`Ideia "${project.title}" adicionada.`);
-    titleRef.current?.focus();
-  };
-
-  const shift = (project: Project, step: 1 | -1) => {
-    const target = PROJECT_STAGES[stageIndex(project.stage) + step]?.id;
-    if (!target) return;
-    setProjects((list) => shiftProject(list, project.id, step));
-    announceStage(project, target);
-  };
-
-  const drop = (stage: ProjectStage) => {
-    const project = projects.find((item) => item.id === dragId);
+  const drop = (status: number) => {
+    const card = cards.find((c) => c.projeto.id === dragId);
     setDragId("");
-    setDropStage("");
-    if (!project || project.stage === stage) return;
-    setProjects((list) => moveProjectTo(list, project.id, stage));
-    announceStage(project, stage);
+    setDropStatus(null);
+    if (card && card.status !== status) void move(card, status);
   };
 
-  const remove = (project: Project) => {
-    setProjects((list) => list.filter((item) => item.id !== project.id));
-    setConfirmId("");
-    setAnnouncement(`Projeto "${project.title}" excluído.`);
+  const onCreated = ({ projeto, etapa, atualizacao, warning }: CreatedProject) => {
+    data.upsert(projeto);
+    data.upsertEtapa(etapa);
+    if (atualizacao) data.addAtualizacao(atualizacao);
+    setDrawerOpen(false);
+    setFreshId(projeto.id);
+    if (warning) toast({ tone: "warning", message: warning });
+    else toast({ tone: "success", message: `Ideia ${projeto.codigo} registrada.` });
   };
+
+  const header = (
+    <PageHeader
+      eyebrow="Software"
+      title="Projetos"
+      description="Ideias de software da anotação à entrega, num quadro só."
+      action={
+        <button className="button button-primary" type="button" onClick={() => setDrawerOpen(true)}>
+          <Plus size={16} /> Nova ideia
+        </button>
+      }
+    />
+  );
 
   return (
     <div className="page-content projects-page">
-      <PageHeader
-        eyebrow="Software"
-        title="Projetos"
-        description="Ideias de software da anotação ao ar, num quadro só."
-        action={
-          <button className="button button-primary" type="button" onClick={() => titleRef.current?.focus()}>
-            <Plus size={16} /> Nova ideia
-          </button>
-        }
-      />
-
-      <section className="projects-pipeline" aria-label="Projetos por etapa">
-        {PROJECT_STAGES.map((stage, index) => {
-          const Icon = STAGE_ICONS[stage.id];
-          const count = byStage[stage.id].length;
-          return (
-            <div key={stage.id} className={`projects-pipeline-step is-${stage.id}`} style={{ "--i": index } as any}>
-              <span className="projects-pipeline-icon"><Icon size={18} /></span>
-              <span className="projects-pipeline-copy">
-                <small>{stage.label}</small>
-                <strong key={count} className="projects-count">{count}</strong>
-              </span>
-              <span className="projects-pipeline-bar" aria-hidden="true">
-                <span style={{ transform: `scaleX(${total ? count / total : 0})` }} />
-              </span>
-            </div>
-          );
-        })}
-      </section>
-
-      <form className="panel projects-composer" onSubmit={addProject}>
-        <label className="projects-field projects-field-title">
-          <span>Nova ideia *</span>
-          <input ref={titleRef} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: painel de pontualidade por cliente" maxLength={120} required />
-        </label>
-        <label className="projects-field">
-          <span>Detalhe</span>
-          <input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Para quem é e que problema resolve" maxLength={280} />
-        </label>
-        <button className="button button-primary projects-add" type="submit" disabled={!title.trim()}>
-          <Plus size={16} /> Adicionar ideia
-        </button>
-      </form>
-      {saveFailed && (
-        <p className="projects-alert" role="alert">Não foi possível guardar neste navegador. Libere o armazenamento local e tente de novo.</p>
+      {header}
+      {data.error && (
+        <Alert tone="danger" action={<Button variant="secondary" size="compact" icon={<RefreshCw size={14} />} onClick={() => void data.reload()}>Tentar de novo</Button>}>
+          Não foi possível carregar os projetos. {data.error} Se o erro falar de permissão, peça o papel Projetos.
+        </Alert>
+      )}
+      {!canMove && data.loaded && (
+        <p className="projects-footnote">Só o Renan muda a situação dos projetos. Você pode registrar novas ideias.</p>
       )}
 
-      <div className="projects-board">
-        {PROJECT_STAGES.map((stage, columnIndex) => {
-          const Icon = STAGE_ICONS[stage.id];
-          const items = byStage[stage.id];
+      <div className="projects-board" aria-busy={!data.loaded}>
+        {BOARD_COLUMNS.map((column, columnIndex) => {
+          const style = COLUMN_STYLE[column.value];
+          const Icon = style.icon;
+          const items = columns.get(column.value) ?? [];
           return (
             <section
-              key={stage.id}
-              className={`projects-column is-${stage.id}${dropStage === stage.id ? " is-drop-target" : ""}`}
+              key={column.value}
+              className={`projects-column is-${style.key}${dropStatus === column.value ? " is-drop-target" : ""}`}
               style={{ "--i": columnIndex } as any}
-              aria-labelledby={`projects-column-${stage.id}`}
-              onDragOver={(event) => { if (!dragId) return; event.preventDefault(); if (dropStage !== stage.id) setDropStage(stage.id); }}
-              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropStage(""); }}
-              onDrop={(event) => { event.preventDefault(); drop(stage.id); }}
+              aria-labelledby={`projects-column-${style.key}`}
+              onDragOver={(event) => { if (!dragId) return; event.preventDefault(); if (dropStatus !== column.value) setDropStatus(column.value); }}
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropStatus(null); }}
+              onDrop={(event) => { event.preventDefault(); drop(column.value); }}
             >
               <header className="projects-column-head">
                 <span className="projects-column-icon"><Icon size={16} /></span>
                 <div>
-                  <h2 id={`projects-column-${stage.id}`}>{stage.label}</h2>
-                  <small>{stage.hint}</small>
+                  <h2 id={`projects-column-${style.key}`}>{column.label}</h2>
+                  <small>{style.hint}</small>
                 </div>
-                <span key={items.length} className="projects-column-count">{items.length}</span>
+                <span key={items.length} className="projects-column-count">{data.loaded ? items.length : "–"}</span>
               </header>
               <div className="projects-column-list">
-                {items.length === 0 && (
-                  <p className="projects-empty">{stage.id === "idea" ? "Anote a primeira ideia acima." : "Arraste um projeto para cá ou use Avançar."}</p>
+                {!data.loaded && <span className="projects-card-skeleton" aria-hidden="true" />}
+                {data.loaded && items.length === 0 && (
+                  <p className="projects-empty">{column.value === STATUS.ideia ? "Registre a primeira ideia em Nova ideia." : canMove ? "Arraste um projeto para cá." : "Nenhum projeto aqui."}</p>
                 )}
-                {items.map((project, index) => {
-                  const position = stageIndex(project.stage);
-                  const previous = PROJECT_STAGES[position - 1];
-                  const next = PROJECT_STAGES[position + 1];
-                  const confirming = confirmId === project.id;
+                {items.map((card, index) => {
+                  const flowIndex = FLOW.indexOf(card.status as (typeof FLOW)[number]);
+                  const previous = flowIndex > 0 ? FLOW[flowIndex - 1] : null;
+                  const next = flowIndex >= 0 && flowIndex < FLOW.length - 1 ? FLOW[flowIndex + 1] : card.status === STATUS.pausada ? STATUS.andamento : null;
+                  const id = card.projeto.id;
                   return (
                     <article
-                      key={project.id}
-                      ref={flipRef(project.id)}
-                      className={`projects-card${dragId === project.id ? " is-dragging" : ""}${launchedId === project.id ? " is-launched" : ""}`}
+                      key={id}
+                      ref={flipRef(id)}
+                      className={`projects-card${dragId === id ? " is-dragging" : ""}${freshId === id ? " is-fresh" : ""}${movingId === id ? " is-moving" : ""}`}
                       style={{ "--i": Math.min(index, 8) } as any}
-                      draggable
-                      onDragStart={(event) => { setDragId(project.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", project.id); }}
-                      onDragEnd={() => { setDragId(""); setDropStage(""); }}
+                      draggable={canMove && !movingId}
+                      aria-busy={movingId === id}
+                      onDragStart={(event) => { setDragId(id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", id); }}
+                      onDragEnd={() => { setDragId(""); setDropStatus(null); }}
                     >
-                      <h3>{project.title}</h3>
-                      {project.note && <p>{project.note}</p>}
-                      <div className="projects-progress" role="img" aria-label={`Etapa ${position + 1} de ${PROJECT_STAGES.length}: ${stage.label}`}>
-                        {PROJECT_STAGES.map((item, step) => (
-                          <span key={item.id} className={step <= position ? "is-done" : ""} />
-                        ))}
-                      </div>
+                      <span className="projects-card-code">{card.projeto.codigo || "Novo"}</span>
+                      <h3>{card.projeto.nome}</h3>
+                      {card.projeto.briefing && <p>{card.projeto.briefing}</p>}
+                      {card.etapa?.nome && <p className="projects-card-next"><strong>Falta:</strong> {card.etapa.nome}</p>}
+                      {flowIndex >= 0 && (
+                        <div className="projects-progress" role="img" aria-label={`Etapa ${flowIndex + 1} de ${FLOW.length}: ${column.label}`}>
+                          {FLOW.map((step, i) => <span key={step} className={i <= flowIndex ? "is-done" : ""} />)}
+                        </div>
+                      )}
                       <footer className="projects-card-foot">
-                        <small>
-                          {project.author ? `${project.author.split(" ")[0]} · ` : ""}
-                          {DATE_FORMATTER.format(new Date(project.createdAt))}
-                        </small>
-                        {confirming ? (
-                          <span className="projects-card-actions">
-                            <button className="projects-icon-button" type="button" onClick={() => setConfirmId("")} aria-label="Manter projeto" title="Manter"><X size={15} /></button>
-                            <button className="projects-chip-button is-danger" type="button" onClick={() => remove(project)}><Check size={14} /> Excluir</button>
-                          </span>
-                        ) : (
-                          <span className="projects-card-actions">
-                            <button className="projects-icon-button" type="button" onClick={() => setConfirmId(project.id)} aria-label={`Excluir ${project.title}`} title="Excluir"><Trash2 size={15} /></button>
-                            {previous && (
-                              <button className="projects-icon-button" type="button" onClick={() => shift(project, -1)} aria-label={`Voltar ${project.title} para ${previous.label}`} title={`Voltar para ${previous.label}`}><ChevronLeft size={15} /></button>
-                            )}
-                            {next ? (
-                              <button className="projects-chip-button" type="button" onClick={() => shift(project, 1)} aria-label={`Avançar ${project.title} para ${next.label}`}>
-                                {next.label} <ArrowRight size={14} />
-                              </button>
-                            ) : (
-                              <span className="projects-live-tag"><Rocket size={13} /> No ar</span>
-                            )}
-                          </span>
-                        )}
+                        <AttachmentCounts card={card} />
+                        <span className="projects-card-actions">
+                          <a className="projects-icon-button" href={hrefFor("projetos", { projeto: id })} aria-label={`Abrir ${card.projeto.nome} em Projetos`} title="Abrir no módulo Projetos"><ExternalLink size={15} /></a>
+                          {canMove && previous != null && (
+                            <button className="projects-icon-button" type="button" disabled={Boolean(movingId)} onClick={() => void move(card, previous)} aria-label={`Voltar ${card.projeto.nome} para ${labelOf(previous)}`} title={`Voltar para ${labelOf(previous)}`}><ChevronLeft size={15} /></button>
+                          )}
+                          {canMove && next != null && (
+                            <button className="projects-chip-button" type="button" disabled={Boolean(movingId)} onClick={() => void move(card, next)} aria-label={`Mover ${card.projeto.nome} para ${labelOf(next)}`}>
+                              {labelOf(next)} <ArrowRight size={14} />
+                            </button>
+                          )}
+                        </span>
                       </footer>
                     </article>
                   );
@@ -249,10 +238,12 @@ export default function ProjectsView({ currentUserName = "" }: { currentUserName
         })}
       </div>
 
-      {total === 0 && (
-        <p className="projects-footnote"><FolderKanban size={14} /> Os projetos ficam guardados neste navegador.</p>
-      )}
+      <NewProjectDrawer open={drawerOpen} source={source} perfil={perfil} onClose={() => setDrawerOpen(false)} onCreated={onCreated} />
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>
   );
+}
+
+export default function ProjectsView({ host }: { host?: Host }) {
+  return <ToastProvider><Board host={host} /></ToastProvider>;
 }
