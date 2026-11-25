@@ -31,14 +31,6 @@ describe('queries de documentos', () => {
     })
   })
 
-  it('documento de veículo leva a unidade Frota quando há id', () => {
-    const novo = { categoria: 'frota' as const, donoId: 'v1', tipoId: 't1', nome: 'CRLV', numero: '', emissao: null, validade: null, pasta: 'x', observacao: '' }
-    const unidade = '00000000-0000-0000-0000-000000000002'
-    expect(docPayload(novo, SETS, unidade)['owningbusinessunit@odata.bind']).toBe(`/businessunits(${unidade})`)
-    expect(docPayload(novo, SETS)).not.toHaveProperty('owningbusinessunit@odata.bind')
-    expect(docPayload({ ...novo, categoria: 'pessoas' }, SETS, unidade)).not.toHaveProperty('owningbusinessunit@odata.bind')
-  })
-
   it('payload do tipo', () => {
     expect(tipoPayload({ codigo: 'cnh ', nome: 'CNH', categoria: 'pessoas', temValidade: true, validadePadraoMeses: null, obrigatorioPara: [100000001, 100000000], ordem: 1 }))
       .toEqual({ cr40f_codigo: 'CNH', cr40f_name: 'CNH', cr40f_categoria: 100000000, cr40f_temvalidade: true, cr40f_validadepadraomeses: null, cr40f_obrigatoriopara: '100000000,100000001', cr40f_ordem: 1 })

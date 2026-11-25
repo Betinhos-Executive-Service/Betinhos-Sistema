@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs'
+
 // Corte da unidade Frota (plano 4, tarefa 15): liga a propriedade entre unidades, cria a unidade "Frota"
 // (filha da raiz, lida por nome), põe nela os documentos de veículo e passa quem tem papel Frota para a cópia.
 // Nada de GUID ou nome real no código: tudo é lido do ambiente.
 
 export const UNIDADE = 'Frota'
-export const PAPEIS_FROTA = ['Perfil - Frota Operador', 'Perfil - Frota Gestor']
+// Nomes lidos do mapa gerado (perfis.gerado.json): nada de nome escrito à mão aqui.
+export const PAPEIS_FROTA = Object.keys(JSON.parse(readFileSync(new URL('./perfis.gerado.json', import.meta.url), 'utf8')).papeis)
+  .filter((n) => n.startsWith('Perfil - Frota - ')).sort()
 const CHAVE = 'EnableOwnershipAcrossBusinessUnits'
 
 export const recursoLigado = (xml) => new RegExp(`<${CHAVE}>true<`, 'i').test(xml ?? '')
@@ -30,6 +34,7 @@ export async function lerDatasNulas(dv) {
 
 export async function lerUnidade(dv) {
   const org = (await dv.todos('organizations?$select=organizationid,orgdborgsettings'))[0]
+  const recurso = recursoLigado(org.orgdborgsettings)
   const bus = await dv.todos('businessunits?$select=businessunitid,name,_parentbusinessunitid_value,isdisabled')
   const raizes = bus.filter((b) => !b._parentbusinessunitid_value)
   if (raizes.length !== 1) throw new Error(`Unidade raiz não encontrada (${raizes.length}).`)
@@ -43,14 +48,18 @@ export async function lerUnidade(dv) {
     if (r._businessunitid_value === raiz) raizPorNome[r.name] = r.roleid
     else if (frota && r._businessunitid_value === frota && r._parentrootroleid_value) copiaPorRaiz[r._parentrootroleid_value] = r.roleid
   }
+  const faltam = PAPEIS_FROTA.filter((n) => !raizPorNome[n])
+  if (faltam.length) throw new Error(`Papel(is) raiz da Frota ausente(s) no ambiente: ${faltam.join(', ')}; rode o Deploy dos perfis antes do corte.`)
   const ids = new Set([...Object.values(raizPorNome), ...Object.values(copiaPorRaiz)])
   const atribuicoes = (await dv.ligacao('systemuserroles', 'systemuserid,roleid'))
     .filter((l) => ids.has(l.roleid)).map((l) => ({ usuario: l.systemuserid, papel: l.roleid }))
   const documentos = (await dv.todos(`cr40f_documentos?$select=cr40f_documentoid,_owningbusinessunit_value&$filter=${encodeURIComponent('_cr40f_veiculo_value ne null and _cr40f_funcionario_value eq null')}`))
     .map((d) => ({ id: d.cr40f_documentoid, unidade: d._owningbusinessunit_value }))
   return {
-    org: { id: org.organizationid, xml: org.orgdborgsettings }, recurso: recursoLigado(org.orgdborgsettings), raiz, frota,
-    raizPorNome, copiaPorRaiz, atribuicoes, documentos, datasNulas: await lerDatasNulas(dv),
+    org: { id: org.organizationid, xml: org.orgdborgsettings }, recurso, raiz, frota,
+    raizPorNome, copiaPorRaiz, atribuicoes, documentos,
+    // Com o recurso já ligado a varredura não importa (a trava só vale antes de ligar).
+    datasNulas: recurso ? [] : await lerDatasNulas(dv),
   }
 }
 
@@ -61,7 +70,7 @@ export function planoDaUnidade(u) {
     criarUnidade: !u.frota,
     documentos: u.documentos.filter((d) => !u.frota || d.unidade !== u.frota).map((d) => d.id).sort(),
     trocas: u.atribuicoes.filter((a) => raizes.has(a.papel)).sort((a, b) => a.usuario.localeCompare(b.usuario) || a.papel.localeCompare(b.papel)),
-    travas: [...u.datasNulas],
+    travas: u.recurso ? [] : [...u.datasNulas],
   }
 }
 

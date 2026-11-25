@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { PAPEIS_FROTA, UNIDADE, aplicarUnidade, mesmaUnidade, resumoUnidade, lerUnidade, planoDaUnidade, planoDesfazerUnidade, recursoLigado, unidadeVazia } from './corte-unidade.mjs'
@@ -74,7 +75,8 @@ test('lerUnidade monta o estado pela Web API', async () => {
     'organizations': { value: [{ organizationid: ORG, orgdborgsettings: XML(true) }] },
     'businessunits': { value: [{ businessunitid: RAIZ, name: 'org', _parentbusinessunitid_value: null, isdisabled: false },
       { businessunitid: FROTA, name: 'frota', _parentbusinessunitid_value: RAIZ, isdisabled: false }] },
-    'roles': { value: [{ roleid: R_GE, name: PAPEIS_FROTA[1], _businessunitid_value: RAIZ, _parentrootroleid_value: R_GE },
+    'roles': { value: [{ roleid: R_OP, name: PAPEIS_FROTA[0], _businessunitid_value: RAIZ, _parentrootroleid_value: null },
+      { roleid: R_GE, name: PAPEIS_FROTA[1], _businessunitid_value: RAIZ, _parentrootroleid_value: R_GE },
       { roleid: C_GE, name: PAPEIS_FROTA[1], _businessunitid_value: FROTA, _parentrootroleid_value: R_GE }] },
     'cr40f_documentos': { value: [{ cr40f_documentoid: ID(40), _owningbusinessunit_value: FROTA }] },
     'EntityDefinitions': { value: [] },
@@ -113,4 +115,38 @@ test('mesmaUnidade compara a foto com o plano de agora', () => {
   assert.equal(mesmaUnidade({ unidade: { ...foto.unidade, existia: true } }, plano), false)
   assert.equal(mesmaUnidade({}, plano), false)
   assert.match(resumoUnidade(plano), /Documentos de veículo a mover: 1/)
+})
+
+test('PAPEIS_FROTA bate com os perfis Frota do mapa gerado', () => {
+  const gerado = Object.keys(JSON.parse(readFileSync(new URL('./perfis.gerado.json', import.meta.url), 'utf8')).papeis).filter((n) => n.startsWith('Perfil - Frota - ')).sort()
+  assert.equal(PAPEIS_FROTA.length, 2)
+  assert.deepEqual([...PAPEIS_FROTA], gerado)
+})
+
+test('papel raiz ausente no ambiente falha com erro claro', async () => {
+  const dv = falso({
+    'organizations': { value: [{ organizationid: ORG, orgdborgsettings: XML(true) }] },
+    'businessunits': { value: [{ businessunitid: RAIZ, name: 'org', _parentbusinessunitid_value: null, isdisabled: false }] },
+    'roles': { value: [{ roleid: R_GE, name: PAPEIS_FROTA[1], _businessunitid_value: RAIZ, _parentrootroleid_value: null }] },
+  })
+  await assert.rejects(() => lerUnidade(dv), /raiz da Frota ausente/)
+})
+
+test('trava de datas nulas só vale com o recurso desligado (e a varredura nem roda ligado)', async () => {
+  const montar = (ligado) => {
+    const dv = falso({
+      'organizations': { value: [{ organizationid: ORG, orgdborgsettings: XML(ligado) }] },
+      'businessunits': { value: [{ businessunitid: RAIZ, name: 'org', _parentbusinessunitid_value: null, isdisabled: false }] },
+      'roles': { value: [{ roleid: R_OP, name: PAPEIS_FROTA[0], _businessunitid_value: RAIZ, _parentrootroleid_value: null },
+        { roleid: R_GE, name: PAPEIS_FROTA[1], _businessunitid_value: RAIZ, _parentrootroleid_value: null }] },
+      'EntityDefinitions?': { value: [{ LogicalName: 'cr40f_x', IsCustomEntity: true, Attributes: [{ LogicalName: 'cr40f_data', AttributeType: 'DateTime', IsCustomAttribute: true }] }] },
+      "EntityDefinitions(LogicalName='cr40f_x')": { value: [{ LogicalName: 'cr40f_data', IsCustomAttribute: true, DateTimeBehavior: null }] },
+    })
+    return dv
+  }
+  const desligado = planoDaUnidade(await lerUnidade(montar(false)))
+  assert.deepEqual(desligado.travas, ['cr40f_x.cr40f_data'])
+  const ligado = planoDaUnidade(await lerUnidade(montar(true)))
+  assert.deepEqual(ligado.travas, [])
+  assert.equal(planoDaUnidade({ ...estado({ recurso: true }), datasNulas: ['cr40f_x.cr40f_data'] }).travas.length, 0)
 })

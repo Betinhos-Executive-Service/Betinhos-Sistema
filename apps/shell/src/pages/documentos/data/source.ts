@@ -166,12 +166,6 @@ export function createDocsSource(host: Host): DocsSource {
   let cache: DocsData | null = null
 
   let sets: Promise<EntitySets> | null = null
-  // Unidade Frota (existe depois do corte): o documento de veículo já nasce nela; sem unidade ou sem leitura, o plugin cobre.
-  let unidadeFrota: Promise<string> | null = null
-  const lerUnidadeFrota = () => (unidadeFrota ??= host.client
-    .getAll("businessunits?$select=businessunitid,_parentbusinessunitid_value&$filter=name eq 'Frota' and isdisabled eq false")
-    .then((linhas) => String(linhas.find((l) => l._parentbusinessunitid_value)?.businessunitid ?? ''))
-    .catch(() => ''))
   // Quem só tem Frota não lê a tabela de RH dos destinatários de aviso: lista vazia, a ficha do veículo abre.
   const semPermissao = <T,>(p: Promise<T[]>) => p.catch((e: unknown) => { if (e instanceof DataverseError && e.status === 403) return [] as T[]; throw e })
 
@@ -217,7 +211,7 @@ export function createDocsSource(host: Host): DocsSource {
       const s = await entitySets()
       return comAviso(salvarDocumento({
         envLabel,
-        criar: async (novo) => cleanId(await host.client.create(s.documento, docPayload(novo, s, novo.categoria === 'frota' ? await lerUnidadeFrota() : undefined))),
+        criar: async (novo) => cleanId(await host.client.create(s.documento, docPayload(novo, s))),
         enviar,
         substituir: (id) => host.client.update(s.documento, id, { cr40f_situacao: SITUACAO_CODE.substituido } as Row),
         dualWrite,

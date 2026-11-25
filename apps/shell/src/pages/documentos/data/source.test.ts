@@ -152,17 +152,6 @@ describe('createDocsSource (Dataverse)', () => {
     await expect(createDocsSource(host).carregar()).rejects.toThrow('falhou')
   })
 
-  it('documento de veículo nasce na unidade Frota quando ela existe; sem leitura da unidade, sem vínculo', async () => {
-    const { host, getAll, create } = hostFalso({})
-    const salvar = () => createDocsSource(host).salvarDocumento({ tipo: TIPO('CRLV', { categoria: 'frota' }), dono: { ...ANA, id: 'v1', categoria: 'frota' }, anterior: null, numero: '', emissao: null, validade: null, observacao: '', arquivos: [] })
-    getAll.mockImplementation(async (path: string) => (path.startsWith('businessunits') ? [{ businessunitid: 'fro-1', _parentbusinessunitid_value: 'raiz' }] : []))
-    await salvar()
-    expect(create.mock.calls.at(-1)?.[1]).toMatchObject({ 'owningbusinessunit@odata.bind': '/businessunits(fro-1)' })
-    getAll.mockImplementation(async (path: string) => { if (path.startsWith('businessunits')) throw new DataverseError('negado', 403); return [] })
-    await salvar()
-    expect(create.mock.calls.at(-1)?.[1]).not.toHaveProperty('owningbusinessunit@odata.bind')
-  })
-
   it('avisa o menu (documentos:alterados) depois de salvar documento e tipo', async () => {
     const { host, dispatchEvent } = hostFalso({ cr40f_validadedacnh: 'DateOnly' })
     const source = createDocsSource(host)
