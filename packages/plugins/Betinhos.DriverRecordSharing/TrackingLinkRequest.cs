@@ -20,6 +20,7 @@ namespace Betinhos.DriverRecordSharing
             public string VehicleBrand { get; set; }
             public string VehicleColor { get; set; }
             public bool VehicleHasInfleet { get; set; }
+            public int? Status { get; set; }
         }
 
         public sealed class Result
@@ -27,20 +28,24 @@ namespace Betinhos.DriverRecordSharing
             public Result(string error, Dictionary<string, object> payload) { Error = error; Payload = payload; }
             public string Error { get; }
             public Dictionary<string, object> Payload { get; }
+            public int? Status { get; set; }
         }
 
         public static Result Build(Input input, DateTime nowUtc)
         {
-            if (input.IsThirdParty) return Fail("Motorista terceiro sem rastreador.");
-            if (string.IsNullOrWhiteSpace(input.VehiclePlate)) return Fail("Motorista sem carro atual.");
-            if (!input.VehicleHasInfleet) return Fail("Carro sem rastreador na Infleet.");
+            if (!StatusAllowsLink(input.Status)) return Fail("Serviço solicitado ou cancelado não tem link de acompanhamento.");
             if (string.IsNullOrWhiteSpace(input.DepartureAddress)) return Fail("Serviço sem endereço de embarque.");
+
+            // Sem motorista, sem carro, terceiro ou carro fora da Infleet: o link sai igual, sem mapa (o Worker não consulta a Infleet).
+            var plate = string.IsNullOrWhiteSpace(input.VehiclePlate) ? null : ServiceVehicleResolver.NormalizePlate(input.VehiclePlate);
+            var tracked = plate != null && !input.IsThirdParty && input.VehicleHasInfleet;
 
             var departure = input.DepartureUtc ?? nowUtc;
             var hours = Math.Max(0.5, Math.Min(336.0, Math.Round((departure.AddHours(4) - nowUtc).TotalHours, 1)));
             var payload = new Dictionary<string, object>
             {
-                ["placa"] = ServiceVehicleResolver.NormalizePlate(input.VehiclePlate),
+                ["placa"] = plate,
+                ["rastreio"] = tracked,
                 ["embarque"] = input.DepartureAddress.Trim(),
                 ["destinoFinal"] = string.IsNullOrWhiteSpace(input.DestinationAddress) ? null : input.DestinationAddress.Trim(),
                 ["trajeto"] = string.IsNullOrWhiteSpace(input.Route) ? null : input.Route.Trim(),
@@ -52,6 +57,14 @@ namespace Betinhos.DriverRecordSharing
                 ["validadeHoras"] = hours
             };
             return new Result(null, payload);
+        }
+
+        // Solicitado ainda não é serviço da Betinhos; Cancelado e Cancelado com Ressalvas revogam o link (RevokeTrackingLinkPlugin).
+        public static bool StatusAllowsLink(int? status)
+        {
+            return status != PluginConfig.ServiceStatusRequested
+                && status != PluginConfig.ServiceStatusCanceled
+                && status != PluginConfig.ServiceStatusCanceledWithReservations;
         }
 
         private static Result Fail(string error) => new Result(error, null);

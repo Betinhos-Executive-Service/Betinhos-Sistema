@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { describe, expect, it, vi } from 'vitest'
 import { MOCK_ROW_COUNT } from './data/mock'
 import { GeralPage } from './GeralPage'
-import { colFilter, columnMenu, dataRows, FakeObserver, hooks, openColumnFilter, usarAmbienteGeral, viewTrigger } from './testUtils'
+import { colFilter, columnMenu, dataRows, FakeObserver, hooks, openColumnFilter, PAGE1 as PAGE1_CURTA, TEST_PAGE_SIZE, usarAmbienteGeral, viewTrigger } from './testUtils'
 
 // Este arquivo testa a página cheia e a rolagem (100, 200, 220): usa o tamanho real da página.
 vi.mock('./data/source', async (importOriginal) => (await import('./testUtils')).mockSource(await importOriginal<typeof import('./data/source')>(), { pageSize: 100 }))
@@ -11,10 +11,16 @@ usarAmbienteGeral()
 
 const PAGE1 = new RegExp(`^100 de ${MOCK_ROW_COUNT} serviços$`)
 
+/** Barra de comandos e filtros não dependem do número de linhas: 20 em vez de 100 corta a renderização e as consultas. */
+async function renderCurta() {
+  hooks.pageSize = TEST_PAGE_SIZE
+  render(<GeralPage host={{ mode: 'mock' }} />)
+  await screen.findAllByText(PAGE1_CURTA)
+}
+
 describe('Geral: espaço e densidade', () => {
   it('sem seleção a linha de comando tem só busca, Atualizar, Mais ações e Criar serviço (a primária, por último)', async () => {
-    render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findAllByText(PAGE1)
+    await renderCurta()
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
     expect(toolbar.classList.contains('is-selecting')).toBe(false)
     for (const name of ['Editar', 'Desativar', 'Ativar', 'Limpar seleção']) expect(within(toolbar).queryByRole('button', { name })).toBeNull()
@@ -27,8 +33,7 @@ describe('Geral: espaço e densidade', () => {
   })
 
   it('com 1 selecionado o contador com ✕ e as ações entram antes da busca; visão, Colunas, Filtros, Auditoria, busca, ⋮, Atualizar e a primária ficam', async () => {
-    render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findAllByText(PAGE1)
+    await renderCurta()
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
     const fixos = () => within(toolbar).getAllByRole('button').map((b) => (b.getAttribute('aria-label') ?? b.textContent)?.replace(/^Mais ações.*/, 'Mais ações')).filter((name) => ['Colunas', 'Filtros', 'Auditoria', 'Mais ações', 'Atualizar', 'Criar serviço'].includes(name ?? ''))
     const antes = fixos()
@@ -58,6 +63,7 @@ describe('Geral: espaço e densidade', () => {
   })
 
   it('cada título de coluna tem o rótulo completo em title (o texto pode ser cortado)', async () => {
+    hooks.pageSize = TEST_PAGE_SIZE
     render(<GeralPage host={{ mode: 'mock' }} />)
     const header = await screen.findByRole('columnheader', { name: /Status de faturamento/, hidden: true })
     expect(header.getAttribute('title')).toBe('Status de faturamento')
@@ -147,8 +153,7 @@ describe('Geral: espaço e densidade', () => {
   }, 90_000)
 
   it('no desktop todos os comandos da lista têm o tamanho padrão do DS (40 px), igual a Colunas e Filtros', async () => {
-    render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findAllByText(PAGE1)
+    await renderCurta()
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
     const search = within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')
     expect(search?.classList.contains('bt-control--compact')).toBe(false)
@@ -165,6 +170,7 @@ describe('Geral: espaço e densidade', () => {
 
   it('no celular a barra usa tamanho de toque (44 px), nunca o compacto de 32 px', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    hooks.pageSize = TEST_PAGE_SIZE
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByRole('listitem')
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
@@ -189,8 +195,7 @@ describe('Geral: espaço e densidade', () => {
     const filtersButton = () => within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Filtros/ })
 
     it('o menu da coluna abre e ordena', async () => {
-      render(<GeralPage host={{ mode: 'mock' }} />)
-      await screen.findAllByText(PAGE1)
+      await renderCurta()
       fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
       expect((await screen.findAllByRole('menuitem', { hidden: true })).map((item) => item.textContent)).toEqual(['Ordenar A→Z', 'Ordenar Z→A', 'Filtrar por…', 'Ocultar coluna'])
       fireEvent.click(screen.getByRole('menuitem', { name: 'Ordenar Z→A', hidden: true }))
@@ -198,8 +203,7 @@ describe('Geral: espaço e densidade', () => {
     }, 60_000)
 
     it('filtrar Status por Confirmado no painel da coluna reduz as linhas e conta no botão; Limpar filtro da coluna restaura', async () => {
-      render(<GeralPage host={{ mode: 'mock' }} />)
-      await screen.findAllByText(PAGE1)
+      await renderCurta()
       const panel = await openColumnFilter(/^Status de Operação$/, 'Status de Operação')
       expect(within(panel).getByRole('combobox', { name: 'Operador', hidden: true }).textContent).toContain('é um de')
       expect(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }).hasAttribute('disabled')).toBe(true)
@@ -207,20 +211,19 @@ describe('Geral: espaço e densidade', () => {
       fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
       fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
       await waitFor(() => expect(colFilter()).toBeNull())
-      await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
+      await waitFor(() => expect(screen.queryAllByText(PAGE1_CURTA)).toHaveLength(0))
       expect(filtersButton().textContent).toContain('1')
       noChips()
       expect(viewTrigger().textContent).toContain('Alterada')
       fireEvent.click(screen.getByRole('button', { name: /^Status de Operação$/, hidden: true }))
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Limpar filtro', hidden: true }))
-      await screen.findAllByText(PAGE1)
+      await screen.findAllByText(PAGE1_CURTA)
       expect(filtersButton().textContent).not.toContain('1')
       expect(viewTrigger().textContent).not.toContain('Alterada')
     }, 60_000)
 
     it('Filtrar por… abre o painel com operador e valor; Aplicar grava, reabrir mostra o filtro ativo, Limpar tira', async () => {
-      render(<GeralPage host={{ mode: 'mock' }} />)
-      await screen.findAllByText(PAGE1)
+      await renderCurta()
       let panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
       expect(within(panel).queryByRole('status', { hidden: true })).toBeNull()
       expect(within(panel).getByRole('button', { name: 'Limpar', hidden: true }).hasAttribute('disabled')).toBe(true)
@@ -251,8 +254,7 @@ describe('Geral: espaço e densidade', () => {
     }, 60_000)
 
     it('o painel Filtros aplica uma condição, conta no botão e o Limpar do painel tira tudo', async () => {
-      render(<GeralPage host={{ mode: 'mock' }} />)
-      await screen.findAllByText(PAGE1)
+      await renderCurta()
       fireEvent.click(screen.getByRole('button', { name: 'Filtros' }))
       const panel = await screen.findByRole('dialog', { name: 'Filtros' })
       // A condição de estado da visão (`statecode`) não é campo de filtro: aparece só leitura, sem ×.
@@ -269,13 +271,12 @@ describe('Geral: espaço e densidade', () => {
       const again = await screen.findByRole('dialog', { name: 'Filtros' })
       fireEvent.click(within(again).getByRole('button', { name: 'Limpar' }))
       fireEvent.click(within(again).getByRole('button', { name: /^Mostrar/ }))
-      await screen.findAllByText(PAGE1)
+      await screen.findAllByText(PAGE1_CURTA)
       expect(filtersButton().textContent).not.toContain('1')
     }, 60_000)
 
     it('fechar o painel com rascunho pede confirmação', async () => {
-      render(<GeralPage host={{ mode: 'mock' }} />)
-      await screen.findAllByText(PAGE1)
+      await renderCurta()
       fireEvent.click(screen.getByRole('button', { name: 'Filtros' }))
       const panel = await screen.findByRole('dialog', { name: 'Filtros' })
       fireEvent.click(within(panel).getByRole('button', { name: '+ Adicionar filtro' }))
@@ -292,6 +293,7 @@ describe('Geral: espaço e densidade', () => {
 
     it('no celular o botão Filtros tem tamanho de toque e o painel aplica um filtro de coluna', async () => {
       vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+      hooks.pageSize = TEST_PAGE_SIZE
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByRole('listitem')
       const button = within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: 'Filtros' })

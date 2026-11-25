@@ -8,6 +8,7 @@ import {
   capacidadeVeiculo, erroPassageiro, errosPassageiros, normalizarPedido, rotuloVeiculo, validarPedido, type ErrosPedido,
 } from '../domain/pedidos'
 import { atalhosDeData, diaSemanaDataHora } from '../domain/formato'
+import { textoAntecedencia, type Prazos } from '../domain/prazos'
 import { deLocalSaoPaulo, paraLocalSaoPaulo } from '../domain/regras'
 import type { NovoPedido, PassageiroPedido, Pedido } from '../domain/types'
 import { EnderecoCampo } from './EnderecoCampo'
@@ -40,11 +41,12 @@ function iniciais(nome: string): string {
   return ((partes[0][0] ?? '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase()
 }
 
-type Props = { onPedido: () => void; modelo?: Pedido | null; onRepetirAnterior?: () => void }
+type Props = { prazos: Prazos; onPedido: () => void; modelo?: Pedido | null; onRepetirAnterior?: () => void }
 
-export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
+export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
   const api = useApi()
   const toast = useToast()
+  const antecedencia = textoAntecedencia(prazos)
   const [passo, setPasso] = useState<Passo>(1)
   const [passageiros, setPassageiros] = useState<PassageiroPedido[]>(() => (modelo?.pessoas ?? []).map((p) => ({ ...p })))
   const [origem, setOrigem] = useState(modelo?.origem ?? '')
@@ -212,7 +214,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
       return true
     }
     if (n === 2) {
-      const { passageiros: _ignorado, ...so2 } = validarPedido(montar(), Date.now())
+      const { passageiros: _ignorado, ...so2 } = validarPedido(montar(), Date.now(), prazos)
       // Substitui os erros do passo 2 (campo corrigido some); o de passageiros é do passo 1.
       setErros((e) => ({ passageiros: e.passageiros, ...so2 }))
       if (Object.values(so2).some(Boolean)) { focarErro(); return false }
@@ -226,7 +228,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
 
   async function enviar() {
     const pedido = montar()
-    const todos = validarPedido(pedido, Date.now())
+    const todos = validarPedido(pedido, Date.now(), prazos)
     if (Object.keys(todos).length) {
       // A hora pode ter vencido enquanto o cliente conferia.
       setErros(todos)
@@ -404,6 +406,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                     <Input type="time" value={hora} onChange={(e) => { setHora(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
                   </Field>
                 </div>
+                {antecedencia && !erros.saida && <p className="pc-pp__dica" id="pc-pp-antecedencia">{antecedencia}</p>}
                 {erros.saida && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erros.saida}</p>}
               </Bloco>
 

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { screen, waitFor } from '@testing-library/react'
+import * as React from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 // O test-setup troca `label.control` e `labels` do jsdom por versões rápidas: estas são as regras do HTML que elas mantêm.
@@ -46,5 +48,29 @@ describe('setTimeout (test-setup)', () => {
     clearTimeout(setTimeout(() => vistos.push('cancelado'), 0))
     await new Promise((resolve) => setTimeout(resolve, 5))
     expect(vistos).toEqual(['disparou'])
+  })
+})
+
+// Atalhos de desempenho do test-setup: o que as consultas e as mensagens de falha precisam continua igual.
+describe('atalhos de desempenho (test-setup)', () => {
+  it('getComputedStyle mantém display e visibility (com herança) e as demais propriedades', () => {
+    document.body.innerHTML = '<div style="visibility:hidden"><span id="s" style="display:none;color:red">x</span></div><p id="p" hidden>y</p>'
+    const estilo = getComputedStyle($('#s'))
+    expect([estilo.display, estilo.visibility, estilo.getPropertyValue('display'), estilo.color]).toEqual(['none', 'hidden', 'none', 'rgb(255, 0, 0)'])
+    expect(getComputedStyle($('#p')).display).toBe('none')
+  })
+
+  it('o estouro do waitFor com elementos repetidos ainda lista cada um', async () => {
+    document.body.innerHTML = '<button id="um">Ok</button><button id="dois">Ok</button>'
+    const erro = await waitFor(() => screen.getByRole('button', { name: 'Ok' }), { timeout: 50 }).catch((e: Error) => e.message)
+    const lista = String(erro).split('Here are the matching elements:')[1]?.split('(If this is intentional')[0]
+    expect(lista).toContain('um')
+    expect(lista).toContain('dois')
+  })
+
+  // O atalho do owner stack é ignorado em silêncio se o React renomear o interno: aqui a atualização aparece.
+  it('a cota de owner stacks do React fica esgotada', () => {
+    const interno = (React as unknown as { __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE?: { recentlyCreatedOwnerStacks?: number } }).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE
+    expect(interno?.recentlyCreatedOwnerStacks).toBe(Number.MAX_SAFE_INTEGER)
   })
 })

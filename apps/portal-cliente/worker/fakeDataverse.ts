@@ -75,6 +75,10 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = '')
     const exigeAtivo = filtro.includes('cr40f_ativo eq true')
     const exigePortal = filtro.includes('cr40f_portalhabilitado eq true')
     const exigeModulos = filtro.includes('cr40f_portalmodulos ne null')
+    if (filtro.includes('cr40f_aprovador eq true')) {
+      const cliente = guids(filtro)[0]
+      return linhas.filter((v) => v._cr40f_cliente_value === cliente && v.cr40f_ativo && v.cr40f_aprovador === true)
+    }
     return linhas
       .filter((v) => (!exigeAtivo || v.cr40f_ativo) && (!email || v.cr40f_email === email))
       .filter((v) => !exigePortal || clienteDe(banco, v._cr40f_cliente_value)?.cr40f_portalhabilitado === true)
@@ -84,9 +88,21 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = '')
     const dominio = /contains\(cr40f_portaldominios,'([^']*)'\)/.exec(filtro)?.[1] ?? ''
     return linhas.filter((c) => c.cr40f_portalhabilitado && String(c.cr40f_portaldominios ?? '').includes(dominio))
   }
+  if (tabela === 'reservadeveculoses' && (filtro.includes('cr40f_portalaprovacao') || filtro.includes('cr40f_status eq 202410001'))) {
+    // Aprovação (pendentes, por id) e avisos (confirmados): o filtro nomeia o que importa.
+    const cliente = /_cr40f_cliente_value eq ([0-9a-f-]{36})/.exec(filtro)?.[1]
+    const rid = /cr40f_reservadeveculosid eq ([0-9a-f-]{36})/.exec(filtro)?.[1]
+    return linhas.filter((r) => (!cliente || r._cr40f_cliente_value === cliente) && (!rid || r.cr40f_reservadeveculosid === rid)
+      && (!filtro.includes('cr40f_portalaprovacao eq 100000000') || (r.cr40f_portalaprovacao === 100000000 && r.cr40f_status === 202410004))
+      && (!filtro.includes('cr40f_portalaprovacao ne null') || r.cr40f_portalaprovacao != null)
+      && (!filtro.includes('cr40f_status eq 202410001') || (r.cr40f_status === 202410001 && !!r._cr40f_portalusuario_value)))
+  }
   if (tabela === 'reservadeveculoses') {
     const [usuario, cliente, id] = guids(filtro)
-    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
+    const passageiro = /\/any\(.*cr40f_email eq '([^']*)'/.exec(filtro)?.[1]
+    const ehPassageiro = (r: Registro) => passageiro !== undefined && banco.servicosporpassageiros.some((v) => v._cr40f_geral_value === r.cr40f_reservadeveculosid
+      && String(banco.bancodedadoses.find((p) => p.cr40f_bancodedadosid === v._cr40f_bancodedados_value)?.cr40f_email ?? '').toLowerCase() === passageiro.toLowerCase())
+    return linhas.filter((r) => (r._cr40f_portalusuario_value === usuario || ehPassageiro(r)) && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
   }
   if (tabela === 'bancodedadoses') {
     const [cliente, id] = guids(filtro)
@@ -112,8 +128,8 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = '')
 }
 
 /** `fetch` falso. `emails` recebe o que iria para o flow. */
-/** `falhas.vinculo` e `falhas.apagar` simulam o Dataverse recusando o vínculo da pessoa e o DELETE da reserva. */
-export type Falhas = { vinculo?: boolean; apagar?: boolean }
+/** `falhas.vinculo` e `falhas.apagar` simulam o Dataverse recusando o vínculo da pessoa e o DELETE da reserva; `exigeAprovacao`, a leitura dessa coluna do cliente com 503; `email`, o flow de e-mails fora do ar. */
+export type Falhas = { vinculo?: boolean; apagar?: boolean; exigeAprovacao?: boolean; email?: boolean }
 
 export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): typeof fetch {
   return async (entrada, init) => {
@@ -121,12 +137,18 @@ export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): 
     const metodo = init?.method ?? 'GET'
     const corpo = init?.body ? JSON.parse(String(init.body).startsWith('{') ? String(init.body) : '{}') : {}
     if (url.startsWith('https://login.microsoftonline.com/')) return Response.json({ access_token: 'tk', expires_in: 3600 })
-    if (url === FLOW_URL) return emails.push(corpo), new Response(null, { status: 202 })
+    if (url === FLOW_URL) return falhas.email ? new Response(null, { status: 502 }) : (emails.push(corpo), new Response(null, { status: 202 }))
     const caminho = decodeURIComponent(url.slice(`${DV_URL}/api/data/v9.2/`.length))
+    const logo = /^cr40f_clientes1s\((.+?)\)\/cr40f_portallogo\/\$value/.exec(caminho)
+    if (logo) {
+      const bytes = banco.clientes1s.find((c) => c.cr40f_clientes1id === logo[1])?.logoBytes
+      return bytes instanceof Uint8Array ? new Response(bytes as Uint8Array<ArrayBuffer>, { headers: { 'Content-Type': 'application/octet-stream' } }) : new Response('sem imagem', { status: 404 })
+    }
     const [, tabelaCr, id] = /^cr40f_(\w+?)(?:\((.+?)\))?(?:\?|$)/.exec(caminho) ?? []
     const tabela = tabelaCr as keyof Banco
     if (!banco[tabela]) return new Response('tabela desconhecida', { status: 404 })
     const chaveId = CHAVE_ID[tabela]
+    if (falhas.exigeAprovacao && caminho.includes('cr40f_portalexigeaprovacao')) return new Response('indisponível', { status: 503 })
     if (metodo === 'POST') {
       if (tabela === 'servicosporpassageiros' && falhas.vinculo) return new Response('sem privilégio', { status: 403 })
       const novo: Registro = { [chaveId]: novoId(), createdon: new Date().toISOString(), ...corpo }
@@ -137,6 +159,9 @@ export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): 
       return init?.headers && String((init.headers as Record<string, string>).Prefer).includes('return=representation') ? Response.json(novo, { status: 201 }) : new Response(null, { status: 204 })
     }
     const expandir = (reg: Registro): Registro => {
+      if (tabela === 'reservadeveculoses' && caminho.includes('cr40f_PortalUsuario(')) {
+        reg = { ...reg, cr40f_PortalUsuario: banco.validadorclientes.find((v) => v.cr40f_validadorclienteid === reg._cr40f_portalusuario_value) ?? null }
+      }
       if (caminho.includes('$expand=cr40f_Cliente')) return { ...reg, cr40f_Cliente: clienteDe(banco, reg._cr40f_cliente_value) ?? null }
       if (tabela === 'reservadeveculoses' && caminho.includes(NAV.passageiros)) {
         const filhos = banco.servicosporpassageiros.filter((v) => v._cr40f_geral_value === reg.cr40f_reservadeveculosid)

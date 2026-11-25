@@ -1,7 +1,8 @@
 import { cleanId } from '@betinhos/dataverse'
+import { PAPEIS_RENAN, papeisPath } from '../../../app/papeisUsuario'
 import type { Host } from '../../../host'
 import { FECHAMENTO_VALOR, LADO_VALOR, STATUS_VALOR, aplicarLiberacao, aplicarResposta } from '../domain/regras'
-import { dominiosDoForm, gravarModulos, type ConfigForm } from '../domain/config'
+import { dominiosDoForm, gravarModulos, prazosDoForm, type ConfigForm } from '../domain/config'
 import type { Cliente, Fechamento, Linha, Mensagem, NovoValidador, PortalConfig, Validador } from '../domain/types'
 import { createMockConfigs, createMockLinhas, createMockMensagens, createMockValidadores } from './mock'
 import { ENTITIES, loadAll, mapMensagem, mensagensPath, type EntitySets } from './queries'
@@ -31,8 +32,14 @@ export type Source = {
   setValidadorAtivo: (id: string, ativo: boolean) => Promise<void>
   /** Apaga a senha do portal (e derruba as sessões abertas): a pessoa cria outra pelo código do e-mail. Não avisa o cliente. */
   zerarSenha: (id: string) => Promise<void>
+  /** Marca ou desmarca quem aprova os pedidos do cliente (`cr40f_aprovador`). */
+  setValidadorAprovador: (id: string, aprovador: boolean) => Promise<void>
   /** Grava portal ligado, módulos e domínios no cadastro do cliente; devolve a configuração gravada. */
   salvarConfig: (cliente: Cliente, form: ConfigForm) => Promise<PortalConfig>
+  /** Só o Renan (administrador do ambiente) edita o logo; para os outros a identidade é só leitura. */
+  podeEditarIdentidade: () => Promise<boolean>
+  /** Logo atual do cliente como data URL; `null` quando não há. */
+  logoDoCliente: (clienteId: string) => Promise<string | null>
 }
 
 /** Papéis que abrem a tela; administradores também. Sem papel de financeiro dedicado no DEV, a checagem é por nome. */
@@ -59,6 +66,7 @@ function createMockSource(): Source {
   let mensagens = createMockMensagens()
   const validadores = new Set(createMockValidadores().map((v) => v.id))
   let configs = createMockConfigs()
+  const logos = new Map<string, string>()
   return {
     mock: true,
     podeAcessar: async () => true,
@@ -87,13 +95,43 @@ function createMockSource(): Source {
     async criarValidador() { await wait(300); const id = nextId('e1000000'); validadores.add(id); return id },
     async setValidadorAtivo(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
     async zerarSenha(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
+    async setValidadorAprovador(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
     async salvarConfig(cliente, form) {
       await wait(350)
-      const salva: PortalConfig = { cliente, ligado: form.ligado, modulos: form.modulos, dominios: dominiosDoForm(form) }
+      const salva: PortalConfig = { cliente, ligado: form.ligado, modulos: form.modulos, dominios: dominiosDoForm(form), exigeAprovacao: form.exigeAprovacao, ...prazosDoForm(form) }
+      if (form.logoMudou) { if (form.logo) logos.set(cliente.id, form.logo); else logos.delete(cliente.id) }
       configs = configs.some((c) => c.cliente.id === cliente.id) ? configs.map((c) => (c.cliente.id === cliente.id ? salva : c)) : [...configs, salva]
       return salva
     },
+    podeEditarIdentidade: async () => true,
+    async logoDoCliente(id) { await wait(150); return logos.get(id) ?? null },
   }
+}
+
+/** Corpo da imagem como a Web API devolve: bytes crus ou JSON `{ value: base64 }`; o tipo sai do conteúdo. */
+export async function lerLogoResposta(response: Response): Promise<string | null> {
+  if (response.status === 204 || response.status === 404) return null
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (!bytes.length) return null
+  let dados = bytes
+  if (/json/i.test(response.headers.get('Content-Type') ?? '')) {
+    const base64 = (JSON.parse(new TextDecoder().decode(bytes)) as { value?: string | null }).value
+    if (!base64) return null
+    dados = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+  }
+  const tipo = detectarTipo(dados)
+  if (!tipo) return null
+  let binario = ''
+  dados.forEach((b) => { binario += String.fromCharCode(b) })
+  return `data:${tipo};base64,${btoa(binario)}`
+}
+
+function detectarTipo(b: Uint8Array): string | null {
+  const ascii = (de: number, ate: number) => String.fromCharCode(...b.slice(de, ate))
+  if (b[0] === 0x89 && ascii(1, 4) === 'PNG') return 'image/png'
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg'
+  return null
 }
 
 async function readEnvVar(host: Extract<Host, { mode: 'dataverse' }>, schemaName: string) {
@@ -193,12 +231,26 @@ export function createSource(host: Host): Source {
     },
     setValidadorAtivo: async (id, ativo) => host.client.update((await entitySets()).validador, id, { cr40f_ativo: ativo }),
     zerarSenha: async (id) => host.client.update((await entitySets()).validador, id, { cr40f_senhadefinidaem: null }),
+    setValidadorAprovador: async (id, aprovador) => host.client.update((await entitySets()).validador, id, { cr40f_aprovador: aprovador }),
     async salvarConfig(cliente, form) {
       const dominios = dominiosDoForm(form)
+      const prazos = prazosDoForm(form)
       await host.client.update((await entitySets()).cliente, cliente.id, {
-        cr40f_portalhabilitado: form.ligado, cr40f_portalmodulos: gravarModulos(form.modulos), cr40f_portaldominios: dominios.length ? dominios.join('; ') : null,
+        cr40f_portalhabilitado: form.ligado, cr40f_portalmodulos: gravarModulos(form.modulos), cr40f_portaldominios: dominios.length ? dominios.join('; ') : null, cr40f_portalexigeaprovacao: form.exigeAprovacao,
+        cr40f_portalantecedenciapedido: prazos.antecedenciaPedidoH, cr40f_portalprazocancelar: prazos.prazoCancelarH, cr40f_portalcontato: prazos.contato || null,
+        // Imagem só vai quando mudou: base64 puro (sem o prefixo data:), ou null para remover.
+        ...(form.logoMudou ? { cr40f_portallogo: form.logo ? form.logo.slice(form.logo.indexOf(',') + 1) : null } : {}),
       })
-      return { cliente, ligado: form.ligado, modulos: form.modulos, dominios }
+      return { cliente, ligado: form.ligado, modulos: form.modulos, dominios, exigeAprovacao: form.exigeAprovacao, ...prazos }
+    },
+    async podeEditarIdentidade() {
+      const me = await host.client.request<{ UserId: string }>('WhoAmI')
+      const roles = await host.client.request<{ value: { name: string }[] }>(papeisPath(me.UserId))
+      return roles.value.some((r) => PAPEIS_RENAN.includes(r.name))
+    },
+    async logoDoCliente(id) {
+      const url = `${host.client.apiUrl}/${(await entitySets()).cliente}(${cleanId(id)})/cr40f_portallogo/$value?size=full`
+      return lerLogoResposta(await fetch(url, { credentials: 'same-origin', headers: { Accept: 'image/*,application/json' } }))
     },
   }
 }

@@ -41,6 +41,50 @@ describe('Portal do cliente', () => {
     expect(document.querySelector('.bt-build-badge')?.textContent).toMatch(/^v\d+\.\d+\.\d+ · /)
   })
 
+  describe('identidade do cliente', () => {
+    const logo = () => document.querySelector<HTMLImageElement>('.pc-parceria__cliente')
+    const comLink = (c: string) => window.history.replaceState(null, '', `/?c=${c}`)
+    afterEach(() => window.history.replaceState(null, '', '/'))
+
+    it('?c=latasa mostra o logo do cliente já na entrada', async () => {
+      comLink('latasa')
+      abrir()
+      await waitFor(() => expect(logo()?.alt).toBe('Latasa'))
+    })
+
+    it('chave desconhecida fica só com a Betinhos', async () => {
+      comLink('nao-existe')
+      abrir()
+      await screen.findByRole('heading', { name: 'Portal do cliente' })
+      await new Promise((r) => setTimeout(r, 50))
+      expect(logo()).toBeNull()
+    })
+
+    it('digitar e-mail do domínio do cliente mostra o logo; domínio público não mostra nada', async () => {
+      abrir()
+      const campo = await screen.findByLabelText(/E-mail/)
+      fireEvent.change(campo, { target: { value: 'x@gmail.com' } })
+      await new Promise((r) => setTimeout(r, 700))
+      expect(logo()).toBeNull()
+      fireEvent.change(campo, { target: { value: 'x@reciclabr.com.br' } })
+      await waitFor(() => expect(logo()?.alt).toBe('Latasa'), { timeout: 3000 })
+    })
+
+    it('depois do login o topo mostra o logo e o nome do cliente', async () => {
+      abrir()
+      await entrarCompleto('compras@latasa.com.br')
+      expect(await screen.findByText('Compras · Latasa')).toBeTruthy()
+      expect(logo()?.alt).toBe('Latasa')
+    })
+
+    it('cliente sem logo (Tenaris): topo só com a Betinhos', async () => {
+      abrir()
+      await entrarCompleto()
+      await screen.findByText(/Marcos Albuquerque · Tenaris/)
+      expect(logo()).toBeNull()
+    })
+  })
+
   it('e-mail incompleto não avança', async () => {
     abrir()
     fireEvent.change(await screen.findByLabelText(/E-mail/), { target: { value: 'fiscal@' } })
@@ -186,7 +230,31 @@ describe('Portal do cliente', () => {
     beforeEach(() => vi.setSystemTime(T0))
     afterEach(() => vi.useRealTimers())
     /** `datetime-local` de amanhã às 09:00 (sem fuso). */
-    const amanha = () => `${new Date(T0 + 86400_000).toISOString().slice(0, 10)}T09:00`
+    const amanha = () => `${new Date(T0 + 2 * 86400_000).toISOString().slice(0, 10)}T09:00`
+
+    it('aprovador vê a aba Para aprovar, recusa com motivo e o pedido sai da lista', async () => {
+      abrir()
+      await entrarCompleto('gestor@latasa.com.br')
+      fireEvent.click(await screen.findByRole('radio', { name: 'Para aprovar' }))
+      fireEvent.click(await screen.findByText('RV-48350'))
+      fireEvent.click(await screen.findByRole('button', { name: 'Recusar' }))
+      const motivo = await screen.findByRole('textbox', { name: 'Motivo da recusa' })
+      const botao = screen.getByRole('button', { name: 'Recusar pedido' }) as HTMLButtonElement
+      expect(botao.disabled).toBe(true)
+      fireEvent.change(motivo, { target: { value: 'Fora da política de viagens.' } })
+      await waitFor(() => expect(botao.disabled).toBe(false))
+      fireEvent.click(botao)
+      await waitFor(() => expect(screen.queryByText('RV-48350')).toBeNull())
+      expect(screen.getByText('RV-48351')).toBeTruthy()
+    })
+
+    it('quem pede e depende de aprovação vê Aguardando aprovação em Meus serviços', async () => {
+      abrir()
+      await entrarCompleto('carlos.mendes@latasa.com.br')
+      fireEvent.click(await screen.findByRole('radio', { name: 'Meus serviços' }))
+      expect((await screen.findAllByText('Aguardando aprovação')).length).toBeGreaterThan(0)
+      expect(screen.queryByRole('radio', { name: 'Para aprovar' })).toBeNull()
+    })
 
     it('entra pelo domínio e vê só Pedir e Meus serviços', async () => {
       abrir()
@@ -426,8 +494,37 @@ describe('Portal do cliente', () => {
       fireEvent.click(screen.getAllByText('Programado')[0].closest<HTMLElement>('[role=row], tr, button')!)
       expect((await screen.findByRole('link', { name: /Ver voucher/ })).getAttribute('href')).toMatch(/\.pdf$/)
       expect(screen.getByText('Motorista programado')).toBeTruthy()
-      fireEvent.click(screen.getByRole('radio', { name: /Todos · 7/ }))
+      fireEvent.click(screen.getByRole('radio', { name: /Todos · 8/ }))
       expect((await screen.findAllByText('Concluído')).length).toBeGreaterThan(0)
+    })
+
+    it('pedido que sai em menos do prazo não tem Cancelar: mostra o motivo e o contato; dentro do prazo cancela', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      fireEvent.click(await screen.findByRole('radio', { name: 'Meus serviços' }))
+      fireEvent.click(await screen.findByText('RV-48299'))
+      expect((await screen.findByTestId('regra-cancelar')).textContent).toMatch(/12 h antes da saída e já passou.*\(12\) 99999-0000 \(WhatsApp\)/)
+      expect(screen.queryByRole('button', { name: 'Cancelar pedido' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: /Fechar/ }))
+      await waitFor(() => expect(screen.queryByTestId('regra-cancelar')).toBeNull())
+      fireEvent.click(screen.getByText('RV-48300'))
+      expect((await screen.findByTestId('regra-cancelar')).textContent).toBe('Você cancela até 12 h antes da saída.')
+      expect(screen.getByRole('button', { name: 'Cancelar pedido' })).toBeTruthy()
+    })
+
+    it('Pedir avisa a antecedência e bloqueia a data fora do prazo, com o contato', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      await screen.findByRole('heading', { name: 'Pedir serviço' })
+      await escolherPassageiro('Hiroshi Tanaka')
+      continuar()
+      expect(await screen.findByText('Pedidos com pelo menos 24 h de antecedência.')).toBeTruthy()
+      preencherTrajeto()
+      fireEvent.change(screen.getByLabelText(/^Data/), { target: { value: new Date(T0).toISOString().slice(0, 10) } })
+      fireEvent.change(screen.getByLabelText(/^Hora/), { target: { value: '18:00' } })
+      continuar()
+      expect((await screen.findByRole('alert', { name: '' })).textContent).toMatch(/menos de 24 h.*\(12\) 99999-0000 \(WhatsApp\)/)
+      expect(screen.getByText('Passo 2 de 3 · Trajeto e horário')).toBeTruthy()
     })
   })
 })

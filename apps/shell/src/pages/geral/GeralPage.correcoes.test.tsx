@@ -105,13 +105,13 @@ describe('Geral: correções finais', () => {
       return screen.findByRole('menuitem', { name: /^Gerar link/, hidden: true })
     }
 
-    it('fica inerte quando o serviço não está Programado', async () => {
+    it('fica inerte quando o serviço está cancelado', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(within(dataRows()[2]).getByRole('checkbox'))
+      fireEvent.click(within(dataRows().find((row) => within(row).queryByText('Cancelado'))!).getByRole('checkbox'))
       const menuitem = await item()
       expect(menuitem.getAttribute('aria-disabled') === 'true' || (menuitem as HTMLButtonElement).disabled).toBe(true)
-      expect(menuitem.textContent).toContain('Programado')
+      expect(menuitem.textContent).toContain('cancelado')
     })
 
     it('mostra o link para abrir e copia ao clicar', async () => {

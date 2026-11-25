@@ -345,6 +345,47 @@ test("avisos: primeira leitura falha na inscrição → nada marcado, alarm em a
   assert.deepEqual(ctx.m.get("s").enviados, { chegando_embarque: true });
 });
 
+test("avisos: motorista definido ou trocado avisa uma vez; tirar não avisa; depois da saída, não avisa", async () => {
+  const emDefinicao = { fase: "agendado", emDefinicao: true, motorista: { nome: null } };
+  const com = (nome, fase = "agendado") => ({ fase, emDefinicao: false, motorista: { nome }, veiculo: { placa: "ABC1D23" } });
+  const { v, ctx, mudar } = await viagemComAvisos(emDefinicao);
+  await pedirAviso(v, "POST", await inscricaoReal(5));
+  assert.equal(ctx.m.get("s").motorista, null, "base: em definição");
+  const push = pushFalso();
+  await comFetch(push, async () => {
+    await v.alarm();
+    mudar(com("Carlos Souza")); await v.alarm(); await v.alarm();
+    mudar(com("Ana Lima")); await v.alarm();
+    mudar(emDefinicao); await v.alarm();
+    mudar(com("Ana Lima", "em_viagem")); await v.alarm();
+    mudar(com("Bruno", "em_viagem")); await v.alarm();
+  });
+  // Carlos, Ana e o viagem_iniciada; a volta de Ana e a troca para Bruno já com a viagem andando ficam sem aviso.
+  assert.equal(push.envios.length, 3);
+  assert.equal(ctx.m.get("s").motorista, "Bruno");
+});
+
+test("avisos: inscrição com motorista já definido não avisa o mesmo motorista", async () => {
+  const { v, ctx } = await viagemComAvisos({ fase: "agendado", motorista: { nome: "Carlos" } });
+  await pedirAviso(v, "POST", await inscricaoReal(6));
+  const push = pushFalso();
+  await comFetch(push, () => v.alarm());
+  assert.equal(push.envios.length, 0);
+  assert.equal(ctx.m.get("s").motorista, "Carlos");
+});
+
+test("avisos: nome que some numa leitura (fora de em definição) e volta não avisa de novo", async () => {
+  const { v, ctx, mudar } = await viagemComAvisos({ fase: "agendado", emDefinicao: false, motorista: { nome: "Carlos" } });
+  await pedirAviso(v, "POST", await inscricaoReal(7));
+  const push = pushFalso();
+  await comFetch(push, async () => {
+    mudar({ fase: "a_caminho", emDefinicao: false, motorista: { nome: null } }); await v.alarm();
+    mudar({ fase: "a_caminho", emDefinicao: false, motorista: { nome: "Carlos" } }); await v.alarm();
+  });
+  assert.equal(push.envios.length, 0);
+  assert.equal(ctx.m.get("s").motorista, "Carlos");
+});
+
 test("avisos: 410 remove a inscrição; 500 tenta no alarm seguinte, até 3 vezes", async () => {
   const { v, ctx, mudar } = await viagemComAvisos({ fase: "a_caminho", chegando: false });
   const [a, b] = [await inscricaoReal(1), await inscricaoReal(2)];

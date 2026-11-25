@@ -13,7 +13,8 @@ function chaveVapid(b64: string) {
 const enviar = (metodo: string, corpo: unknown) => fetch(location.pathname + "/avisos", { method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
 
 // Aviso por notificação (Web Push). O botão só aparece quando o navegador suporta (ou, no iPhone fora da tela de início, para explicar como instalar).
-export function Sino({ vapid, nomeMotorista, abrirTela }: { vapid: string; nomeMotorista?: string; abrirTela: (q: "negado" | "iphone") => void }) {
+// `emDefinicao`: sem motorista ainda, o mesmo toque liga o aviso "Seu motorista é X" e os de chegada.
+export function Sino({ vapid, nomeMotorista, emDefinicao = false, abrirTela }: { vapid: string; nomeMotorista?: string; emDefinicao?: boolean; abrirTela: (q: "negado" | "iphone") => void }) {
   const { t, id } = useIdioma();
   const toast = useToast();
   const [visivel, setVisivel] = useState(false);
@@ -46,7 +47,7 @@ export function Sino({ vapid, nomeMotorista, abrirTela }: { vapid: string; nomeM
     const r = await enviar("POST", { endpoint: j.endpoint, p256dh: j.keys!.p256dh, auth: j.keys!.auth, idioma: id });
     if (!r.ok) { sub.unsubscribe(); throw new Error(String(r.status)); }
     setInscrita(true);
-    toast(nomeMotorista ? t("sino.ligado", { motorista: nomeMotorista.split(" ")[0] }) : t("sino.ligadoSemNome"));
+    toast(emDefinicao ? t("sino.ligadoEmDefinicao") : nomeMotorista ? t("sino.ligado", { motorista: nomeMotorista.split(" ")[0] }) : t("sino.ligadoSemNome"));
   }
   async function cancelar() {
     const sub = await reg.current!.pushManager.getSubscription();
@@ -67,7 +68,7 @@ export function Sino({ vapid, nomeMotorista, abrirTela }: { vapid: string; nomeM
   return (
     <div className="sino" id="sino-area" hidden={!visivel}>
       <button type="button" className="btn btn-secundario" id="sino" aria-pressed={inscrita} disabled={ocupado} onClick={clique}>
-        <IconeSino /><span id="sino-txt">{t(inscrita ? "sino.ativo" : "sino.ativar")}</span>
+        <IconeSino /><span id="sino-txt">{t(inscrita ? "sino.ativo" : emDefinicao ? "sino.ativarEmDefinicao" : "sino.ativar")}</span>
       </button>
     </div>
   );

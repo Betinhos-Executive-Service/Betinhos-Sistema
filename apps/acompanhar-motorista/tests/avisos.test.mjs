@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EVENTOS, eventosNovos, guardarInscricao, payloadAviso, textoAviso, validarInscricao } from "../src/avisos.mjs";
+import { EVENTOS, eventosNovos, guardarInscricao, MOTORISTA_DEFINIDO, payloadAviso, textoAviso, validarInscricao } from "../src/avisos.mjs";
 import { toBase64Url } from "../src/webpush.mjs";
 
 const b64 = (n) => toBase64Url(new Uint8Array(n).fill(4));
@@ -69,4 +69,12 @@ test("até 5 inscrições; mesma endpoint substitui; a 6ª tira a mais antiga", 
   assert.deepEqual(lista.map((i) => i.endpoint), ["e1", "e2", "e3", "e4", "e5"]);
   lista = guardarInscricao(lista, { endpoint: "e2", idioma: "es" });
   assert.deepEqual(lista.map((i) => i.endpoint), ["e1", "e3", "e4", "e5", "e2"]);
+});
+
+test("aviso do motorista: primeiro nome, carro e placa; sem carro, convite a abrir", () => {
+  const dados = { motorista: { nome: "Carlos Souza" }, veiculo: { modelo: "Corolla", cor: "Prata", placa: "RUH7G45" } };
+  assert.deepEqual(textoAviso(MOTORISTA_DEFINIDO, dados, "pt"), { titulo: "Seu motorista é Carlos", corpo: "Corolla Prata · RUH7G45" });
+  assert.deepEqual(textoAviso(MOTORISTA_DEFINIDO, { ...dados, veiculo: { placa: "RUH7G45" } }, "en"), { titulo: "Your driver is Carlos", corpo: "RUH7G45" });
+  assert.equal(textoAviso(MOTORISTA_DEFINIDO, { motorista: { nome: "Ana" } }, "es").corpo, "Toca para ver los detalles");
+  assert.equal(payloadAviso("x", MOTORISTA_DEFINIDO, dados, "pt").tag, "x:motorista_definido");
 });

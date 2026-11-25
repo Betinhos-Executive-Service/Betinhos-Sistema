@@ -61,3 +61,29 @@ describe('workerApi', () => {
     expect(erro.codigo).toBe(codigo)
   })
 })
+
+describe('workerApi.marca', () => {
+  it('consulta pela chave do link ou pelo e-mail, sem expor nada além do endereço', async () => {
+    const urls: string[] = []
+    const marca = { nome: 'Latasa', logoUrl: '/api/marca/logo/x?v=1' }
+    const api = createWorkerApi('/api', async (u) => (urls.push(String(u)), new Response(JSON.stringify(marca), { status: 200 })))
+    expect(await api.marca({ chave: 'latasa' })).toEqual(marca)
+    await api.marca({ email: 'a+b@x.com.br' })
+    expect(urls).toEqual(['/api/marca?c=latasa', '/api/marca?email=a%2Bb%40x.com.br'])
+  })
+
+  it('404 vira null; erro do servidor sobe', async () => {
+    expect(await createWorkerApi('/api', resposta(404, { erro: 'nao_permitido' })).marca({ chave: 'x' })).toBeNull()
+    await expect(createWorkerApi('/api', resposta(500)).marca({ chave: 'x' })).rejects.toMatchObject({ codigo: 'falha' })
+  })
+
+  it('aprovacoes e decidirAprovacao chamam GET /aprovacoes e POST /aprovacoes/:id', async () => {
+    const chamadas: { url: string; init?: RequestInit }[] = []
+    const api = createWorkerApi('/api', async (u, i) => (chamadas.push({ url: String(u), init: i }), new Response(JSON.stringify(chamadas.length === 1 ? [] : { id: 'p 1', decisao: 'recusar' }), { status: 200 })))
+    expect(await api.aprovacoes()).toEqual([])
+    await api.decidirAprovacao('p 1', { decisao: 'recusar', motivo: 'Fora da política.' })
+    expect(chamadas[0].url).toBe('/api/aprovacoes')
+    expect(chamadas[1].url).toBe('/api/aprovacoes/p%201')
+    expect(chamadas[1].init).toMatchObject({ method: 'POST', body: '{"decisao":"recusar","motivo":"Fora da política."}' })
+  })
+})

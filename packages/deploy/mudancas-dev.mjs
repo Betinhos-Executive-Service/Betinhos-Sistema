@@ -15,7 +15,7 @@ import { FRONT, NEUTRO, PLUGIN_PASTA, nomePlugin } from './caminho-publicacao.mj
 // Flows têm decisão própria (flows-dev.mjs, pela tag flows-dev-publicado); flow novo, schema e sitemap:* continuam à mão:
 // usam az login e conexões do usuário. Por aqui, arquivo de flow não publica nada.
 
-export const TELA = [...FRONT, /^packages\/deploy\/(push-dev\.ps1|bump-version\.mjs)$/]
+export const TELA = [...FRONT, /^packages\/deploy\/(push-dev\.ps1|chunk-cleanup\.ps1|bump-version\.mjs)$/]
 
 // Não republica o que fica fora do bundle: neutro do PROD (teste, fixture, .md, docs/) e a infraestrutura à mão do app
 // (power-platform/: plugin, connector, flows; scripts/provision-*). O script de publicação republica no DEV.

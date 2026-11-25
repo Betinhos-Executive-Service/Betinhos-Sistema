@@ -227,8 +227,13 @@ button.pc-pp__passo-botao:focus-visible { outline: 2px solid var(--ped-navy); ou
 
 @media (min-width: 960px) {
   .pc-pp { max-width: 1080px; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: 'cab .' 'card lateral'; column-gap: var(--bt-space-5, 24px); }
-  .pc-pp--conferir { grid-template-areas: 'cab .' 'card .'; }
-  .pc-pp--conferir .pc-pp__card { max-width: 720px; }
+  /* Conferir ocupa a largura toda e o resumo vai em 2 colunas: cabe sem rolar em notebook. */
+  .pc-pp--conferir { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'cab' 'card'; }
+  .pc-pp--conferir .pc-pp__card { gap: 20px; }
+  .pc-pp__resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 40px; }
+  .pc-pp__resumo .pc-pp__bloco { gap: 8px; }
+  .pc-pp__resumo .pc-pp__bloco + .pc-pp__bloco { border-top: 0; padding-top: 0; }
+  .pc-pp__resumo .pc-pp__bloco:nth-child(n + 3) { border-top: 1px solid var(--ped-borda); padding-top: 20px; }
   .pc-pp__lateral { display: block; position: sticky; top: 16px; }
   .pc-pp__recap { display: none; }
   .pc-pp__busca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--bt-space-3); }

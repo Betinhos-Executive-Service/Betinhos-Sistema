@@ -2,8 +2,9 @@
 // quantidade de arquivos como o Vitest faz por padrão (hash do caminho): com poucos arquivos pesados (Geral,
 // Equipamentos) a divisão padrão deixava uma fatia com o dobro do tempo das outras.
 // Os tempos vêm de tempos-testes.json (atualize com `pnpm --filter @betinhos/shell tempos:testes`). Arquivo novo,
-// ainda sem tempo registrado, entra com a mediana. Toda fatia calcula a mesma divisão, então nada roda duas vezes
-// nem fica de fora. Sem --shard (pnpm test local) este sequenciador não muda nada.
+// ainda sem tempo registrado, entra com a mediana dos arquivos do mesmo tipo: teste .tsx monta tela e leva ~100 vezes
+// o tempo de um .ts de regra pura, então uma mediana só errava os dois. Toda fatia calcula a mesma divisão, então nada
+// roda duas vezes nem fica de fora. Sem --shard (pnpm test local) este sequenciador não muda nada.
 import { readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import { BaseSequencer, type TestSpecification } from 'vitest/node'
@@ -29,9 +30,14 @@ export class SequenciadorPorTempo extends BaseSequencer {
     const { shard, root } = this.ctx.config
     if (!shard) return files
     const tempos = lerTempos()
-    const padrao = mediana(Object.values(tempos))
+    const ehTela = (arquivo: string) => arquivo.endsWith('.tsx')
+    const medianaDe = (tela: boolean) => mediana(Object.entries(tempos).filter(([arquivo]) => ehTela(arquivo) === tela).map(([, ms]) => ms))
+    const padrao = { tela: medianaDe(true), regra: medianaDe(false) }
     const caminho = (spec: TestSpecification) => relative(root, spec.moduleId).split('\\').join('/')
-    const peso = (spec: TestSpecification) => tempos[caminho(spec)] ?? padrao
+    const peso = (spec: TestSpecification) => {
+      const arquivo = caminho(spec)
+      return tempos[arquivo] ?? (ehTela(arquivo) ? padrao.tela : padrao.regra)
+    }
 
     // Maior primeiro, sempre para a fatia mais leve (LPT). Empate pelo caminho: a ordem é a mesma em toda fatia.
     const fatias = Array.from({ length: shard.count }, () => ({ total: 0, specs: [] as TestSpecification[] }))

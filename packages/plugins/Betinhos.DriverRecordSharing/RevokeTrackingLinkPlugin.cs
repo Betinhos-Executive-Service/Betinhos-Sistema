@@ -79,7 +79,7 @@ namespace Betinhos.DriverRecordSharing
         }
 
         // Uma chamada, sem retry. True em 2xx (ou 404 quando notFoundIsOk); nunca registra o segredo.
-        private static bool Send(TrackingLinkWorkerConfig config, string method, string url, bool notFoundIsOk, ITracingService tracing)
+        internal static bool Send(TrackingLinkWorkerConfig config, string method, string url, bool notFoundIsOk, ITracingService tracing)
         {
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             try

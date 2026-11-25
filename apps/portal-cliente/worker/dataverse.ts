@@ -17,6 +17,8 @@ export type Dv = {
   criar(caminho: string, corpo: Registro): Promise<Registro>
   /** DELETE de um registro (ex.: `cr40f_reservadeveculoses(<id>)`). */
   apagar(caminho: string): Promise<void>
+  /** GET de um valor binário (`.../coluna/$value`): imagem de coluna Image. O corpo pode vir cru ou em JSON `{ value: <base64> }`. */
+  binario(caminho: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; tipo: string }>
 }
 
 const CHAVE_TOKEN = 'dv:token'
@@ -39,14 +41,14 @@ async function token(env: Env, f: typeof fetch): Promise<string> {
 }
 
 export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
-  async function chamar(metodo: string, caminho: string, corpo?: Registro, prefer = ''): Promise<Response> {
+  async function chamar(metodo: string, caminho: string, corpo?: Registro, prefer = '', accept = 'application/json'): Promise<Response> {
     // URL montada só na chamada: rota sem Dataverse (ex.: 401 sem sessão) não depende dos secrets.
     if (!env.DV_URL) throw new Error('secret DV_URL ausente')
     const r = await f(`${env.DV_URL.replace(/\/$/, '')}/api/data/v9.2/${caminho}`, {
       method: metodo,
       headers: {
         Authorization: `Bearer ${await token(env, f)}`,
-        Accept: 'application/json',
+        Accept: accept,
         'Content-Type': 'application/json; charset=utf-8',
         'OData-MaxVersion': '4.0',
         'OData-Version': '4.0',
@@ -64,11 +66,18 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
     patch: async (c, corpo) => void (await chamar('PATCH', c, corpo)),
     post: async (c, corpo) => void (await chamar('POST', c, corpo)),
     apagar: async (c) => void (await chamar('DELETE', c)),
+    binario: async (c) => {
+      const r = await chamar('GET', c, undefined, '', '*/*')
+      const tipo = r.headers.get('Content-Type') ?? ''
+      if (!tipo.includes('json')) return { bytes: new Uint8Array(await r.arrayBuffer()), tipo }
+      const { value } = (await r.json()) as { value?: string }
+      return { bytes: Uint8Array.from(atob(value ?? ''), (ch) => ch.charCodeAt(0)), tipo }
+    },
     criar: async (c, corpo) => (await (await chamar('POST', c, corpo, ',return=representation')).json()) as Registro,
   }
 }
 
-export type TipoEmail = 'codigo' | 'resumo_diario' | 'resposta_betinhos'
+export type TipoEmail = 'codigo' | 'resumo_diario' | 'resposta_betinhos' | 'pedido_confirmado' | 'aprovacao_pendente' | 'aprovacao_lembrete' | 'aprovacao_resultado' | 'aviso_operacao' | 'cancelamento_operacao'
 
 export async function enviarEmail(env: Env, tipo: TipoEmail, para: string[], dados: Registro, f: typeof fetch = fetch): Promise<void> {
   // Logo servida pelo próprio portal (public/email).

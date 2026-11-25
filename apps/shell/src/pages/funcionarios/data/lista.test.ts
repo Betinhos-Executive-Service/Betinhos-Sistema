@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { emptyFilters, matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
 import { withAlertas } from './filters'
-import { FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, builtinViews, fromLegacyFilters, matchesAlerta, matchesKeyword, readFuncionario, sortFuncionarios } from './lista'
+import { acessosDoMock, TODOS } from '../../../app/acessos'
+import { alertasDoPerfil, camposDoPerfil, colunasDoPerfil, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, builtinViews, fromLegacyFilters, matchesAlerta, matchesKeyword, readFuncionario, sortFuncionarios } from './lista'
 import type { Funcionario } from './types'
 
 function row(id: string, values: Funcionario['values']): Funcionario {
@@ -45,5 +46,24 @@ describe('lista de funcionários (Design System)', () => {
 
   it('ordena por nome sem acento', () => {
     expect(sortFuncionarios(rows, { key: 'nome', dir: 'asc' }).map((r) => r.id)).toEqual(['3', '1', '2'])
+  })
+})
+
+describe('lista por perfil', () => {
+  const chaves = (itens: { key: string }[]) => itens.map((i) => i.key)
+
+  it('admin e RH Operador veem todas as colunas; RH Operador perde só o chip de aniversários', () => {
+    for (const a of [TODOS, acessosDoMock('rh:operador')]) expect(chaves(colunasDoPerfil(a))).toEqual(['nome', 'apelido', 'funcao', 'status', 'contato', 'veiculo', 'cnh', 'aso', 'admissao'])
+    expect(alertasDoPerfil(TODOS)).toEqual(['cnh', 'aso', 'aniversario'])
+    expect(alertasDoPerfil(acessosDoMock('rh:operador'))).toEqual(['cnh', 'aso'])
+    expect(alertasDoPerfil(acessosDoMock('rh:gestor'))).toEqual(['cnh', 'aso', 'aniversario'])
+  })
+
+  it('Administrador de acessos: sem CNH, ASO, admissão e vínculo', () => {
+    const a = acessosDoMock('acessos')
+    expect(chaves(colunasDoPerfil(a))).toEqual(['nome', 'apelido', 'funcao', 'status', 'contato', 'veiculo'])
+    expect(chaves(camposDoPerfil(a))).not.toContain('vinculo')
+    expect(chaves(camposDoPerfil(a))).not.toContain('cnh')
+    expect(alertasDoPerfil(a)).toEqual([])
   })
 })
