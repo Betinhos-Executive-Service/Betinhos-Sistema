@@ -21,12 +21,14 @@ function NomeCarro({ veiculo, esqueleto }: { veiculo: NonNullable<Dados["veiculo
     el.textContent = n.completo + sufixo;
     if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1) el.textContent = n.modelo + sufixo;
   };
+  const ultimo = useRef(ajustar);
+  ultimo.current = ajustar;
   useLayoutEffect(ajustar);
   useEffect(() => {
-    const f = () => requestAnimationFrame(ajustar);
+    const f = () => requestAnimationFrame(() => ultimo.current());
     window.addEventListener("resize", f);
     return () => window.removeEventListener("resize", f);
-  });
+  }, []);
   return <span id="m-carro" ref={ref} className={esqueleto ? "esqueleto" : undefined} />;
 }
 

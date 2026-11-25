@@ -17,13 +17,11 @@ interface Props {
   retomada: number;
   vivo: Vivo;
   eta: EtaMostrado;
-  aoMostrarCard: () => void;
-  aoMapaPronto: (pronto: boolean) => void;
   aoDiagnostico: (texto: string) => void;
 }
 
 // Mapa único: a miniatura e a tela cheia são o mesmo MapLibre (resize), e a morfose card -> tela cheia é um layout animation do motion.
-export function CardMapa({ dados, retomada, vivo, eta, aoMostrarCard, aoMapaPronto, aoDiagnostico }: Props) {
+export function CardMapa({ dados, retomada, vivo, eta, aoDiagnostico }: Props) {
   const { t, id } = useIdioma();
   const caixa = useRef<HTMLDivElement>(null);
   const alvo = useRef<HTMLDivElement>(null);
@@ -33,8 +31,8 @@ export function CardMapa({ dados, retomada, vivo, eta, aoMostrarCard, aoMapaPron
   const ctrl = useRef<MapaViagem | null>(null);
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
-  const cb = useRef({ aoMostrarCard, aoDiagnostico });
-  cb.current = { aoMostrarCard, aoDiagnostico };
+  const cb = useRef({ aoDiagnostico });
+  cb.current = { aoDiagnostico };
   const textos = useRef({ t });
   textos.current = { t };
   const [seguindo, setSeguindo] = useState(true);
@@ -51,15 +49,14 @@ export function CardMapa({ dados, retomada, vivo, eta, aoMostrarCard, aoMapaPron
       corRota: getComputedStyle(document.documentElement).getPropertyValue("--bt-color-action").trim(),
       rotuloVeiculo: textos.current.t("veiculo"), rotuloEtapa: (n) => textos.current.t("etapa", { n }),
       aoMexer: () => setSeguindo(false), aoSeguir: setSeguindo,
-      aoMostrarCard: () => cb.current.aoMostrarCard(), aoDiagnostico: (x) => cb.current.aoDiagnostico(x),
+      aoMostrarCard() {}, aoDiagnostico: (x) => cb.current.aoDiagnostico(x),
     }, dadosRef.current).then((m) => {
       if (!vivoEfeito) { m.destruir(); return; }
       ctrl.current = m;
       // Os dados que chegaram enquanto a biblioteca baixava (o efeito de [dados] ainda não tinha mapa) entram agora.
       if (dadosRef.current) m.atualizar(dadosRef.current);
-      aoMapaPronto(true);
     }).catch(() => { /* sem biblioteca: o painel segue funcionando e o card final aparece pelo plano B */ });
-    return () => { vivoEfeito = false; ctrl.current?.destruir(); ctrl.current = null; aoMapaPronto(false); };
+    return () => { vivoEfeito = false; ctrl.current?.destruir(); ctrl.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { if (dados) ctrl.current?.atualizar(dados); }, [dados]);

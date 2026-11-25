@@ -1,5 +1,5 @@
 import { useIdioma } from "../i18n";
-import { hora } from "../formato";
+import { diaMes, hora } from "../formato";
 import type { EtaMostrado } from "../hooks/useEta";
 import { aeroportoNoEmbarque, estadoViagem, fraseFase, SEGMENTOS, segmentosAcesos, tituloFase } from "../portal";
 import type { Dados } from "../tipos";
@@ -13,7 +13,7 @@ export function Faixa({ dados, eta, reserva, espera }: Props) {
   const ag = Date.parse(dados?.horarioAgendado ?? "");
   const linha = [
     reserva,
-    isNaN(ag) ? null : new Date(ag).toLocaleDateString(id === "en" ? "en-GB" : id === "es" ? "es-ES" : "pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }),
+    isNaN(ag) ? null : diaMes(id, ag),
     isNaN(ag) ? null : t("faixa.saida", { h: hora(id, ag) }),
   ].filter(Boolean).join(" · ");
   const e = dados ? estadoViagem(dados) : null;
@@ -33,7 +33,7 @@ export function Faixa({ dados, eta, reserva, espera }: Props) {
           {minutos !== null ? <span className="selo-eta" id="eta"><b>{minutos}</b> min</span> : null}
         </div>
         <ol className="barra" id="passos" aria-label={t("card.trajeto")}>
-          {SEGMENTOS.map((c, i) => <li key={c} className={i < acesos ? (i === acesos - 1 && e !== "concluido" ? "atual" : "feita") : undefined}><i /><span>{t(c)}</span></li>)}
+          {SEGMENTOS.map((c, i) => <li key={c} aria-current={i === acesos - 1 && e !== "concluido" ? "step" : undefined} className={i < acesos ? (i === acesos - 1 && e !== "concluido" ? "atual" : "feita") : undefined}><i /><span>{t(c)}</span></li>)}
         </ol>
         <p className="frase" id="frase">{dados ? fraseFase(dados, { t, id, cor, eta, espera }) : ""}</p>
       </div>

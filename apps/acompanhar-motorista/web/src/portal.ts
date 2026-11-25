@@ -1,4 +1,4 @@
-import { hora } from "./formato";
+import { diaMes, hora } from "./formato";
 import type { IdiomaId, Traduz } from "./i18n";
 import type { EtaMostrado } from "./hooks/useEta";
 import { textoAvisoCarro } from "./status";
@@ -51,8 +51,7 @@ export function fraseFase(d: Dados, c: CtxFrase) {
   if (e === "definicao") return t("f.definicao");
   if (e === "agendado") {
     if (isNaN(agendado) || !semRastreio(d)) return t("f.aguarda");
-    const dia = new Date(agendado).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
-    return t("agendado.texto", { dia, h: hora("pt", agendado) });
+    return t("agendado.texto", { dia: diaMes(id, agendado), h: hora(id, agendado) });
   }
   if (e === "a_caminho") {
     if (!eta.eta || !eta.chegada) return t("f.semPrevisao");

@@ -52,7 +52,6 @@ export function App() {
     }
   }, [concluido, noLocal, setTitulo]);
 
-  const semAviso = useCallback(() => {}, []);
   const abrirTela = useCallback((q: Exclude<Tela, null>) => { origemTela.current = document.activeElement; setTela(q); }, []);
   const fecharTela = useCallback(() => {
     setTela(null);
@@ -82,7 +81,7 @@ export function App() {
               <button type="button" className="btn btn-secundario btn-leve" onClick={(e) => editar(faltam[0], e.currentTarget)}>{t("pax.completar")}</button>
             </div>
           ) : null}
-          {comMapa ? <CardMapa dados={dados} retomada={retomada} vivo={vivo} eta={eta} aoMostrarCard={semAviso} aoMapaPronto={semAviso} aoDiagnostico={setDiag} /> : null}
+          {comMapa ? <CardMapa dados={dados} retomada={retomada} vivo={vivo} eta={eta} aoDiagnostico={setDiag} /> : null}
           <CardMotorista dados={dados} cfg={BT.cfg} abrirTela={abrirTela} />
           <LinhaDoTempo dados={dados} cfg={BT.cfg} chegada={eta.chegada} abrirTela={abrirTela} />
           {concluido ? null : <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />}
