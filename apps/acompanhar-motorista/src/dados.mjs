@@ -110,6 +110,7 @@ const TRAJETO_ANTES_MS = 90 * 60000; // olha o trajeto desde 1h30 antes do horá
 
 // Histórico de posições da Infleet desde 1h30 antes do horário agendado até agora.
 async function lerTrajeto(t, env, agora, nome = "Trajeto") {
+  if (!t.vehicleId) return [];
   const inicio = new Date(t.horarioAgendado).getTime();
   const d = await gqlInfleet(env.INFLEET_TOKEN,
     `query ${nome}($f: ListVehiclePositionsFilterInput!){ listVehiclePositions(filter:$f){ latitude longitude fixTime } }`,
@@ -192,6 +193,8 @@ function resposta(id, t, v, { fase, chegando = false, etapas = null, eta = null,
   const fim = fase === "concluido", simples = t.modo === "simples", l = v?.location;
   return {
     titulo: t.titulo ?? null, modo: simples ? "simples" : "completo",
+    // Sem veículo da Infleet a página não monta mapa; sem motorista nem placa, mostra "Motorista em definição".
+    rastreio: Boolean(t.vehicleId), emDefinicao: !t.motorista && !t.vehicleId && !t.placa,
     ...cartoes(id, t, v, fim), comSinal: v ? Boolean(v.hasSignal) : true,
     posicao: !fim && l ? { lat: l.latitude, lon: l.longitude, endereco: l.address ?? null, velocidadeKmh: Math.round(l.speed ?? 0), atualizadoEm: l.fixTime ?? null } : null,
     sinalAtrasadoMin,
@@ -262,8 +265,8 @@ export async function calcularDados(id, t, env, est, { concluido = false, econom
     const percorrido = await percorridoFinal(t, env, marcos.concluidoEm, est);
     return resposta(id, t, null, { fase: "concluido", etapas: comEtapas(t) ? etapasVisiveis(etapasPublicas(t.etapas), null) : null, percorrido, marcos });
   }
-  // Antes de 2 h do horário agendado não consulta a Infleet nem mostra posição: só a tela "viagem agendada".
-  if (agendadoAinda(t)) return resposta(id, t, null, { fase: "agendado", etapas: comEtapas(t) ? etapasVisiveis(etapasPublicas(t.etapas), null) : null });
+  // Antes de 2 h do horário agendado, ou sem veículo da Infleet (sem rastreio), não consulta a Infleet: só a tela "viagem agendada".
+  if (agendadoAinda(t) || !t.vehicleId) return resposta(id, t, null, { fase: "agendado", etapas: comEtapas(t) ? etapasVisiveis(etapasPublicas(t.etapas), null) : null });
   const d = await gqlInfleet(env.INFLEET_TOKEN,
     `query($id: ID!){ getVehicle(id:$id){ plate brand model hasSignal
       driver { name profilePictures { url } }

@@ -3,6 +3,7 @@ export interface Etapa { tipo?: string; rotulo?: string; lat?: number; lon?: num
 export interface Eta { minutos: number; faixa?: [number, number]; km?: number; transito?: boolean }
 export interface Dados {
   versao?: string; servidorEm?: string; titulo?: string; modo?: string; fase: string; chegando?: boolean;
+  rastreio?: boolean; emDefinicao?: boolean; // links antigos não mandam: valem como rastreio com motorista
   posicao?: { lat: number; lon: number; atualizadoEm?: string; velocidadeKmh?: number; endereco?: string } | null;
   comSinal?: boolean; sinalAtrasadoMin?: number; fonteIndisponivel?: boolean; avaliado?: boolean;
   motorista?: { nome?: string; foto?: string; telefone?: string };

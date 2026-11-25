@@ -66,6 +66,13 @@ description: "Verifica o link público de acompanhamento (página /r/<id>, /dado
 - Erros de console esperados: só avisos do WebGL do mapa. `__name is not defined` indica função interna embutida sem o shim (ver `PASSAGEIROS_SCRIPT`).
 - Prints de referência: `docs/verificacao/2026-11-23-portal-passageiros/`. Flow real não é chamado: declare "não verificado com o flow real".
 
+## Sem motorista e sem rastreio (fase 2, 25/11/2026)
+- `POST/PUT /api/links` aceita pedido sem `placa` e com `rastreio: false`; `rastreio: true` sem placa → 400 "placa obrigatória para rastreio". Sem rastreio o link nasce com `vehicleId` nulo e `acharVeiculo` não é chamado; um PUT com placa da Infleet passa a rastrear, um PUT sem motorista volta a "em definição" sem revogar. Foto do carro só segue com a mesma placa.
+- `/dados` publica `rastreio` (há `vehicleId`) e `emDefinicao` (sem motorista, sem veículo e sem placa); sem `vehicleId` a Infleet nunca é chamada e a fase fica "agendado" até o Dataverse concluir (limite conhecido).
+- Página: `emDefinicao` → card "Motorista em definição" com o contato da central e o Sino; `rastreio === false` → sem `.col-b`/mapa e, no desktop, `.portal.sem-mapa` em coluna única centralizada. Links antigos (sem os campos) continuam com mapa.
+- Testes: `tests/api-links.test.mjs` ("link sem rastreio…"), `tests/dados.test.mjs` (Infleet não chamada), `web/src/testes/em-definicao.test.tsx`. Cenários locais `DevDefinica1` e `DevSemRastr1` (`scripts/semear-local.mjs`): print a 390 e 1280 px.
+- Ponta a ponta depende do plugin (`TrackingLinkRequest`/`UpdateTrackingLinkPlugin`) mandar `rastreio: false` ou o pedido sem placa; até lá, não verificado com Dataverse.
+
 ## Casos de borda
 - Infleet fora com o Durable Object recém-acordado (sem leitura em memória): a página recebe `{"tipo":"fonte_fora"}` e mostra "Aguardando o rastreador"; o log mostra `Leitura do alarm falhou`.
 - Prévia do WhatsApp: `curl -s http://127.0.0.1:36489/r/DevCompleto1 | rg 'og:'` → título, descrição com horário e carro, `og:image` absoluto; revogado/expirado só com metatags genéricas.

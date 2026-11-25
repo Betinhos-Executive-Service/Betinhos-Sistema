@@ -23,6 +23,20 @@ test("calcularDados: concluído não consulta a Infleet nem grava", async () => 
   assert.equal(gravados.length, 0);
 });
 
+test("calcularDados: sem veículo da Infleet não consulta a Infleet e marca em definição", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error("não devia chamar"); };
+  try {
+    const t = { modo: "completo", etapas: etapas(), vehicleId: null, motorista: null, horarioAgendado: new Date().toISOString(), expiraEm: "2099-01-01T00:00:00Z" };
+    const d = await calcularDados("z".repeat(12), t, {}, {}, { gravar: () => {} });
+    assert.deepEqual([d.fase, d.rastreio, d.emDefinicao, d.posicao], ["agendado", false, true, null]);
+    const sem = await calcularDados("z".repeat(12), { ...t, motorista: { nome: "Ana" } }, {}, {}, { gravar: () => {} });
+    assert.deepEqual([sem.rastreio, sem.emDefinicao, sem.motorista.nome], [false, false, "Ana"]);
+    const soPlaca = await calcularDados("z".repeat(12), { ...t, placa: "TER1A23" }, {}, {}, { gravar: () => {} });
+    assert.deepEqual([soPlaca.emDefinicao, soPlaca.veiculo.placa], [false, "TER1A23"], "placa conhecida não vira em definição");
+  } finally { globalThis.fetch = original; }
+});
+
 test("calcularDados: posição nova grava com mesclar e guarda a trilha no `est` recebido", async () => {
   const gravados = [], est = {};
   const t = { modo: "completo", vehicleId: "v1", etapas: etapas(), expiraEm: "2099-01-01T00:00:00Z" };
