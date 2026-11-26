@@ -1,11 +1,11 @@
 # Cancelado da Tenaris passa pela trava e vira Requer Análise
 
 - Nível: 2 (plugin de proteção, plugin do aviso, flow Tenaris e flow do aviso)
-- Etapa: 4 de 7 Go
-- Próximo passo: Go do Renan · com você
+- Etapa: 5 de 7 Construir
+- Próximo passo: tarefa 1 (ProtecaoCampos) · sozinho
 - Branch e PR: feat/tenaris-cancelado-requer-analise · ainda não
 - Protótipo: sem protótipo
-- Go: pendente
+- Go: 26/11/2026 14:57 por Renan (card)
 - PROD: ainda não
 - Atualizado: 26/11/2026 14:55
 

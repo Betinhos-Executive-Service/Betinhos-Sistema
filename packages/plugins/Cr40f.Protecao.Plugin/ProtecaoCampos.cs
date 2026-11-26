@@ -20,11 +20,15 @@ public sealed class Resultado
 /// <summary>
 /// Campos da reserva da Tenaris editados pela equipe ficam protegidos contra a sincronização.
 /// A gravação da sincronização é reconhecida por trazer new_snapshotsharepoint (o Upsert_Geral do flow da Tenaris sempre manda).
+/// Exceção (decisão do Renan, 26/11/2026): o Cancelado da sincronização passa pela trava do status quando o serviço
+/// está aberto e vira Requer Análise, para o financeiro decidir a cobrança.
 /// </summary>
 public static class ProtecaoCampos
 {
     public const string Lista = "new_camposprotegidos";
     public const string Snapshot = "new_snapshotsharepoint";
+    public const string Status = "cr40f_status";
+    const int Cancelado = 202410002, CanceladoComRessalvas = 202410010, RequerAnalise = 100000001, Concluido = 202410008;
     public static readonly string[] Monitorados =
     {
         "cr40f_destino", "cr40f_endereodesada", "cr40f_dataehorriodesada", "cr40f_obsdeoperao", "cr40f_horrioprevistoderetorno",
@@ -37,7 +41,9 @@ public static class ProtecaoCampos
         var protegidos = LerLista(alvo.Contains(Lista) ? alvo.GetAttributeValue<string>(Lista) : anterior?.GetAttributeValue<string>(Lista));
         if (alvo.Contains(Snapshot))
         {
-            var barrados = protegidos.Where(alvo.Contains).ToList();
+            var canceladoPassa = CanceladoPassa(alvo, anterior, protegidos);
+            if (canceladoPassa) alvo[Status] = new OptionSetValue(RequerAnalise);
+            var barrados = protegidos.Where(campo => alvo.Contains(campo) && !(canceladoPassa && campo == Status)).ToList();
             foreach (var campo in barrados) alvo.Attributes.Remove(campo);
             return new Resultado(Array.Empty<string>(), barrados);
         }
@@ -50,6 +56,14 @@ public static class ProtecaoCampos
             .ToList();
         if (adicionados.Count > 0) alvo[Lista] = string.Join(",", protegidos.Concat(adicionados));
         return new Resultado(adicionados, Array.Empty<string>());
+    }
+
+    /// <summary>Fechado (Concluído, Requer Análise ou cancelado) não volta: a Tenaris manda Cancelado em toda sincronização.</summary>
+    static bool CanceladoPassa(Entity alvo, Entity? anterior, List<string> protegidos)
+    {
+        if (!protegidos.Contains(Status) || alvo.GetAttributeValue<OptionSetValue>(Status)?.Value != Cancelado) return false;
+        var atual = anterior?.GetAttributeValue<OptionSetValue>(Status)?.Value;
+        return atual is int valor && valor != Concluido && valor != RequerAnalise && valor != Cancelado && valor != CanceladoComRessalvas;
     }
 
     static List<string> LerLista(string? texto) =>

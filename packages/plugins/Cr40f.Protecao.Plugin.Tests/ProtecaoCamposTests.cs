@@ -40,12 +40,49 @@ public class ProtecaoCamposTests
         Assert.False(alvo.Contains(ProtecaoCampos.Lista));
     }
 
-    [Fact]
-    public void Status_cancelado_da_tenaris_tambem_e_barrado()
+    [Theory]
+    [InlineData(202410005)] // Programado
+    [InlineData(202410001)] // Confirmado
+    [InlineData(202410006)] // Em execução
+    public void Cancelado_da_sincronizacao_em_servico_aberto_vira_requer_analise(int atual)
     {
+        var anterior = Anterior("cr40f_status,cr40f_cr"); anterior["cr40f_status"] = new OptionSetValue(atual);
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo["cr40f_cr"] = "999"; alvo[ProtecaoCampos.Snapshot] = Planilha;
+        var r = ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.Equal(100000001, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.Equal(new[] { "cr40f_cr" }, r.Barrados);
+        Assert.False(alvo.Contains("cr40f_cr"));
+        Assert.True(alvo.Contains(ProtecaoCampos.Snapshot));
+    }
+
+    [Theory]
+    [InlineData(202410008)] // Concluído
+    [InlineData(100000001)] // Requer Análise
+    [InlineData(202410002)] // Cancelado
+    [InlineData(202410010)] // Cancelado com ressalvas
+    public void Cancelado_da_sincronizacao_em_servico_fechado_e_barrado(int atual)
+    {
+        var anterior = Anterior("cr40f_status"); anterior["cr40f_status"] = new OptionSetValue(atual);
         var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        var r = ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.False(alvo.Contains("cr40f_status"));
+        Assert.Equal(new[] { "cr40f_status" }, r.Barrados);
+    }
+
+    [Fact]
+    public void Cancelado_com_ressalvas_da_sincronizacao_continua_barrado()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410010); alvo[ProtecaoCampos.Snapshot] = Planilha;
         ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_status"));
         Assert.False(alvo.Contains("cr40f_status"));
+    }
+
+    [Fact]
+    public void Cancelado_com_status_nao_protegido_grava_cancelado()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_cr"));
+        Assert.Equal(202410002, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
     }
 
     [Fact]
