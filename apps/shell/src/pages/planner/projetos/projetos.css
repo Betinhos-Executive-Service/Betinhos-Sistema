@@ -7,8 +7,33 @@
 
 .pj-detalhe { display: grid; gap: var(--bt-space-4); }
 .pj-bloco { display: grid; gap: var(--bt-space-2); min-width: 0; }
-.pj-lbl { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--bt-color-text-tertiary); }
-.pj-lbl .pj-num { letter-spacing: 0; color: var(--bt-color-text-secondary); }
+.pj-lbl { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text); }
+.pj-lbl .pj-num { font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
+.pj-bloco__topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); }
+.pj-erro { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-danger); }
+
+/* Título editável no cabeçalho do drawer (no lugar do campo Título repetido). */
+.pj-titulo { width: 100%; min-width: 0; margin: -4px 0 -4px -8px; padding: 4px 8px; border: var(--bt-border-width-default) solid transparent; border-radius: var(--bt-radius-sm); background: transparent; font: inherit; color: inherit; text-overflow: ellipsis; }
+.pj-titulo:hover { border-color: var(--bt-color-border); }
+.pj-titulo:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
+.pj-titulo[aria-invalid="true"] { border-color: var(--bt-color-danger); }
+
+/* O cabeçalho do DS corta o título (nowrap/overflow); com o campo editável ele ocupa a largura toda. */
+.bt-drawer__heading:has(.pj-titulo) { flex: 1; }
+.bt-drawer__title:has(.pj-titulo) { overflow: visible; }
+
+/* Barra de progresso do checklist. */
+.pj-barra { height: 4px; overflow: hidden; border-radius: var(--bt-radius-full); background-color: var(--bt-color-surface-soft); }
+.pj-barra span { display: block; height: 100%; border-radius: inherit; background-color: var(--bt-color-success); transition: width .2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .pj-barra span { transition: none; } }
+
+/* Ações dos anexos (Anexar, Gravar áudio): botões discretos no título da seção. */
+.pj-acoes { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
+.pj-acao { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-brand); font: inherit; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); cursor: pointer; }
+.pj-acao:hover:not(:disabled) { background-color: var(--bt-color-surface-soft); }
+.pj-acao:disabled { cursor: progress; opacity: .6; }
+.pj-acao:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.pj-acao.is-gravando { background-color: var(--bt-color-danger-soft); color: var(--bt-color-danger); font-variant-numeric: tabular-nums; }
 
 /* Checklist */
 .pj-check { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
@@ -17,16 +42,16 @@
 .pj-check__rm { display: inline-grid; flex: none; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
 .pj-check__rm:hover { background-color: var(--bt-color-surface-soft); color: var(--bt-color-text); }
 .pj-check__rm:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
-.pj-check__novo { display: flex; gap: var(--bt-space-2); }
-.pj-check__novo > :first-child { flex: 1; min-width: 0; }
-@media (max-width: 560px) { .pj-check__novo { flex-direction: column; } }
+.pj-check li.pj-check__novo { justify-content: flex-start; padding-left: 1px; color: var(--bt-color-text-secondary); }
+.pj-check__novo input { flex: 1; min-width: 0; min-height: 32px; padding: 0 var(--bt-space-2); border: var(--bt-border-width-default) solid transparent; border-radius: var(--bt-radius-sm); background: transparent; font: inherit; color: var(--bt-color-text); }
+.pj-check__novo input:hover { border-color: var(--bt-color-border); }
+.pj-check__novo input:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
 
-/* Anexos em grade; áudio ocupa a linha toda com a transcrição embaixo. */
+/* Arquivos em grade de miniaturas; áudios numa lista abaixo, cada um com a transcrição. */
 .pj-gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--bt-space-2); }
-.pj-gal__audio { display: grid; gap: var(--bt-space-1); grid-column: 1 / -1; padding: var(--bt-space-2) var(--bt-space-3); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-soft); }
-.pj-gal__add { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 64px; border: var(--bt-border-width-default) dashed var(--bt-color-border-strong); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface); color: var(--bt-color-text-secondary); font: inherit; font-size: var(--bt-font-size-12); cursor: pointer; }
-.pj-gal__add:disabled { cursor: progress; opacity: .7; }
-.pj-gal__add:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.pj-audios { display: grid; margin: 0; padding: 0; list-style: none; }
+.pj-audios li { display: grid; gap: var(--bt-space-1); padding: var(--bt-space-2) 0; border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
+.pj-audios li:first-child { border-top: 0; }
 .pj-anexo { display: grid; gap: var(--bt-space-1); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-sm); }
 .pj-anexo:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .pj-anexo__thumb { display: grid; place-items: center; width: 100%; height: 64px; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-soft); color: var(--bt-color-text-secondary); }
