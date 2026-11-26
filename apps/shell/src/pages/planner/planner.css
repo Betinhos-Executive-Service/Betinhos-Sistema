@@ -3259,24 +3259,20 @@
 @media (max-width: 560px) { :where(.planner-page, .planner-portal) .projects-board { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 820px) { :where(.planner-page, .planner-portal) .projects-icon-button { height: 44px; } :where(.planner-page, .planner-portal) .projects-icon-button { width: 44px; } }
 
-/* Cabeçalho com abas: a Central de Trabalho não tem mais sidebar própria ao lado da sidebar do shell. */
-:where(.planner-page, .planner-portal) .planner-header { position: sticky; top: 0; z-index: 45; display: grid; gap: 6px; padding: 12px 42px 0; border-bottom: 1px solid var(--line); background: var(--surface); }
-:where(.planner-page, .planner-portal) .planner-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-:where(.planner-page, .planner-portal) .planner-header-title { color: var(--navy); font-size: 15px; letter-spacing: -.15px; }
-:where(.planner-page, .planner-portal) .planner-header-actions { display: flex; align-items: center; gap: 8px; }
-:where(.planner-page, .planner-portal) .planner-header-actions .notification-trigger { margin-left: 4px; }
-:where(.planner-page, .planner-portal) .planner-day-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font-size: 11px; white-space: nowrap; }
+/* Faixa única com abas: a Central de Trabalho não tem mais sidebar própria ao lado da sidebar do shell. */
+:where(.planner-page, .planner-portal) .planner-header { position: sticky; top: 0; z-index: 45; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 0 42px; border-bottom: 1px solid var(--line); background: var(--surface); }
+:where(.planner-page, .planner-portal) .planner-header-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+:where(.planner-page, .planner-portal) .planner-header-actions .notification-trigger { width: 32px; height: 32px; margin-left: 2px; border-radius: 9px; }
+:where(.planner-page, .planner-portal) .planner-day-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font-size: 11px; white-space: nowrap; }
 :where(.planner-page, .planner-portal) .planner-day-chip b { color: var(--ink); font-size: 12px; font-variant-numeric: tabular-nums; }
 :where(.planner-page, .planner-portal) .planner-day-chip-overdue { border-color: color-mix(in srgb, var(--red) 28%, transparent); color: var(--red); background: var(--red-soft); }
 :where(.planner-page, .planner-portal) .planner-day-chip-overdue b { color: var(--red); }
-:where(.planner-page, .planner-portal) .planner-tabs { display: flex; align-items: center; gap: 2px; margin-bottom: -1px; overflow-x: auto; scrollbar-width: none; }
-:where(.planner-page, .planner-portal) .planner-tab { min-height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; transition: color 150ms ease, border-color 150ms ease; }
+:where(.planner-page, .planner-portal) .planner-tabs { align-self: stretch; display: flex; align-items: stretch; gap: 2px; min-width: 0; margin-bottom: -1px; overflow-x: auto; scrollbar-width: none; }
+:where(.planner-page, .planner-portal) .planner-tab { display: inline-flex; align-items: center; gap: 6px; padding: 0 11px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; transition: color 150ms ease, border-color 150ms ease; }
 :where(.planner-page, .planner-portal) .planner-tab:hover { color: var(--ink); }
 :where(.planner-page, .planner-portal) .planner-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; border-radius: 6px 6px 0 0; }
 :where(.planner-page, .planner-portal) .planner-tab.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 700; }
-:where(.planner-page, .planner-portal) .planner-tab-end { margin-left: auto; }
 :where(.planner-page, .planner-portal) .planner-tab-count { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--neutral); color: var(--muted); font-size: 10px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 :where(.planner-page, .planner-portal) .planner-tab-count-alert { background: var(--red-soft); color: var(--red); }
-:where(.planner-page, .planner-portal) .planner-header-version { display: inline-flex; align-items: center; gap: 6px; padding-left: 12px; color: var(--tertiary); font-size: 10px; white-space: nowrap; pointer-events: none; user-select: none; }
 @media (max-width: 1120px) { :where(.planner-page, .planner-portal) .planner-header { padding-left: 26px; padding-right: 26px; } }
 @media (max-width: 820px) { :where(.planner-page, .planner-portal) .planner-header { display: none; } }

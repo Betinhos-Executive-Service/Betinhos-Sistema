@@ -1,6 +1,5 @@
 // Porte de Tela Planner/src/App.jsx (sem mudança de comportamento).
 import { CENTRAL_NAV_ITEMS, MOBILE_NAV_ITEMS, TODAY_LABEL_FORMATTER } from '../constants'
-import { APP_VERSION } from '../data/version'
 import { isTaskVisibleToEmployee, taskStats } from '../domain/domain'
 import { canViewManagement } from '../domain/management'
 import { unreadCount } from '../domain/notifications'
@@ -59,44 +58,6 @@ export function AppShell({
     <div className="app-shell">
       <main className="main-area">
         <header className="planner-header">
-          <div className="planner-header-row">
-            <strong className="planner-header-title">Central de Trabalho</strong>
-            <div className="planner-header-actions" aria-label="Ações do aplicativo">
-              <span
-                className="planner-day-chip"
-                title={`Hoje, ${todayLabel}`}
-                aria-label={`Hoje, ${stats.open} pendências e ${stats.overdue} atrasados`}
-              >
-                <b>{stats.open}</b> pendências hoje
-              </span>
-              {stats.overdue > 0 && (
-                <span className="planner-day-chip planner-day-chip-overdue">
-                  <b>{stats.overdue}</b> {stats.overdue === 1 ? "atrasada" : "atrasadas"}
-                </span>
-              )}
-              {!currentEmployee && <span className="planner-day-chip">Sem vínculo Dataverse</span>}
-              <button
-                className="notification-trigger"
-                type="button"
-                onClick={() => setNotificationsOpen(true)}
-                aria-label={`Abrir notificações${unreadCount(notifications) ? `, ${unreadCount(notifications)} não lidas` : ""}`}
-                title="Notificações"
-              >
-                <BellRing size={17} />
-                {unreadCount(notifications) > 0 && <b>{unreadCount(notifications)}</b>}
-              </button>
-              <button
-                className={`refresh-trigger${refreshing ? " is-refreshing" : ""}`}
-                type="button"
-                onClick={() => onRefresh?.({ silent: false })}
-                disabled={refreshing}
-                aria-label={refreshing ? "Atualizando dados" : "Atualizar dados"}
-                title={refreshing ? "Atualizando dados" : "Atualizar dados"}
-              >
-                <RotateCcw size={16} />
-              </button>
-            </div>
-          </div>
           <nav className="planner-tabs" aria-label="Seções da Central de Trabalho">
             {CENTRAL_NAV_ITEMS.filter(([id]: any) => id !== "management" || canViewManagement)
               .sort(([a]: any, [b]: any) => Number(a === "settings") - Number(b === "settings"))
@@ -104,11 +65,11 @@ export function AppShell({
               <button
                 key={id}
                 type="button"
-                className={`planner-tab${desktopNavActive === id ? " active" : ""}${id === "settings" ? " planner-tab-end" : ""}`}
+                className={`planner-tab${desktopNavActive === id ? " active" : ""}`}
                 aria-current={desktopNavActive === id ? "page" : undefined}
                 onClick={() => onNavigate(id)}
               >
-                <Icon size={16} aria-hidden="true" />
+                <Icon size={15} aria-hidden="true" />
                 <span>{label}</span>
                 {id === "board" && <span className="planner-tab-count">{openTaskCount}</span>}
                 {id === "dashboard" && personalStats?.alertCount > 0 && (
@@ -116,11 +77,42 @@ export function AppShell({
                 )}
               </button>
             ))}
-            <span className="planner-header-version" aria-label={`Versão do aplicativo ${APP_VERSION}`}>
-              <span className="pulse-dot" />
-              {live ? "Dataverse" : "Mock"} · {APP_VERSION}
-            </span>
           </nav>
+          <div className="planner-header-actions" aria-label="Ações do aplicativo">
+            <span
+              className="planner-day-chip"
+              title={`Hoje, ${todayLabel}: ${stats.open} pendências`}
+              aria-label={`Hoje, ${stats.open} pendências e ${stats.overdue} atrasados`}
+            >
+              <b>{stats.open}</b> hoje
+            </span>
+            {stats.overdue > 0 && (
+              <span className="planner-day-chip planner-day-chip-overdue">
+                <b>{stats.overdue}</b> {stats.overdue === 1 ? "atrasada" : "atrasadas"}
+              </span>
+            )}
+            {!currentEmployee && <span className="planner-day-chip">Sem vínculo</span>}
+            <button
+              className="notification-trigger"
+              type="button"
+              onClick={() => setNotificationsOpen(true)}
+              aria-label={`Abrir notificações${unreadCount(notifications) ? `, ${unreadCount(notifications)} não lidas` : ""}`}
+              title="Notificações"
+            >
+              <BellRing size={16} />
+              {unreadCount(notifications) > 0 && <b>{unreadCount(notifications)}</b>}
+            </button>
+            <button
+              className={`refresh-trigger${refreshing ? " is-refreshing" : ""}`}
+              type="button"
+              onClick={() => onRefresh?.({ silent: false })}
+              disabled={refreshing}
+              aria-label={refreshing ? "Atualizando dados" : "Atualizar dados"}
+              title={refreshing ? "Atualizando dados" : "Atualizar dados"}
+            >
+              <RotateCcw size={15} />
+            </button>
+          </div>
         </header>
         <header className="mobile-header">
           <div className="mobile-header-copy">
