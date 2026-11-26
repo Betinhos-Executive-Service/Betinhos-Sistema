@@ -46,7 +46,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         public void GerarMeuAditivoDevolveOPdfDoProprioMotoristaSemAceitarFuncionarioId()
         {
             var m = new Mundo();
-            var outro = m.S.Add(new Entity("cr40f_funcionarios") { ["cr40f_nomecompleto"] = "Maria Outra", ["cr40f_numerodocpf"] = "987.654.321-00", ["cr40f_emailmicrosoft"] = "maria@empresa.test", ["statecode"] = new OptionSetValue(0) });
+            var outro = m.S.Add(new Entity("cr40f_funcionarios") { ["cr40f_nomecompleto"] = "Maria Outra", ["cr40f_numerodocpf"] = "111.444.777-35", ["cr40f_emailmicrosoft"] = "maria@empresa.test", ["statecode"] = new OptionSetValue(0) });
             m.S.Add(new Entity("systemuser") { ["internalemailaddress"] = "maria@empresa.test", ["isdisabled"] = false });
 
             var meu = m.Gerar();
@@ -158,7 +158,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         public void MotoristaANuncaRegistraOAditivoDeB()
         {
             var m = new Mundo();
-            var b = m.S.Add(new Entity("cr40f_funcionarios") { ["cr40f_nomecompleto"] = "Maria Outra", ["cr40f_numerodocpf"] = "987.654.321-00", ["cr40f_emailmicrosoft"] = "maria@empresa.test", ["statecode"] = new OptionSetValue(0) });
+            var b = m.S.Add(new Entity("cr40f_funcionarios") { ["cr40f_nomecompleto"] = "Maria Outra", ["cr40f_numerodocpf"] = "111.444.777-35", ["cr40f_emailmicrosoft"] = "maria@empresa.test", ["statecode"] = new OptionSetValue(0) });
             var userB = m.S.Add(new Entity("systemuser") { ["internalemailaddress"] = "maria@empresa.test", ["isdisabled"] = false });
             m.S.Privilegiados.Add(m.S.Gestor);
             var deB = Convert.FromBase64String((string)TermoMultaCommandPluginTests.Run(m.S, "new_GerarAditivoMotorista", m.S.Gestor, new Dictionary<string, object> { ["new_FuncionarioId"] = b.Id }).OutputParameters["new_PdfBase64"]);
