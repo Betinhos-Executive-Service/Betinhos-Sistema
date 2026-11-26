@@ -1,7 +1,8 @@
-# Rotina do SNE: roteiro da skill de multas (versão da fase 1, 17/11/2026)
+# Rotina do SNE: roteiro da skill de multas (versão da fase 3, 26/11/2026)
 
 Este é o texto que o Júnior copia para a skill dele no claude.ai (Claude in Chrome com o conector "Dataverse Betinhos" do claude.ai).
-Mudou aqui, copie de novo para a skill. Spec: `docs/superpowers/specs/2026-11-17-multas-fase1-design.md`, §8.
+Mudou aqui, copie de novo para a skill. Specs: `docs/superpowers/specs/2026-11-17-multas-fase1-design.md`, §8, e
+`docs/superpowers/specs/2026-11-18-multas-fase3-app-design.md`.
 
 ---
 
@@ -11,8 +12,8 @@ Uma ou duas vezes por semana, olhar as multas no portal da Senatran (SNE) e deix
 1. cadastrar as multas novas;
 2. completar as multas abertas que ganharam penalidade (vencimento, valor com 40% e PDF).
 
-O resto (quem é o responsável, aviso ao motorista, indicação, pagamento e acerto) é feito no passo a passo do Sistema
-Betinhos, nunca por esta rotina.
+O resto (quem é o responsável, aviso ao motorista, termo e aditivo, indicação, aceite na CNH Digital, pagamento,
+parcelas e acerto) é feito no passo a passo do Sistema Betinhos e no App Motoristas, nunca por esta rotina.
 
 ## Regras que não mudam
 
@@ -20,10 +21,12 @@ Betinhos, nunca por esta rotina.
 - **Nunca gravar** estes campos: `cr40f_status`, `cr40f_responsavel`, `cr40f_motivoempresa`, `cr40f_canalindicacao`,
   `cr40f_datadeavisoaocondutor`, `cr40f_datadeindicacao`, `cr40f_aceiteem`, `cr40f_pagaem`, `cr40f_valorpago`,
   `cr40f_competenciadesconto`, `cr40f_acertoem`, `cr40f_encerradaem`, `cr40f_canceladaem`, `cr40f_motivocancelamento`,
-  `cr40f_indicado`. Eles são do passo a passo. O servidor registra (e, quando a trava estiver ligada, recusa) a gravação
-  feita por fora dos campos de passo com a mensagem "Os campos de passo da multa só mudam pelo passo a passo do Sistema
-  Betinhos (...)". O `cr40f_indicado` não tem essa recusa, mas também não é seu: o sistema calcula esse campo a partir
-  das etapas.
+  `cr40f_contestadaem`, `cr40f_aceitedeclaradoem`, `cr40f_ultimolembreteaceiteem`. Eles são do passo a passo e do App
+  Motoristas. O servidor registra (e, quando a trava estiver ligada, recusa) a gravação feita por fora com a mensagem
+  "Os campos de passo da multa só mudam pelo passo a passo do Sistema Betinhos (...)".
+- Também não são seus, embora o servidor não recuse: `cr40f_indicado` (o sistema calcula a partir das etapas),
+  `cr40f_motorista`, `new_termovigente`, `new_recursopendente` e `cr40f_avisoautomaticoem` (o passo a passo grava;
+  esta última só existe no PROD depois da próxima publicação). Em resumo: grave só os campos listados nos passos 1 e 2.
 - **Duplicata:** o Dataverse tem a chave alternativa `cr40f_ChaveNotificacaodaMulta` em `cr40f_novacoluna` e recusa número
   de auto repetido em qualquer modo da trava (observar ou travar). Mesmo assim, a busca pelo número do auto antes de criar
   (passo 1, item 1) continua obrigatória: evita o erro e mantém o resumo limpo. Se a criação for recusada por duplicata, a
@@ -49,7 +52,7 @@ Para cada notificação de autuação que aparecer no SNE:
    assim, sem o campo da infração**, e anote o auto como "sem infração no cadastro" no resumo final.
 4. **Crie a multa** com todos estes campos e mais nenhum:
    - `cr40f_novacoluna`: número do auto;
-   - `cr40f_codigodoorgaoautuador`: código do órgão autuador;
+   - `cr40f_codigodoorgaoautuador`: código do órgão autuador (número inteiro, só os dígitos);
    - `cr40f_nomedoorgaoautuador`: nome do órgão autuador;
    - placa: o veículo do item 2, como lookup (veja "Como gravar os lookups" abaixo);
    - `cr40f_dataehorario`: data e hora da infração;
@@ -108,4 +111,5 @@ Um resumo curto, nesta ordem:
 - puladas e por quê (já cadastrada, duplicada, placa não encontrada, dado obrigatório faltando no SNE, outra recusa com a
   mensagem) e PDFs que não subiram.
 
-Lembrete final: "Abra o e-mail Multas de hoje ou a lista Comigo no Sistema Betinhos para dar os próximos passos."
+Lembrete final: "Abra a lista Comigo das Multas no Sistema Betinhos para dar os próximos passos. O e-mail Multas de
+hoje chega às quartas, às 8h, com o mesmo resumo."
