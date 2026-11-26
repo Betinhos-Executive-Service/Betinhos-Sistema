@@ -1,13 +1,13 @@
 # Spec: Cancelado da Tenaris passa pela trava e vira Requer Análise
 
 ## Objetivo
-Quando a Tenaris cancela no sistema dela um serviço que a equipe já editou (status protegido), o status sai do aberto para Requer Análise, a gestão recebe o aviso que já existe e o motorista programado recebe o aviso Cancelado.
+Quando a Tenaris cancela no sistema dela um serviço (protegido ou não), o status sai do aberto para Requer Análise, a gestão recebe o aviso que já existe e o motorista programado recebe o aviso Cancelado.
 
 ## Fora de escopo
-Outros campos protegidos; status não protegido (segue gravando Cancelado direto); Cancelado com ressalvas vindo da Tenaris; tipo novo de aviso; tela.
+Outros campos protegidos; Cancelado com ressalvas vindo da Tenaris; tipo novo de aviso; tela.
 
 ## Como funciona hoje (conferido em 26/11/2026)
-- Flow "Flow Novo Sistema Tenaris -> Dataverse" (`cbcd9564-1b1e-f111-88b1-7ced8da87540`): `Compose_Status` traduz o texto da planilha (cancelado → 202410002 ...). `Upsert_Geral` manda o status atual do Dataverse quando `new_camposprotegidos` contém `cr40f_status`, senão o `Compose_Status`. Sempre manda `new_snapshotsharepoint`.
+- Flow "Flow Novo Sistema Tenaris -> Dataverse" (`cbcd9564-1b1e-f111-88b1-7ced8da87540`): `Compose_Status` traduz o texto da planilha (cancelado → 202410002, requer análise → 100000001 ...). `Upsert_Geral` manda o status atual do Dataverse quando `new_camposprotegidos` contém `cr40f_status`, senão o `Compose_Status`. Sempre manda `new_snapshotsharepoint`.
 - `Cr40f.Protecao.Plugin` (pré-operação, Update de `cr40f_reservadeveculos`): gravação com snapshot tem os campos protegidos removidos do Target.
 - "Flow Notificação Novo Requer Análise | Interno": gatilho em `cr40f_status eq 100000001` (ligado no PROD, rascunho no DEV). Avisa a gestão em qualquer mudança para Requer Análise.
 - `DriverNoticeRules`: aviso Cancelado só para status final Cancelado ou funcionário "Cancelado", partindo de Programado.
@@ -21,6 +21,8 @@ Outros campos protegidos; status não protegido (segue gravando Cancelado direto
 6. Aviso Cancelado chega com título "Serviço cancelado" e corpo "Este serviço foi cancelado e saiu da sua agenda."
 7. Cancelado da sincronização em status aberto → a gestão recebe "Cancelado pela Tenaris" (não o "Novo Serviço com Status Requer Análise"): "A Tenaris cancelou o serviço OS-X. / Estava: Programado · Agora: Requer Análise / | Data de Saída / | Motorista: Júnior (avisado no App) / | ID". Sem motorista: "Motorista: sem motorista". Motorista só leva "(avisado no App)" quando estava Programado.
 8. Cancelado da sincronização em Concluído → status continua Concluído; a gestão recebe o aviso uma vez só, com "Agora: Concluído (status mantido)". Sincronizações seguintes não repetem.
+10. A Tenaris marca o cancelamento como Requer Análise (é o que chega: 312 execuções do PROD desde 21/10/2026, nenhum "Cancelado"). Requer Análise e Cancelado da sincronização contam do mesmo jeito, protegido ou não, só quando o snapshot anterior não tinha nenhum dos dois.
+11. Equipe reabriu o serviço depois do cancelamento (snapshot anterior já cancelado) → a sincronização não o leva de novo para Requer Análise e não grava a marca.
 9. Equipe muda o status depois (qualquer gravação de status fora da sincronização) → a marca do cancelamento é limpa; Requer Análise posto pela equipe ou pelo App continua com a mensagem antiga.
 
 ## Dados (nomes lógicos conferidos)

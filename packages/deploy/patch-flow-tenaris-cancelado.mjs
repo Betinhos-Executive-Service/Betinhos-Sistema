@@ -1,8 +1,11 @@
 #!/usr/bin/env node
-// Deixa o "Cancelado" da Tenaris passar pela proteção do status no "Flow Novo Sistema Tenaris -> Dataverse".
+// Deixa o cancelamento da Tenaris passar pela proteção do status no "Flow Novo Sistema Tenaris -> Dataverse".
 // Antes: com cr40f_status em new_camposprotegidos, o Upsert_Geral regravava o status atual e o cancelamento sumia.
-// Depois: o Cancelado (202410002) vai sempre; o Cr40f.Protecao.Plugin decide (serviço aberto vira Requer Análise,
-// fechado continua barrado). Os outros status continuam respeitando a proteção. Já aplicado, não faz nada.
+// Depois: Cancelado (202410002) e Requer Análise (100000001, como a Tenaris marca o cancelamento; execuções do PROD
+// desde 21/10/2026) vão sempre; o Cr40f.Protecao.Plugin decide (serviço aberto vira Requer Análise com a marca,
+// fechado continua barrado, só quando o cancelamento é novo). Os outros status continuam respeitando a proteção.
+// O formato 'so-cancelado' (primeira versão, só 202410002, aplicada no DEV em 26/11/2026) é atualizado.
+// Já aplicado, não faz nada.
 // docs/features/tenaris-cancelado-requer-analise
 //
 // Uso (requer `az login`; sem --apply é DRY RUN):
@@ -19,7 +22,9 @@ const CAMPO = 'item/cr40f_status'
 const LINHA = "first(body('List_rows_Geral')?['value'])"
 const PROTEGIDO = `contains(coalesce(${LINHA}?['new_camposprotegidos'],''),'cr40f_status')`
 export const ANTES = `@if(${PROTEGIDO},${LINHA}?['cr40f_status'],outputs('Compose_Status'))`
-export const DEPOIS = `@if(and(${PROTEGIDO},not(equals(coalesce(outputs('Compose_Status'),''),'202410002'))),${LINHA}?['cr40f_status'],outputs('Compose_Status'))`
+const STATUS = "coalesce(outputs('Compose_Status'),'')"
+export const SO_CANCELADO = `@if(and(${PROTEGIDO},not(equals(${STATUS},'202410002'))),${LINHA}?['cr40f_status'],outputs('Compose_Status'))`
+export const DEPOIS = `@if(and(${PROTEGIDO},not(equals(${STATUS},'202410002')),not(equals(${STATUS},'100000001'))),${LINHA}?['cr40f_status'],outputs('Compose_Status'))`
 
 // Upsert_Geral em qualquer escopo (Loop_Servicos no formato antigo, Scope_Servico depois do patch do lote).
 function upsertGeral(acoes) {
@@ -38,6 +43,7 @@ export function estado(clientdata) {
   const valor = upsert?.inputs?.parameters?.[CAMPO]
   if (valor === DEPOIS) return 'final'
   if (valor === ANTES) return 'original'
+  if (valor === SO_CANCELADO) return 'so-cancelado'
   throw new Error(`Upsert_Geral fora do formato esperado (${CAMPO} = ${JSON.stringify(valor)}); nada foi alterado.`)
 }
 
@@ -77,7 +83,7 @@ async function main(argv) {
   const esperado = estado(clientdata) // no restaurar, recusa arquivo que não é deste flow
   console.log(`${o.ambiente}: '${FLOW_NOME}' (statecode ${flow.statecode}, modificado ${flow.modifiedon}), status do Upsert_Geral: ${estado(JSON.parse(flow.clientdata))}`)
   if (!mudou) { console.log('Já aplicado; nada a fazer.'); return }
-  console.log(`Depois: ${CAMPO} = ${esperado === 'final' ? DEPOIS : ANTES}`)
+  console.log(`Depois: ${CAMPO} = ${{ final: DEPOIS, original: ANTES, 'so-cancelado': SO_CANCELADO }[esperado]}`)
   if (!o.apply) { console.log('DRY RUN: nada foi gravado. Use --apply para gravar.'); return }
 
   backup(o.ambiente, flow.clientdata)

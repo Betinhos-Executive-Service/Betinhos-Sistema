@@ -20,10 +20,12 @@ public sealed class Resultado
 /// <summary>
 /// Campos da reserva da Tenaris editados pela equipe ficam protegidos contra a sincronização.
 /// A gravação da sincronização é reconhecida por trazer new_snapshotsharepoint (o Upsert_Geral do flow da Tenaris sempre manda).
-/// Exceção (decisão do Renan, 26/11/2026): o Cancelado da sincronização passa pela trava do status quando o serviço
-/// está aberto e vira Requer Análise, para o financeiro decidir a cobrança. O status anterior fica em
+/// Exceção (decisão do Renan, 26/11/2026): o cancelamento da sincronização, com o status protegido ou não, vira Requer
+/// Análise quando o serviço está aberto, para o financeiro decidir a cobrança; fechado não muda. A Tenaris marca o
+/// cancelamento como "Requer Análise" na planilha (nunca veio "Cancelado" nas execuções desde 21/10/2026); os dois contam.
+/// Vale só quando o cancelamento é novo (o snapshot anterior não trazia nenhum dos dois). O status anterior fica em
 /// cr40f_cancelamentocliente, que o flow de Requer Análise usa para avisar a gestão "Cancelado pela Tenaris";
-/// Concluído não muda, mas grava a coluna quando o cancelamento é novo (o snapshot anterior não tinha Cancelado).
+/// Concluído não muda, mas grava a coluna.
 /// </summary>
 public static class ProtecaoCampos
 {
@@ -50,7 +52,7 @@ public static class ProtecaoCampos
         if (alvo.Contains(Snapshot))
         {
             var canceladoPassa = false;
-            if (CanceladoProtegido(alvo, protegidos, anterior) is int atual)
+            if (CanceladoDaSincronizacao(alvo, anterior) is int atual && !PlanilhaJaCancelava(anterior))
             {
                 if (Abertos.TryGetValue(atual, out var rotulo))
                 {
@@ -58,9 +60,11 @@ public static class ProtecaoCampos
                     alvo[Status] = new OptionSetValue(RequerAnalise);
                     alvo[CancelamentoCliente] = rotulo;
                 }
-                // Uma vez só: a Tenaris manda Cancelado em toda sincronização; o snapshot anterior diz se já mandava.
-                else if (atual == Concluido && !PlanilhaJaCancelava(anterior))
-                    alvo[CancelamentoCliente] = "Concluído";
+                else
+                {
+                    if (!protegidos.Contains(Status)) alvo.Attributes.Remove(Status); // fechado não muda; protegido sai em barrados
+                    if (atual == Concluido) alvo[CancelamentoCliente] = "Concluído";
+                }
             }
             var barrados = protegidos.Where(campo => alvo.Contains(campo) && !(canceladoPassa && campo == Status)).ToList();
             foreach (var campo in barrados) alvo.Attributes.Remove(campo);
@@ -81,21 +85,24 @@ public static class ProtecaoCampos
         return new Resultado(adicionados, Array.Empty<string>());
     }
 
-    /// <summary>Status atual quando a sincronização manda Cancelado num status protegido. Só aberto passa; fechado
-    /// (Concluído, Requer Análise ou cancelado) não volta, porque a Tenaris manda Cancelado em toda sincronização.</summary>
-    static int? CanceladoProtegido(Entity alvo, List<string> protegidos, Entity? anterior) =>
-        protegidos.Contains(Status) && alvo.GetAttributeValue<OptionSetValue>(Status)?.Value == Cancelado
+    /// <summary>Status atual quando a sincronização manda Cancelado ou Requer Análise. Só aberto passa (como Requer
+    /// Análise); fechado (Concluído, Requer Análise ou cancelado) não volta. Sem status anterior (criação), nada muda
+    /// aqui: protegido fica barrado, não protegido grava o que veio.</summary>
+    static int? CanceladoDaSincronizacao(Entity alvo, Entity? anterior) =>
+        alvo.GetAttributeValue<OptionSetValue>(Status)?.Value is Cancelado or RequerAnalise
             ? anterior?.GetAttributeValue<OptionSetValue>(Status)?.Value
             : null;
 
     static bool TemMarca(Entity? anterior) => !string.IsNullOrEmpty(anterior?.GetAttributeValue<string>(CancelamentoCliente));
 
+    /// <summary>Uma vez só: a planilha repete o status em toda sincronização da linha; o snapshot anterior diz se já
+    /// cancelava (a equipe que reabriu depois não é desfeita).</summary>
     static bool PlanilhaJaCancelava(Entity? anterior)
     {
         var texto = anterior?.GetAttributeValue<string>(Snapshot);
         return !string.IsNullOrWhiteSpace(texto)
             && LerSnapshot(texto!).TryGetValue(Status, out var status)
-            && status == Cancelado.ToString(CultureInfo.InvariantCulture);
+            && (status == Cancelado.ToString(CultureInfo.InvariantCulture) || status == RequerAnalise.ToString(CultureInfo.InvariantCulture));
     }
 
     static List<string> LerLista(string? texto) =>

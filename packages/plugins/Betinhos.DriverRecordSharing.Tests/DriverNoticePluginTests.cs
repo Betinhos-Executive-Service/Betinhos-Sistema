@@ -228,12 +228,12 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void RequerAnaliseVindoDaPlanilhaNaoGeraAviso()
+        public void RequerAnaliseVindoDaPlanilhaGeraCancelado()
         {
-            // A planilha do cliente trouxe "Requer Análise" com o status não protegido: ninguém cancelou.
+            // A Tenaris marca o cancelamento como "Requer Análise" na planilha (decisão do Renan, 26/11/2026).
             RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", "{\"cr40f_status\":\"100000001\"}"), Pre(driverA, Programado));
 
-            Assert.Empty(Notices());
+            AssertOnly(TipoCancelado, driverA);
         }
 
         [Fact]
