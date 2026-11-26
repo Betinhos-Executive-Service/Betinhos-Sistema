@@ -84,17 +84,23 @@ namespace Betinhos.DriverRecordSharing
 
         private readonly Func<DateTime> clock;
         private readonly Func<IOrganizationService, ITracingService, ITermoInfleet> infleet;
+        private readonly IList<byte[]> acsConfiaveis;
 
         public TermoMultaCommandPlugin() : this((string)null, (string)null) { }
 
         public TermoMultaCommandPlugin(string unsecureConfig, string secureConfig)
-            : this(() => DateTime.UtcNow, (system, tracing) => new TermoInfleetGateway(system, secureConfig, tracing)) { }
+            : this(() => DateTime.UtcNow, (system, tracing) => new TermoInfleetGateway(system, secureConfig, tracing), null) { }
 
         public TermoMultaCommandPlugin(Func<DateTime> clock, Func<ITermoInfleet> infleet)
-            : this(clock, infleet == null ? null : (Func<IOrganizationService, ITracingService, ITermoInfleet>)((system, tracing) => infleet())) { }
+            : this(clock, infleet == null ? null : (Func<IOrganizationService, ITracingService, ITermoInfleet>)((system, tracing) => infleet()), null) { }
 
-        private TermoMultaCommandPlugin(Func<DateTime> clock, Func<IOrganizationService, ITracingService, ITermoInfleet> infleet)
+        /// <summary>Testes: <paramref name="acsConfiaveis"/> (DER) substitui a AC Final do gov.br na conferência do aditivo do motorista.</summary>
+        public TermoMultaCommandPlugin(Func<DateTime> clock, Func<ITermoInfleet> infleet, IList<byte[]> acsConfiaveis)
+            : this(clock, infleet == null ? null : (Func<IOrganizationService, ITracingService, ITermoInfleet>)((system, tracing) => infleet()), acsConfiaveis) { }
+
+        private TermoMultaCommandPlugin(Func<DateTime> clock, Func<IOrganizationService, ITracingService, ITermoInfleet> infleet, IList<byte[]> acsConfiaveis = null)
         {
+            this.acsConfiaveis = acsConfiaveis ?? AssinaturaGovBr.AcsGovBr();
             this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
             this.infleet = infleet ?? throw new ArgumentNullException(nameof(infleet));
         }
@@ -124,6 +130,8 @@ namespace Betinhos.DriverRecordSharing
                     case "new_LembrarAceiteMulta": LembrarAceite(context, caller, system); break;
                     case "new_GerarAditivoMotorista": GerarAditivo(context, system); break;
                     case "new_RegistrarAditivoMotorista": RegistrarAditivo(context, system); break;
+                    case "new_GerarMeuAditivo": GerarMeuAditivo(context, system, tracing); break;
+                    case "new_RegistrarMeuAditivo": RegistrarMeuAditivo(context, system, tracing); break;
                     case "Create":
                     case "Update":
                     case "Delete":
@@ -865,7 +873,11 @@ namespace Betinhos.DriverRecordSharing
         private static AditivoGerado RegerarAditivo(IPluginExecutionContext context, IOrganizationService system)
         {
             if (!TemPrivilegio(system, context.InitiatingUserId, PrivilegioGestor)) throw new InvalidPluginExecutionException("Só a gestão gera e anexa o aditivo.");
-            var id = InputGuid(context, "new_FuncionarioId");
+            return GerarDoFuncionario(system, InputGuid(context, "new_FuncionarioId"));
+        }
+
+        private static AditivoGerado GerarDoFuncionario(IOrganizationService system, Guid id)
+        {
             Entity funcionario;
             try { funcionario = system.Retrieve(Funcionario, id, new ColumnSet("cr40f_nomecompleto", "cr40f_numerodocpf")); }
             catch (Exception) { throw new InvalidPluginExecutionException("Funcionário não encontrado."); }
@@ -893,21 +905,82 @@ namespace Betinhos.DriverRecordSharing
         private static void GerarAditivo(IPluginExecutionContext context, IOrganizationService system)
         {
             var aditivo = RegerarAditivo(context, system);
-            var nome = SemAcento(aditivo.Funcionario.GetAttributeValue<string>("cr40f_nomecompleto"));
             context.OutputParameters["new_PdfBase64"] = Convert.ToBase64String(aditivo.Pdf);
-            context.OutputParameters["new_NomeArquivo"] = "aditivo-" + (nome.Length == 0 ? "funcionario" : nome) + "-" + SemAcento(aditivo.Versao) + ".pdf";
+            context.OutputParameters["new_NomeArquivo"] = NomeArquivoAditivo(aditivo);
         }
 
-        private void RegistrarAditivo(IPluginExecutionContext context, IOrganizationService system)
+        private static byte[] LerPdfAssinado(IPluginExecutionContext context)
         {
-            var aditivo = RegerarAditivo(context, system);
             var base64 = InputString(context, "new_PdfBase64");
             if (string.IsNullOrWhiteSpace(base64)) throw new InvalidPluginExecutionException("Envie o PDF assinado.");
             // O limite vale antes de decodificar: 5 MB em bytes são cerca de 7 milhões de caracteres em base64.
             if (base64.Length > (AditivoPdf.MaxBytes / 3 + 2) * 4) throw new InvalidPluginExecutionException("O PDF passa de 5 MB.");
-            byte[] assinado;
-            try { assinado = Convert.FromBase64String(base64); }
+            try { return Convert.FromBase64String(base64); }
             catch (FormatException) { throw new InvalidPluginExecutionException("Envie o PDF assinado."); }
+        }
+
+        // O motorista é sempre o chamador: não existe parâmetro de funcionário. O aditivo só é liberado com o módulo Multas ligado para ele.
+        private Guid MotoristaChamador(IPluginExecutionContext context, IOrganizationService system, ITracingService tracing)
+        {
+            var driver = new DriverResolver(system, tracing ?? NullTrace.Instance).ResolveFromUser(new EntityReference("systemuser", context.InitiatingUserId));
+            RecusarSeDuplicado(system, driver, tracing);
+            if (driver?.EmployeeReference == null) throw new InvalidPluginExecutionException("Não encontramos o seu cadastro de motorista. Procure o escritório.");
+            ExigirMultas(system, driver.EmployeeReference.Id);
+            return driver.EmployeeReference.Id;
+        }
+
+        private void GerarMeuAditivo(IPluginExecutionContext context, IOrganizationService system, ITracingService tracing)
+        {
+            var aditivo = GerarDoFuncionario(system, MotoristaChamador(context, system, tracing));
+            ExigirCpfValido(aditivo.Funcionario); // recusa já aqui: não adianta assinar um aditivo que o servidor não vai aceitar
+            context.OutputParameters["new_PdfBase64"] = Convert.ToBase64String(aditivo.Pdf);
+            context.OutputParameters["new_NomeArquivo"] = NomeArquivoAditivo(aditivo);
+        }
+
+        // Certifica pelo próprio PDF: é o aditivo deste motorista (bytes do gerado intactos), a assinatura vale na cadeia Gov-Br e o CPF
+        // de quem assinou é o do cadastro. Nada disso vai para trace nem mensagem com dado pessoal.
+        private void RegistrarMeuAditivo(IPluginExecutionContext context, IOrganizationService system, ITracingService tracing)
+        {
+            var id = MotoristaChamador(context, system, tracing);
+            var atual = system.Retrieve(Funcionario, id, new ColumnSet("new_aditivoassinaturaem", "new_aditivoassinatura"));
+            if (TemAditivo(atual)) return; // idempotente: já registrado, não regrava
+            var aditivo = GerarDoFuncionario(system, id);
+            var assinado = LerPdfAssinado(context);
+            var erro = AditivoPdf.Conferir(assinado, aditivo.Pdf);
+            if (erro != null)
+                throw new InvalidPluginExecutionException(erro.StartsWith("Este PDF não é o aditivo", StringComparison.Ordinal)
+                    ? "Este PDF não é o seu aditivo. Baixe o aditivo no App, assine no gov.br e envie o arquivo devolvido." : erro);
+            var alterado = AcrescimoPdf.Conferir(assinado, aditivo.Pdf);
+            if (alterado != null) throw new InvalidPluginExecutionException(alterado);
+            var agora = clock();
+            var conferida = AssinaturaGovBr.Verificar(assinado, aditivo.Pdf.Length, acsConfiaveis, agora, tracing);
+            if (conferida.Erro != null) throw new InvalidPluginExecutionException(conferida.Erro);
+            var cpfCadastro = ExigirCpfValido(aditivo.Funcionario);
+            if (conferida.Cpf != cpfCadastro) throw new InvalidPluginExecutionException("O CPF de quem assinou não é o do seu cadastro. Assine com a sua própria conta gov.br.");
+            var dia = TimeZoneInfo.ConvertTimeFromUtc(agora, SaoPaulo()).Date;
+            UploadPdf(system, aditivo.Funcionario.ToEntityReference(), NomeArquivoAditivo(aditivo), assinado, ColunaAditivo);
+            system.Update(new Entity(Funcionario, id) { ["new_aditivoassinaturaem"] = DateTime.SpecifyKind(dia.AddHours(12), DateTimeKind.Utc) });
+        }
+
+        private static string ExigirCpfValido(Entity funcionario)
+        {
+            var cpf = AssinaturaGovBr.Digitos(funcionario.GetAttributeValue<string>("cr40f_numerodocpf"));
+            if (cpf.Length != 11) throw new InvalidPluginExecutionException("Seu cadastro está sem CPF válido. Procure o escritório.");
+            return cpf;
+        }
+
+        private static string NomeArquivoAditivo(AditivoGerado aditivo)
+        {
+            var nome = SemAcento(aditivo.Funcionario.GetAttributeValue<string>("cr40f_nomecompleto"));
+            return "aditivo-" + (nome.Length == 0 ? "funcionario" : nome) + "-" + SemAcento(aditivo.Versao) + ".pdf";
+        }
+
+        // Fluxo da gestão: a data vem informada e a conferência é só a de integridade (AditivoPdf.Conferir). Ela não exige a cadeia Gov-Br
+        // nem o CPF de propósito: a gestão registra aditivo assinado por outros meios e o motorista tem o caminho certificado acima.
+        private void RegistrarAditivo(IPluginExecutionContext context, IOrganizationService system)
+        {
+            var aditivo = RegerarAditivo(context, system);
+            var assinado = LerPdfAssinado(context);
             var assinadoEm = context.InputParameters.Contains("new_AssinadoEm") && context.InputParameters["new_AssinadoEm"] is DateTime d ? d : (DateTime?)null;
             if (assinadoEm == null) throw new InvalidPluginExecutionException("Informe a data da assinatura.");
             var dia = assinadoEm.Value.Kind == DateTimeKind.Utc ? TimeZoneInfo.ConvertTimeFromUtc(assinadoEm.Value, SaoPaulo()).Date : assinadoEm.Value.Date;

@@ -244,6 +244,9 @@ type InitialScreenProps = {
   pendingGastosCartao?: number;
   /** "Você tem N multas para assinar · prazo até dd/mm"; null sem pendências. */
   multasBanner?: string | null;
+  /** Motorista sem aditivo de assinatura eletrônica: cartão na Home (some com o módulo Multas desligado). */
+  semAditivo?: boolean;
+  onOpenAditivo?: () => void;
   canGeneratePersonalReceipt?: boolean;
   isThirdParty?: boolean;
   showLocalReset?: boolean;
@@ -468,6 +471,8 @@ export function InitialScreen(props: InitialScreenProps) {
     .filter((type) => type.count > 0 && ligado(type.id === "gastosCartao" ? "expenses" : type.id))
     .map((type) => ({ id: type.id, text: type.text(type.count) }));
 
+  const cartaoAditivo = props.semAditivo === true && ligado("multas") && !!props.onOpenAditivo;
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
@@ -533,8 +538,14 @@ export function InitialScreen(props: InitialScreenProps) {
         </button>
       )}
 
-      {pendencias.length > 0 && (
+      {(pendencias.length > 0 || cartaoAditivo) && (
         <section className="concept-pending" aria-label="Pendências">
+          {cartaoAditivo ? (
+            <button className="concept-pending-row" type="button" data-testid="cartao-aditivo" onClick={() => props.onOpenAditivo?.()}>
+              <span className="concept-pending-dot" aria-hidden="true" />
+              <span className="concept-pending-text">Assine o aditivo de assinatura eletrônica</span>
+            </button>
+          ) : null}
           {pendencias.map((item) => (
             <button className="concept-pending-row" key={item.id} type="button" onClick={() => navigateTo(item.id)}>
               <span className="concept-pending-dot" aria-hidden="true" />

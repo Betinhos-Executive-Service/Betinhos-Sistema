@@ -30,6 +30,7 @@ export type Screen =
   | "boasIdeias"
   | "meuCarro"
   | "multas"
+  | "aditivo"
   | "treinamentos"
   | "minhaNota"
   | "gastosCartao"

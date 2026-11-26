@@ -1,5 +1,6 @@
 import type { MinhaMulta, CargaStatus } from "./minhasMultas";
 import { declararAceite } from "./minhasMultas";
+import { AditivoScreen } from "./AditivoMotorista";
 import { MinhasMultasScreen } from "./MinhasMultasScreen";
 import type { TermoMulta } from "./termosMulta";
 import type { Screen } from "../../types";
@@ -14,6 +15,7 @@ type Props = {
   minhasMultas: MinhaMulta[];
   minhasMultasOfflineEm: string | null;
   minhasMultasLidoEm: string | null;
+  onAditivoConfirmado: () => void;
 };
 
 // Tela Multas: o que precisa do motorista, o que está em andamento e as encerradas.
@@ -25,12 +27,17 @@ export function rotasTermos(screen: Screen, {
   termosStatus,
   minhasMultas,
   minhasMultasOfflineEm,
-  minhasMultasLidoEm
+  minhasMultasLidoEm,
+  onAditivoConfirmado
 }: Props): ReactNode | null {
   if (screen === "multas") {
     return (
-      <MinhasMultasScreen items={minhasMultas} termos={termosMulta} loadStatus={termosStatus} offlineEm={minhasMultasOfflineEm} lidoEm={minhasMultasLidoEm} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onDeclarar={declararAceite} onSelectedChange={setTourTermoId} />
+      <MinhasMultasScreen items={minhasMultas} termos={termosMulta} loadStatus={termosStatus} offlineEm={minhasMultasOfflineEm} lidoEm={minhasMultasLidoEm} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onDeclarar={declararAceite} onSelectedChange={setTourTermoId} onAditivoConfirmado={onAditivoConfirmado} />
     );
+  }
+  if (screen === "aditivo") {
+    // "Voltar" só navega: o cartão da Home sai apenas quando o servidor confirma o aditivo.
+    return <AditivoScreen onBack={() => setScreen("inicio")} onConfirmado={onAditivoConfirmado} />;
   }
   return null;
 }

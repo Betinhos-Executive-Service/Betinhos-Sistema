@@ -22,6 +22,8 @@ type Props = {
   onDeclarar: (multaId: string) => Promise<void>;
   /** Avisa o App quando um termo abre ou fecha (o tour tem um capítulo para cada estado). */
   onSelectedChange?: (id: string) => void;
+  /** O motorista confirmou o aditivo dentro do termo: tira o cartão da Home. */
+  onAditivoConfirmado?: () => void;
 };
 
 function useOnline(aoVoltar: () => void) {
@@ -189,7 +191,7 @@ function Grupo({ titulo, destaque, children }: { titulo: string; destaque?: bool
   );
 }
 
-export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, lidoEm, onBack, onReload, onDeclarar, onSelectedChange }: Props) {
+export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, lidoEm, onBack, onReload, onDeclarar, onSelectedChange, onAditivoConfirmado }: Props) {
   // Guarda o termo aberto: depois de assinar a multa muda de grupo, mas a tela de sucesso continua.
   const [selected, setSelected] = useState<TermoMulta | null>(null);
   useEffect(() => { onSelectedChange?.(selected?.id ?? ""); }, [selected?.id, onSelectedChange]);
@@ -238,7 +240,7 @@ export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, lidoE
     <AppShell screenLabel="Multas">
       {selected ? (
         // O detalhe desenha o próprio cabeçalho: o Voltar dele volta uma etapa do fluxo.
-        <TermoMultaDetalheScreen key={selected.id} termo={selected} onDone={close} onRefresh={refresh} />
+        <TermoMultaDetalheScreen key={selected.id} termo={selected} onDone={close} onRefresh={refresh} onAditivoConfirmado={onAditivoConfirmado} />
       ) : (
         <>
           <ServicesMenu title="Multas" eyebrow={isMockTermos() ? "Operação · Mock local" : "Operação"} homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={refresh} />

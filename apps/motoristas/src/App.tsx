@@ -230,7 +230,7 @@ function App() {
     voucherDrafts
   });
 
-  const { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
+  const { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce, semAditivo, aditivoConfirmado } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
   const treinamentosLista = useTreinamentos({ comunicadosDriverIdRef, driverContextId: driverContext?.id, setScreen });
   const { setSelectedTreinamentoId, treinamentos } = treinamentosLista;
   const cartao = useGastosCartao({ comunicadosDriverIdRef, despesas, driverContextId: driverContext?.id, gastoCartaoAtualRef, remoteMode, screen, setScreen });
@@ -613,7 +613,8 @@ function App() {
     termosStatus,
     minhasMultas,
     minhasMultasOfflineEm,
-    minhasMultasLidoEm
+    minhasMultasLidoEm,
+    onAditivoConfirmado: aditivoConfirmado
   });
   if (telaTermos) return show(telaTermos);
 
@@ -649,6 +650,8 @@ function App() {
       pendingTreinamentos={treinamentos.filter(isTreinamentoPendente).length}
       pendingGastosCartao={cartao.gastosCartaoPendentes.length}
       multasBanner={resumoPendentes(termosMulta)}
+      semAditivo={semAditivo}
+      onOpenAditivo={() => setScreen("aditivo")}
       driverId={driverContext?.id}
       driverName={driverContext?.fullName || (isPreviewMode() ? configApp.nomePreview() : undefined)}
       showLocalReset={isLocalhostRuntime && !remoteMode}

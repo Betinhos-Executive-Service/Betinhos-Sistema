@@ -429,6 +429,45 @@ export async function consultarAditivo(): Promise<boolean> {
   return result.new_TemAditivo === true || result.new_TemAditivo === "true";
 }
 
+export const ADITIVO_LIMITE_BYTES = 5 * 1024 * 1024;
+export const ADITIVO_ASSINADOR_URL = "https://assinador.iti.br";
+
+/** Baixa o aditivo do próprio motorista (a API ignora qualquer id: gera só o de quem chama). Mock: mockAditivo=erro-gerar. */
+export async function gerarMeuAditivo(): Promise<PdfTermo> {
+  if (isMockTermos()) {
+    await mockDelay();
+    if (mockParam("mockAditivo") === "erro-gerar") throw new Error("Não encontramos o seu cadastro de motorista. Procure o escritório.");
+    return { base64: btoa("%PDF-1.4\n% aditivo (mock)\n"), nome: "aditivo-assinatura-eletronica.pdf" };
+  }
+  const result = await executeCustomApi("new_GerarMeuAditivo", {});
+  const base64 = String(result.new_PdfBase64 ?? "");
+  if (!base64) throw new Error("O PDF do aditivo veio vazio.");
+  return { base64, nome: String(result.new_NomeArquivo || "aditivo-assinatura-eletronica.pdf") };
+}
+
+/** Envia o PDF devolvido pelo gov.br; o servidor confere dono, assinatura e CPF. Mock: mockAditivo=cpf|alterado|outro|ok. */
+export async function registrarMeuAditivo(base64: string): Promise<void> {
+  if (isMockTermos()) {
+    await mockDelay();
+    const falha = mockParam("mockAditivo");
+    if (falha === "cpf") throw new Error("O CPF de quem assinou não é o do seu cadastro. Assine com a sua própria conta gov.br.");
+    if (falha === "alterado") throw new Error("O PDF foi alterado depois da assinatura. Baixe o aditivo de novo e assine sem mexer no arquivo.");
+    if (falha === "outro") throw new Error("Este PDF não é o seu aditivo. Baixe o aditivo no App, assine no gov.br e envie o arquivo devolvido.");
+    return;
+  }
+  await executeCustomApi("new_RegistrarMeuAditivo", { new_PdfBase64: base64 });
+}
+
+/** Lê o PDF escolhido como base64 puro; recusa tipo errado e arquivo acima do limite antes de enviar. */
+export async function lerPdfAssinado(file: File): Promise<string> {
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") throw new Error("Escolha o arquivo PDF devolvido pelo gov.br.");
+  if (file.size > ADITIVO_LIMITE_BYTES) throw new Error("O arquivo passa de 5 MB. Envie o PDF devolvido pelo gov.br, sem alterações.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
 type XrmOpenFile = (file: { fileContent: string; fileName: string; fileSize: number; mimeType: string }, options?: { openMode: number }) => Promise<unknown> | unknown;
 export type AbrirPdfEnv = {
   xrmOpenFile?: XrmOpenFile;

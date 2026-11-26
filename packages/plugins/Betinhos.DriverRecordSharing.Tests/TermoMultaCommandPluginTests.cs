@@ -188,7 +188,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(Pendente, Status(termo));
         }
 
-        private static void DesligarMultas(Scenario s)
+        internal static void DesligarMultas(Scenario s)
             => s.Rows("cr40f_appconfigversao").Single()["cr40f_conteudo"] = "{\"proprio\":{\"multas\":false},\"terceiro\":{\"multas\":false}}";
 
         [Fact]
@@ -1066,11 +1066,11 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Null(s.UploadedPdf);
         }
 
-        private static RemoteExecutionContext Run(Scenario s, string message, Guid user, Dictionary<string, object> inputs)
+        internal static RemoteExecutionContext Run(Scenario s, string message, Guid user, Dictionary<string, object> inputs, IList<byte[]> acs = null)
         {
             var ctx = new RemoteExecutionContext { MessageName = message, InitiatingUserId = user, UserId = user, Depth = 1 };
             foreach (var input in inputs) ctx.InputParameters[input.Key] = input.Value;
-            new TermoMultaCommandPlugin(() => s.Relogio, () => s).Execute(new Provider(ctx, s));
+            new TermoMultaCommandPlugin(() => s.Relogio, () => s, acs).Execute(new Provider(ctx, s));
             return ctx;
         }
 
@@ -1096,7 +1096,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             }
         }
 
-        private static Scenario Cenario()
+        internal static Scenario Cenario()
         {
             var s = new Scenario();
             var gestor = s.Add(new Entity("systemuser") { ["internalemailaddress"] = "gestor@empresa.test", ["isdisabled"] = false });

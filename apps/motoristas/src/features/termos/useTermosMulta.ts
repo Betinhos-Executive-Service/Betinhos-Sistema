@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type MutableRefObject } from "react";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { agruparMinhasMultas, erroDeRede, listarMinhasMultas, type CargaStatus, type MinhaMulta } from "./minhasMultas";
 import { lerMinhasMultas, salvarMinhasMultas, usuarioAtual } from "./minhasMultasOffline";
-import { isMockTermos, listarTermosMotorista, type TermoMulta } from "./termosMulta";
+import { consultarAditivo, isMockTermos, listarTermosMotorista, type TermoMulta } from "./termosMulta";
 
 export type TermosLoadStatus = CargaStatus;
 
@@ -16,6 +16,9 @@ export function useTermosMulta(driverIdRef: MutableRefObject<string>, driverId: 
 
   /** Hora da última leitura bem-sucedida: a faixa de sem conexão a usa quando a rede cai depois de carregar. */
   const [minhasMultasLidoEm, setMinhasMultasLidoEm] = useState<string | null>(null);
+
+  /** true = o motorista ainda não tem aditivo (cartão na Home); falha na consulta (ex.: Multas desligado) não mostra cartão. */
+  const [semAditivo, setSemAditivo] = useState(false);
 
   const carregarMinhasMultas = useCallback(async () => {
     try {
@@ -44,7 +47,11 @@ export function useTermosMulta(driverIdRef: MutableRefObject<string>, driverId: 
     const termos = listarTermosMotorista(driverIdRef.current).then(setTermosMulta, (error) => {
       reportAppError(error, { severity: "warning", source: "app", action: "listarTermosMotorista", notifyUser: false });
     });
-    await Promise.all([carregarMinhasMultas(), termos]);
+    const aditivo = consultarAditivo().then((tem) => setSemAditivo(!tem), (error) => {
+      setSemAditivo(false);
+      reportAppError(error, { severity: "info", source: "app", action: "consultarAditivo", notifyUser: false });
+    });
+    await Promise.all([carregarMinhasMultas(), termos, aditivo]);
   }, [carregarMinhasMultas]);
 
   useEffect(() => {
@@ -52,6 +59,7 @@ export function useTermosMulta(driverIdRef: MutableRefObject<string>, driverId: 
     reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarMinhasMultas", notifyUser: false }));
   }, [driverId]);
 
+  const aditivoConfirmado = useCallback(() => setSemAditivo(false), []);
   const precisaDeVoce = agruparMinhasMultas(minhasMultas).precisa.length;
-  return { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce };
+  return { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce, semAditivo, aditivoConfirmado };
 }
