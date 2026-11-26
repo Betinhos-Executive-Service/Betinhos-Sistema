@@ -13,7 +13,7 @@ Motorista com serviço Programado recebe push "Serviço cancelado" quando o serv
 - Cancelado não tem prazo de visualização (como Retirado).
 
 ## Flow "Aviso Motorista | Enviar" (`provision-flow-aviso-motorista.ps1`)
-- Cancelado: título "Serviço cancelado"; corpo "<OS> · <dia>\nCancelado pelo gestor. Toque para ver a agenda atualizada."; link `?agenda=1` (como Retirado). Envio igual ao Retirado (não depende de o serviço continuar Programado).
+- Cancelado: título "Serviço cancelado"; corpo "<OS> · <dia>\nEste serviço foi cancelado e saiu da sua agenda."; link `?agenda=1` (como Retirado). Envio igual ao Retirado (não depende de o serviço continuar Programado).
 - Vigia: já trata todo tipo diferente de Novo como Retirado; sem mudança.
 
 ## Cenários de aceite

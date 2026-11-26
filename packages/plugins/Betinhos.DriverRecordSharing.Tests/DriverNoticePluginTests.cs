@@ -23,6 +23,8 @@ namespace Betinhos.DriverRecordSharing.Tests
         private const int Solicitado = 202410004;
         private const int StatusCancelado = 202410002;
         private const int CanceladoComRessalvas = 202410010;
+        private const int RequerAnalise = 100000001;
+        private const string SnapshotCancelado = "{\"cr40f_cr\":\"501019731\",\"cr40f_status\":\"202410002\"}";
         private const int Novo = 100000000;
         private const int Retirado = 100000001;
         private const int TipoCancelado = 100000002;
@@ -206,6 +208,40 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(Pendente, Option(aviso, "new_situacao"));
             Assert.False(aviso.Contains("new_prazovisualizacao"));
             Assert.Equal($"{correlationId:N}:{serviceId:N}:{driverA:N}:Cancelado", aviso.GetAttributeValue<string>("new_chaveidempotencia"));
+        }
+
+        [Fact]
+        public void SincronizacaoLevandoProgramadoParaRequerAnaliseGeraCancelado()
+        {
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", SnapshotCancelado), Pre(driverA, Programado));
+
+            AssertOnly(TipoCancelado, driverA);
+        }
+
+        [Fact]
+        public void RequerAnaliseSemSnapshotNaoGeraAviso()
+        {
+            // O motorista cancela no local pelo App: ele mesmo fez a ação.
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise)), Pre(driverA, Programado));
+
+            Assert.Empty(Notices());
+        }
+
+        [Fact]
+        public void RequerAnaliseVindoDaPlanilhaGeraCancelado()
+        {
+            // A Tenaris marca o cancelamento como "Requer Análise" na planilha (decisão do Renan, 26/11/2026).
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", "{\"cr40f_status\":\"100000001\"}"), Pre(driverA, Programado));
+
+            AssertOnly(TipoCancelado, driverA);
+        }
+
+        [Fact]
+        public void SincronizacaoLevandoConfirmadoParaRequerAnaliseNaoGeraAviso()
+        {
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", SnapshotCancelado), Pre(driverA, Confirmado));
+
+            Assert.Empty(Notices());
         }
 
         [Fact]

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Microsoft.Xrm.Sdk;
 
 namespace Betinhos.DriverRecordSharing
@@ -30,6 +31,9 @@ namespace Betinhos.DriverRecordSharing
     /// </summary>
     public static class DriverNoticeRules
     {
+        // Snapshot da planilha do cliente (JSON de texto) com o status Cancelado ou Requer Análise (é como a Tenaris
+        // marca o cancelamento; decisão do Renan, 26/11/2026: o motorista recebe o aviso Cancelado nos dois).
+        private static readonly Regex SyncSnapshotCanceled = new Regex("\"cr40f_status\"\\s*:\\s*\"(202410002|100000001)\"", RegexOptions.CultureInvariant);
         private static readonly TimeSpan ViewWindow = TimeSpan.FromMinutes(30);
         private static readonly TimeSpan ImminentDeparture = TimeSpan.FromHours(2);
 
@@ -75,12 +79,16 @@ namespace Betinhos.DriverRecordSharing
 
             // Serviço programado que deixa de existir para o motorista anterior: cancelado pelo status ou pela troca
             // para o funcionário "Cancelado", em qualquer ordem. Cancelado com ressalvas fica de fora (decisão do Renan).
+            // Requer Análise só conta quando a gravação é da sincronização com Cancelado ou Requer Análise no snapshot
+            // (o Cr40f.Protecao.Plugin deixou passar); o "cancelado no local" do App e a equipe na tela não avisam.
+            var canceledBySync = finalStatus == PluginConfig.ServiceStatusRequiresAnalysis &&
+                SyncSnapshotCanceled.IsMatch(target.GetAttributeValue<string>(PluginConfig.ServiceSyncSnapshot) ?? string.Empty);
             if (previousDriver != null &&
                 previousStatus == PluginConfig.ServiceStatusProgrammed &&
-                (driverChanged || finalStatus == PluginConfig.ServiceStatusCanceled) &&
+                (driverChanged || finalStatus == PluginConfig.ServiceStatusCanceled || canceledBySync) &&
                 !isCanceledEmployee(previousDriver))
             {
-                var canceled = finalStatus == PluginConfig.ServiceStatusCanceled || (finalDriver != null && isCanceledEmployee(finalDriver));
+                var canceled = finalStatus == PluginConfig.ServiceStatusCanceled || canceledBySync || (finalDriver != null && isCanceledEmployee(finalDriver));
                 notices.Add(new PlannedDriverNotice(canceled ? DriverNoticeKind.Cancelado : DriverNoticeKind.Retirado, previousDriver));
             }
 

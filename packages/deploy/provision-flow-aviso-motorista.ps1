@@ -166,7 +166,7 @@ $today = "convertFromUtc(utcNow(), '$tz')"
 $day = "if(empty($departureUtc), 'Horário a definir', if(equals($departureDay, formatDateTime($today, 'yyyy-MM-dd')), concat('Hoje às ', $time), if(equals($departureDay, formatDateTime(addDays($today, 1), 'yyyy-MM-dd')), concat('Amanhã às ', $time), if(equals($departureDay, formatDateTime(addDays($today, -1), 'yyyy-MM-dd')), concat('Ontem às ', $time), formatDateTime(convertFromUtc($departureUtc, '$tz'), 'dd/MM ''às'' HH:mm')))))"
 # Notificação em duas partes: título diz o que aconteceu, corpo diz qual serviço e quando (sem caixa alta).
 $title = "@{if($isNovo, 'Novo serviço na sua agenda', if($isCancelado, 'Serviço cancelado', 'Serviço retirado da sua agenda'))}"
-$message = "@{outputs('Get_reserva')?['body/cr40f_id']} · @{$day}`n@{if($isNovo, 'Adicionado pelo gestor. Toque para ver os detalhes.', if($isCancelado, 'Cancelado pelo gestor. Toque para ver a agenda atualizada.', 'Removido pelo gestor. Toque para ver a agenda atualizada.'))}"
+$message = "@{outputs('Get_reserva')?['body/cr40f_id']} · @{$day}`n@{if($isNovo, 'Adicionado pelo gestor. Toque para ver os detalhes.', if($isCancelado, 'Este serviço foi cancelado e saiu da sua agenda.', 'Removido pelo gestor. Toque para ver a agenda atualizada.'))}"
 
 $sendPush = @{
   type = "OpenApiConnection"

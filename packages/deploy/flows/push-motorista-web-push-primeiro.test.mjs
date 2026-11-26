@@ -147,7 +147,7 @@ test('Aviso Motorista | Enviar: tipo Cancelado (100000002) tem título, corpo e 
   assert.ok(ps1.includes('$tipoCancelado = 100000002'))
   assert.ok(ps1.includes(`$isCancelado = "equals(outputs('Get_aviso')?['body/new_tipo'], $tipoCancelado)"`))
   assert.ok(ps1.includes(`if($isNovo, 'Novo serviço na sua agenda', if($isCancelado, 'Serviço cancelado', 'Serviço retirado da sua agenda'))`))
-  assert.ok(ps1.includes(`if($isNovo, 'Adicionado pelo gestor. Toque para ver os detalhes.', if($isCancelado, 'Cancelado pelo gestor. Toque para ver a agenda atualizada.', 'Removido pelo gestor. Toque para ver a agenda atualizada.'))`))
+  assert.ok(ps1.includes(`if($isNovo, 'Adicionado pelo gestor. Toque para ver os detalhes.', if($isCancelado, 'Este serviço foi cancelado e saiu da sua agenda.', 'Removido pelo gestor. Toque para ver a agenda atualizada.'))`))
   // Só o Novo abre o detalhe; Retirado e Cancelado abrem a agenda.
   assert.ok(ps1.includes(`if($isNovo, concat('/WebResources/new_app-motoristas-v2?servicoId=', outputs('Get_aviso')?['body/_new_reserva_value']), '/WebResources/new_app-motoristas-v2?agenda=1')`))
   // Só o Novo exige o serviço ainda Programado com o mesmo motorista; o Cancelado entrega como o Retirado.

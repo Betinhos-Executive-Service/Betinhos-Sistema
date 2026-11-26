@@ -10,6 +10,8 @@ namespace Cr40f.Protecao.Plugin.Tests;
 public class ProtecaoCamposTests
 {
     const string Planilha = "{\"cr40f_destino\":\"Aeroporto; \\n\",\"cr40f_dataehorriodesada\":\"2026-11-04T14:30:00Z\",\"cr40f_horrioprevistoderetorno\":\"\",\"cr40f_status\":\"202410001\",\"cr40f_cr\":\"501019731\"}";
+    const string PlanilhaCancelada = "{\"cr40f_status\":\"202410002\"}";
+    const string PlanilhaRequerAnalise = "{\"cr40f_status\":\"100000001\"}"; // como a Tenaris marca o cancelamento
     static readonly Guid Id = Guid.NewGuid();
 
     static Entity Anterior(string? lista = null, string? snapshot = Planilha, int tipo = 202410000) => new("cr40f_reservadeveculos", Id)
@@ -40,12 +42,197 @@ public class ProtecaoCamposTests
         Assert.False(alvo.Contains(ProtecaoCampos.Lista));
     }
 
-    [Fact]
-    public void Status_cancelado_da_tenaris_tambem_e_barrado()
+    [Theory]
+    [InlineData(202410000, "Pré-reserva")]
+    [InlineData(202410004, "Solicitado")]
+    [InlineData(202410005, "Programado")]
+    [InlineData(202410001, "Confirmado")]
+    [InlineData(202410006, "Em Execução")]
+    public void Cancelado_da_sincronizacao_em_servico_aberto_vira_requer_analise(int atual, string rotulo)
     {
+        var anterior = Anterior("cr40f_status,cr40f_cr"); anterior["cr40f_status"] = new OptionSetValue(atual);
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo["cr40f_cr"] = "999"; alvo[ProtecaoCampos.Snapshot] = Planilha;
+        var r = ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.Equal(100000001, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.Equal(rotulo, alvo[ProtecaoCampos.CancelamentoCliente]);
+        Assert.Equal(new[] { "cr40f_cr" }, r.Barrados);
+        Assert.False(alvo.Contains("cr40f_cr"));
+        Assert.True(alvo.Contains(ProtecaoCampos.Snapshot));
+    }
+
+    [Theory]
+    [InlineData(202410008)] // Concluído
+    [InlineData(100000001)] // Requer Análise
+    [InlineData(202410002)] // Cancelado
+    [InlineData(202410010)] // Cancelado com ressalvas
+    public void Cancelado_da_sincronizacao_em_servico_fechado_e_barrado(int atual)
+    {
+        var anterior = Anterior("cr40f_status"); anterior["cr40f_status"] = new OptionSetValue(atual);
         var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        var r = ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.False(alvo.Contains("cr40f_status"));
+        Assert.Equal(new[] { "cr40f_status" }, r.Barrados);
+        Assert.Equal(atual == 202410008, alvo.Contains(ProtecaoCampos.CancelamentoCliente));
+    }
+
+    [Fact]
+    public void Cancelado_da_sincronizacao_em_concluido_marca_o_cancelamento_uma_vez()
+    {
+        var anterior = Anterior("cr40f_status"); anterior["cr40f_status"] = new OptionSetValue(202410008);
+        var primeira = Alvo(); primeira["cr40f_status"] = new OptionSetValue(202410002); primeira[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(primeira, anterior);
+        Assert.Equal("Concluído", primeira[ProtecaoCampos.CancelamentoCliente]);
+
+        anterior[ProtecaoCampos.CancelamentoCliente] = "Concluído"; anterior[ProtecaoCampos.Snapshot] = PlanilhaCancelada;
+        var seguinte = Alvo(); seguinte["cr40f_status"] = new OptionSetValue(202410002); seguinte[ProtecaoCampos.Snapshot] = PlanilhaCancelada;
+        ProtecaoCampos.Aplicar(seguinte, anterior);
+        Assert.False(seguinte.Contains(ProtecaoCampos.CancelamentoCliente));
+        Assert.False(seguinte.Contains("cr40f_status"));
+    }
+
+    [Fact]
+    public void Concluido_que_a_planilha_ja_cancelava_nao_avisa()
+    {
+        // Financeiro decidiu Concluído depois do Requer Análise (marca limpa) e OS antigas no primeiro Deploy: a planilha já mandava Cancelado.
+        var anterior = Anterior("cr40f_status", PlanilhaCancelada); anterior["cr40f_status"] = new OptionSetValue(202410008);
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = PlanilhaCancelada;
+        ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.False(alvo.Contains(ProtecaoCampos.CancelamentoCliente));
+        Assert.False(alvo.Contains("cr40f_status"));
+    }
+
+    [Theory]
+    [InlineData(202410005, "Programado")]
+    [InlineData(202410001, "Confirmado")]
+    public void Requer_analise_da_sincronizacao_em_servico_aberto_marca_o_cancelamento(int atual, string rotulo)
+    {
+        var anterior = Anterior("cr40f_status"); anterior["cr40f_status"] = new OptionSetValue(atual);
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(100000001); alvo[ProtecaoCampos.Snapshot] = PlanilhaRequerAnalise;
+        var r = ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.Equal(100000001, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.Equal(rotulo, alvo[ProtecaoCampos.CancelamentoCliente]);
+        Assert.Empty(r.Barrados);
+    }
+
+    [Fact]
+    public void Requer_analise_sem_protecao_em_servico_aberto_marca_o_cancelamento()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(100000001); alvo[ProtecaoCampos.Snapshot] = PlanilhaRequerAnalise;
+        ProtecaoCampos.Aplicar(alvo, Anterior());
+        Assert.Equal(100000001, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.Equal("Confirmado", alvo[ProtecaoCampos.CancelamentoCliente]);
+    }
+
+    [Theory]
+    [InlineData("{\"cr40f_status\":\"100000001\"}")]
+    [InlineData("{\"cr40f_status\":\"202410002\"}")]
+    public void Equipe_que_reabriu_depois_do_cancelamento_nao_e_desfeita(string snapshotAnterior)
+    {
+        // A planilha repete o Requer Análise em toda sincronização da linha; a equipe já tinha voltado para Programado.
+        var anterior = Anterior("cr40f_status", snapshotAnterior); anterior["cr40f_status"] = new OptionSetValue(202410005);
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(100000001); alvo[ProtecaoCampos.Snapshot] = PlanilhaRequerAnalise;
+        var r = ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.False(alvo.Contains("cr40f_status"));
+        Assert.Equal(new[] { "cr40f_status" }, r.Barrados);
+        Assert.False(alvo.Contains(ProtecaoCampos.CancelamentoCliente));
+    }
+
+    [Fact]
+    public void Requer_analise_da_sincronizacao_em_concluido_marca_uma_vez()
+    {
+        var anterior = Anterior("cr40f_status"); anterior["cr40f_status"] = new OptionSetValue(202410008);
+        var primeira = Alvo(); primeira["cr40f_status"] = new OptionSetValue(100000001); primeira[ProtecaoCampos.Snapshot] = PlanilhaRequerAnalise;
+        ProtecaoCampos.Aplicar(primeira, anterior);
+        Assert.Equal("Concluído", primeira[ProtecaoCampos.CancelamentoCliente]);
+        Assert.False(primeira.Contains("cr40f_status"));
+
+        anterior[ProtecaoCampos.Snapshot] = PlanilhaRequerAnalise; anterior[ProtecaoCampos.CancelamentoCliente] = null;
+        var seguinte = Alvo(); seguinte["cr40f_status"] = new OptionSetValue(100000001); seguinte[ProtecaoCampos.Snapshot] = PlanilhaRequerAnalise;
+        ProtecaoCampos.Aplicar(seguinte, anterior);
+        Assert.False(seguinte.Contains(ProtecaoCampos.CancelamentoCliente));
+    }
+
+    [Fact]
+    public void Sincronizacao_que_muda_status_nao_protegido_limpa_a_marca()
+    {
+        // A Tenaris volta o serviço para Confirmado depois do cancelamento: o status passa e a marca sai.
+        var anterior = Anterior(); anterior["cr40f_status"] = new OptionSetValue(100000001); anterior[ProtecaoCampos.CancelamentoCliente] = "Programado";
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410001); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.Equal(202410001, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.True(alvo.Contains(ProtecaoCampos.CancelamentoCliente));
+        Assert.Null(alvo[ProtecaoCampos.CancelamentoCliente]);
+    }
+
+    [Fact]
+    public void Equipe_muda_status_depois_do_cancelamento_limpa_a_marca()
+    {
+        var anterior = Anterior("cr40f_status"); anterior["cr40f_status"] = new OptionSetValue(100000001); anterior[ProtecaoCampos.CancelamentoCliente] = "Programado";
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002);
+        ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.True(alvo.Contains(ProtecaoCampos.CancelamentoCliente));
+        Assert.Null(alvo[ProtecaoCampos.CancelamentoCliente]);
+    }
+
+    [Fact]
+    public void Gravacao_fora_da_sincronizacao_sem_status_ou_sem_marca_nao_mexe_na_marca()
+    {
+        var marcado = Anterior(); marcado[ProtecaoCampos.CancelamentoCliente] = "Programado";
+        var semStatus = Alvo(); semStatus["cr40f_cr"] = "123";
+        ProtecaoCampos.Aplicar(semStatus, marcado);
+        Assert.False(semStatus.Contains(ProtecaoCampos.CancelamentoCliente));
+
+        var semMarca = Alvo(); semMarca["cr40f_status"] = new OptionSetValue(202410005);
+        ProtecaoCampos.Aplicar(semMarca, Anterior());
+        Assert.False(semMarca.Contains(ProtecaoCampos.CancelamentoCliente));
+    }
+
+    [Fact]
+    public void Cancelado_da_sincronizacao_sem_status_anterior_e_barrado()
+    {
+        var anterior = Anterior("cr40f_status"); anterior.Attributes.Remove("cr40f_status");
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.False(alvo.Contains("cr40f_status"));
+    }
+
+    [Fact]
+    public void Cancelado_com_ressalvas_da_sincronizacao_continua_barrado()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410010); alvo[ProtecaoCampos.Snapshot] = Planilha;
         ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_status"));
         Assert.False(alvo.Contains("cr40f_status"));
+    }
+
+    [Fact]
+    public void Cancelado_com_status_nao_protegido_e_aberto_vira_requer_analise()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_cr"));
+        Assert.Equal(100000001, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.Equal("Confirmado", alvo[ProtecaoCampos.CancelamentoCliente]);
+    }
+
+    [Theory]
+    [InlineData(202410008)] // Concluído
+    [InlineData(100000001)] // Requer Análise
+    [InlineData(202410010)] // Cancelado com ressalvas
+    public void Cancelado_com_status_nao_protegido_e_fechado_nao_muda(int atual)
+    {
+        var anterior = Anterior(); anterior["cr40f_status"] = new OptionSetValue(atual);
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.False(alvo.Contains("cr40f_status"));
+        Assert.Equal(atual == 202410008, alvo.Contains(ProtecaoCampos.CancelamentoCliente));
+    }
+
+    [Fact]
+    public void Cancelado_na_criacao_sem_protecao_grava_cancelado()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(alvo, null);
+        Assert.Equal(202410002, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.False(alvo.Contains(ProtecaoCampos.CancelamentoCliente));
     }
 
     [Fact]
