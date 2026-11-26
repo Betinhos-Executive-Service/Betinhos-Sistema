@@ -95,7 +95,8 @@
         {"tabela": "cr40f_errooperacional", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_funcionarios", "motivo": "o Base nao le funcionarios (spec): sem perfil de area o Planner fica sem seletor de responsaveis e sem o vinculo Microsoft; tratar a falha na tela (plano 3)"},
         {"tabela": "cr40f_multas", "motivo": "card de outra area, some sem perfil (plano 3)"},
-        {"tabela": "new_appmotoristaslog", "motivo": "card de outra area, some sem perfil (plano 3)"}
+        {"tabela": "new_appmotoristaslog", "motivo": "card de outra area, some sem perfil (plano 3)"},
+        {"tabela": "cr40f_projeto", "motivo": "pagina Projetos do Planner usa as tabelas do modulo #/projetos (papel Projetos); acesso de gravacao ainda sem dono: decisao do Renan"}
       ]
     },
     "composicao": {
