@@ -34,10 +34,12 @@ describe("fases, título e barra", () => {
     if (titulo) expect(tituloFase(d, t)).toBe(titulo);
     expect(segmentosAcesos(d)).toBe(acesos);
   });
-  it("aeroporto no local: título com o primeiro nome e frase de desembarque", () => {
+  it("aeroporto no local: título com o primeiro nome e sem frase repetida", () => {
     const d: Dados = { fase: "no_local", motorista: { nome: "Carlos Silva" }, embarque: { lat: 0, lon: 0, label: "Aeroporto de Guarulhos" } };
     expect(tituloFase(d, t)).toBe("Carlos espera você no desembarque");
-    expect(fraseFase(d, { t, id: "pt", cor, eta: vazio, espera: 0 })).toBe("Seu motorista espera você no desembarque.");
+    expect(fraseFase(d, { t, id: "pt", cor, eta: vazio, espera: 0 })).toBe("");
+    const semNome: Dados = { ...d, motorista: undefined };
+    expect(fraseFase(semNome, { t, id: "pt", cor, eta: vazio, espera: 0 })).toBe("Seu motorista espera você no desembarque.");
   });
 });
 

@@ -18,6 +18,7 @@ export function Faixa({ dados, eta, reserva, espera }: Props) {
   ].filter(Boolean).join(" · ");
   const e = dados ? estadoViagem(dados) : null;
   const acesos = dados ? segmentosAcesos(dados) : 0;
+  const frase = dados ? fraseFase(dados, { t, id, cor, eta, espera }) : "";
   const minutos = dados && eta.eta && (e === "a_caminho" || e === "em_viagem") ? eta.eta.minutos : null;
   return (
     <header className="faixa">
@@ -35,7 +36,7 @@ export function Faixa({ dados, eta, reserva, espera }: Props) {
         <ol className="barra" id="passos" aria-label={t("card.trajeto")}>
           {SEGMENTOS.map((c, i) => <li key={c} aria-current={i === acesos - 1 && e !== "concluido" ? "step" : undefined} className={i < acesos ? (i === acesos - 1 && e !== "concluido" ? "atual" : "feita") : undefined}><i /><span>{t(c)}</span></li>)}
         </ol>
-        <p className="frase" id="frase">{dados ? fraseFase(dados, { t, id, cor, eta, espera }) : ""}</p>
+        {frase ? <p className="frase" id="frase">{frase}</p> : null}
       </div>
     </header>
   );

@@ -61,7 +61,8 @@ export function fraseFase(d: Dados, c: CtxFrase) {
     return diff >= 1 ? t("f.chega", { ...v, n: diff }) : diff <= -1 ? t("f.chegaTarde", { ...v, n: -diff }) : t("f.chegaHora", v);
   }
   if (e === "no_local") {
-    if (aeroportoNoEmbarque(d)) return t("f.desembarque");
+    // O título já diz "<nome> espera você no desembarque"; sem nome, a frase cobre o desembarque.
+    if (aeroportoNoEmbarque(d)) return primeiroNome(d) ? "" : t("f.desembarque");
     return c.espera >= 1 ? t("f.espera", { n: c.espera }) : textoAvisoCarro(d, t, c.cor);
   }
   if (e === "em_viagem") return eta.eta && eta.chegada ? t("f.emViagem", { h: hora(id, eta.chegada) }) : t("f.boaViagem");
