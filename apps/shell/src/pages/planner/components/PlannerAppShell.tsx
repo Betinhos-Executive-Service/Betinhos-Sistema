@@ -1,14 +1,12 @@
 // Porte de Tela Planner/src/App.jsx (sem mudança de comportamento).
-import { CENTRAL_NAV_ITEMS, MOBILE_NAV_ITEMS, SIDEBAR_EXPANDED_KEY, TODAY_LABEL_FORMATTER } from '../constants'
-import { APP_VERSION } from '../data/version'
+import { CENTRAL_NAV_ITEMS, MOBILE_NAV_ITEMS, TODAY_LABEL_FORMATTER } from '../constants'
 import { isTaskVisibleToEmployee, taskStats } from '../domain/domain'
 import { canViewManagement } from '../domain/management'
 import { unreadCount } from '../domain/notifications'
-import { Avatar } from './Badges'
 import { useMentionController } from './MentionableField'
 import { NotificationsPanel, notificationsVisibleToEmployee } from './NotificationsPanel'
-import { BellRing, ClipboardList, PanelLeftClose, PanelLeftOpen, Plus, RotateCcw, Settings } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { BellRing, Plus, RotateCcw } from 'lucide-react'
+import { useState } from 'react'
 
 
 export function AppShell({
@@ -34,20 +32,6 @@ export function AppShell({
   refreshing = false,
   canViewManagement = false,
 }: any) {
-  const [expanded, setExpanded] = useState<any>(() => {
-    try {
-      return localStorage.getItem(SIDEBAR_EXPANDED_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem(SIDEBAR_EXPANDED_KEY, String(expanded));
-    } catch {
-      // O estado da navegação continua utilizável quando o navegador bloqueia o storage.
-    }
-  }, [expanded]);
   const [notificationsOpen, setNotificationsOpen] = useState<any>(false);
   useMentionController(
     mentionEmployees.length
@@ -58,7 +42,6 @@ export function AppShell({
   const stats = personalStats || taskStats(visibleTasks);
   const visibleNotifications = notificationsVisibleToEmployee(notifications, tasks, currentEmployee, teams);
   const todayLabel = TODAY_LABEL_FORMATTER.format(new Date()).replace(".", "");
-  const userName = currentEmployee?.name || "Usuário não vinculado";
   const desktopNavActive =
     active === "team"
       ? "dashboard"
@@ -72,125 +55,65 @@ export function AppShell({
     MOBILE_NAV_ITEMS.find(([id]: any) => id === mobileNavActive)?.[1] || (active === "contacts" ? "Contatos" : "Central");
   const canCreateTask = ["dashboard", "team", "board", "list", "calendar"].includes(active);
   return (
-    <div className={`app-shell ${expanded ? "" : "sidebar-collapsed"}`}>
-      <aside className="sidebar">
-        <button
-          className="sidebar-toggle"
-          type="button"
-          onClick={() => setExpanded((value: any) => !value)}
-          aria-label={expanded ? "Recolher navegação" : "Expandir navegação"}
-          title={expanded ? "Recolher navegação" : "Expandir navegação"}
-        >
-          {expanded ? (
-            <PanelLeftClose size={18} />
-          ) : (
-            <PanelLeftOpen size={18} />
-          )}
-        </button>
-        <div className="brand-block">
-          <div className="brand-mark">
-            <ClipboardList size={20} />
-          </div>
-          <div className="brand-copy">
-            <strong>Central de Trabalho</strong>
-            <span>Operação Betinhos</span>
-          </div>
-        </div>
-        <div
-          className="sidebar-day-card"
-          aria-label={`Hoje, ${stats.open} pendências e ${stats.overdue} atrasados`}
-        >
-          <div className="sidebar-day-title">
-            <span>Hoje</span>
-            <strong>{todayLabel}</strong>
-          </div>
-          <div className="sidebar-day-stats">
-            <span className="sidebar-day-stat">
-              <strong>{stats.open}</strong>
-              <small>Pendências</small>
-            </span>
-            <span className="sidebar-day-stat sidebar-day-stat-overdue">
-              <strong>{stats.overdue}</strong>
-              <small>Atrasados</small>
-            </span>
-          </div>
-        </div>
-        <nav className="main-nav">
-          {CENTRAL_NAV_ITEMS.filter(([id]: any) => id !== "management" || canViewManagement).map(([id, label, Icon]: any) => (
-            <button
-              key={id}
-              className={
-                desktopNavActive === id ? "nav-item active" : "nav-item"
-              }
-              onClick={() => onNavigate(id)}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-              {id === "board" && (
-                <span className="nav-count">{openTaskCount}</span>
-              )}
-              {id === "dashboard" && personalStats?.alertCount > 0 && (
-                <span className="nav-count nav-count-alert">
-                  {personalStats.alertCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="mock-label">
-            <span className="pulse-dot" />
-            {live ? "Dataverse conectado" : "Modo local · mock"}
-          </div>
-          <div
-            className="sidebar-version"
-            aria-label={`Versão do aplicativo ${APP_VERSION}`}
-          >
-            Versão {APP_VERSION}
-          </div>
-          <div className="user-card">
-            <Avatar name={userName} />
-            <div className="user-copy">
-              <strong>{userName}</strong>
-              <span>
-                {currentEmployee ? "Administrativo" : "Sem vínculo Dataverse"}
-              </span>
-            </div>
-            <button
-              className="user-settings-button"
-              type="button"
-              onClick={() => onNavigate("settings")}
-              aria-label="Abrir configurações"
-              title="Configurações"
-            >
-              <Settings size={15} />
-            </button>
-          </div>
-        </div>
-      </aside>
+    <div className="app-shell">
       <main className="main-area">
-        <div className="app-topbar" aria-label="Ações do aplicativo">
-          <button
-            className="notification-trigger"
-            type="button"
-            onClick={() => setNotificationsOpen(true)}
-            aria-label={`Abrir notificações${unreadCount(notifications) ? `, ${unreadCount(notifications)} não lidas` : ""}`}
-            title="Notificações"
-          >
-            <BellRing size={17} />
-            {unreadCount(notifications) > 0 && <b>{unreadCount(notifications)}</b>}
-          </button>
-          <button
-            className={`refresh-trigger${refreshing ? " is-refreshing" : ""}`}
-            type="button"
-            onClick={() => onRefresh?.({ silent: false })}
-            disabled={refreshing}
-            aria-label={refreshing ? "Atualizando dados" : "Atualizar dados"}
-            title={refreshing ? "Atualizando dados" : "Atualizar dados"}
-          >
-            <RotateCcw size={16} />
-          </button>
-        </div>
+        <header className="planner-header">
+          <nav className="planner-tabs" aria-label="Seções da Central de Trabalho">
+            {CENTRAL_NAV_ITEMS.filter(([id]: any) => id !== "management" || canViewManagement)
+              .sort(([a]: any, [b]: any) => Number(a === "settings") - Number(b === "settings"))
+              .map(([id, label, Icon]: any) => (
+              <button
+                key={id}
+                type="button"
+                className={`planner-tab${desktopNavActive === id ? " active" : ""}`}
+                aria-current={desktopNavActive === id ? "page" : undefined}
+                onClick={() => onNavigate(id)}
+              >
+                <Icon size={15} aria-hidden="true" />
+                <span>{label}</span>
+                {id === "board" && <span className="planner-tab-count">{openTaskCount}</span>}
+                {id === "dashboard" && personalStats?.alertCount > 0 && (
+                  <span className="planner-tab-count planner-tab-count-alert">{personalStats.alertCount}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="planner-header-actions" aria-label="Ações do aplicativo">
+            <span
+              className="planner-day-chip"
+              title={`Hoje, ${todayLabel}: ${stats.open} pendências`}
+              aria-label={`Hoje, ${stats.open} pendências e ${stats.overdue} atrasados`}
+            >
+              <b>{stats.open}</b> hoje
+            </span>
+            {stats.overdue > 0 && (
+              <span className="planner-day-chip planner-day-chip-overdue">
+                <b>{stats.overdue}</b> {stats.overdue === 1 ? "atrasada" : "atrasadas"}
+              </span>
+            )}
+            {!currentEmployee && <span className="planner-day-chip">Sem vínculo</span>}
+            <button
+              className="notification-trigger"
+              type="button"
+              onClick={() => setNotificationsOpen(true)}
+              aria-label={`Abrir notificações${unreadCount(notifications) ? `, ${unreadCount(notifications)} não lidas` : ""}`}
+              title="Notificações"
+            >
+              <BellRing size={16} />
+              {unreadCount(notifications) > 0 && <b>{unreadCount(notifications)}</b>}
+            </button>
+            <button
+              className={`refresh-trigger${refreshing ? " is-refreshing" : ""}`}
+              type="button"
+              onClick={() => onRefresh?.({ silent: false })}
+              disabled={refreshing}
+              aria-label={refreshing ? "Atualizando dados" : "Atualizar dados"}
+              title={refreshing ? "Atualizando dados" : "Atualizar dados"}
+            >
+              <RotateCcw size={15} />
+            </button>
+          </div>
+        </header>
         <header className="mobile-header">
           <div className="mobile-header-copy">
             <strong>{activeLabel}</strong>
