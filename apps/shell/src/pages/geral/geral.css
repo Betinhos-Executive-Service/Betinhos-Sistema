@@ -75,7 +75,7 @@
 .gr-dialog__warn { color: var(--bt-color-danger); font-size: var(--bt-font-size-12); }
 .gr-copy { max-height: 50vh; margin: 0; padding: var(--bt-space-3); overflow: auto; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font: inherit; font-size: var(--bt-font-size-12); white-space: pre-wrap; }
 .gr-ids { margin: 0; padding-left: var(--bt-space-5); columns: 2; font-size: var(--bt-font-size-12); }
-.gr-frame { display: block; width: 100%; height: calc(100vh - 120px); border: 0; }
+.gr-frame { display: block; width: 100%; height: calc(var(--altura-util) - 120px); border: 0; }
 .gr-voucher { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; opacity: 0; transition: opacity 180ms var(--bt-ease-out); }
 .gr-voucher:focus { outline: 0; }
 /* Saída: mesma duração do temporizador de VoucherOverlay (EXIT_MS = 160). */
@@ -98,7 +98,7 @@
 /* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
 @media (min-width: 821px) {
   /* Padding das listas (`.page--full`: 22/16/16 px; barra de comandos com 12 px até a tabela). */
-  .page.gr-page { height: calc(100dvh - var(--faixa-ambiente-h, 0px)); display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+  .page.gr-page { height: var(--altura-util); display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
   .gr-page .bt-page-toolbar__start, .gr-page .bt-page-toolbar__end { gap: var(--bt-space-3); }
   .gr-page .bt-table__footer { padding: 0; min-height: 40px; }
   .gr-page .page__header { margin-bottom: var(--bt-space-2); }

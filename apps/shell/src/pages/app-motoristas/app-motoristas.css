@@ -11,7 +11,7 @@
 .am-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4, 16px); align-items: start; }
 @media (min-width: 1101px) { .am-grade { grid-template-columns: minmax(0, 1fr) 360px; } }
 .am-principal { display: flex; flex-direction: column; gap: var(--space-3, 12px); min-width: 0; container-type: inline-size; }
-.am-lateral { position: sticky; top: var(--space-3, 12px); max-height: calc(100vh - 96px); overflow: auto; background: var(--bt-color-surface); border: 1px solid var(--bt-color-border); border-radius: var(--radius-lg, 12px); padding: var(--space-3, 12px); }
+.am-lateral { position: sticky; top: var(--space-3, 12px); max-height: calc(var(--altura-util) - 96px); overflow: auto; background: var(--bt-color-surface); border: 1px solid var(--bt-color-border); border-radius: var(--radius-lg, 12px); padding: var(--space-3, 12px); }
 
 /* barra do rascunho */
 .am-barra { display: flex; align-items: center; gap: var(--space-3, 12px); flex-wrap: wrap; padding: var(--space-3, 12px) var(--space-4, 16px); background: var(--bt-color-surface); border: 1px solid var(--bt-color-border); border-radius: var(--radius-lg, 12px); }

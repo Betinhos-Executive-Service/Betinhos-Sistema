@@ -78,7 +78,7 @@
   margin: 0;
 }
 .pf-root .app-shell {
-  min-height: 100vh;
+  min-height: var(--altura-util);
   display: grid;
   grid-template-columns: 238px minmax(0, 1fr);
   transition: grid-template-columns 220ms var(--ease-out);
@@ -89,7 +89,7 @@
 .pf-root .sidebar {
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: var(--altura-util);
   padding: 20px 14px 16px;
   display: flex;
   flex-direction: column;
@@ -249,7 +249,7 @@
 .pf-root .content-wrap {
   width: min(1500px, 100%);
   min-width: 0;
-  min-height: 100vh;
+  min-height: var(--altura-util);
   margin: 0 auto;
   padding: var(--content-page-padding);
 }
@@ -2012,7 +2012,7 @@
   }
 }
 .pf-root .connection-error {
-  min-height: 100vh;
+  min-height: var(--altura-util);
   padding: 30px;
   display: grid;
   place-content: center;
@@ -2262,7 +2262,7 @@
 @media (max-width: 820px) {
   .pf-root .content-wrap:has(.all-services-page),
 .pf-root .content-wrap:has(.repasse-page) {
-    height: calc(100dvh - 140px);
+    height: calc(var(--altura-util) - 140px);
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -3066,7 +3066,7 @@
 .pf-root .repasse-favorecido-dialog {
   position: relative;
   width: min(460px, 100%);
-  max-height: min(680px, calc(100dvh - 32px));
+  max-height: min(680px, calc(var(--altura-util) - 32px));
   overflow: auto;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -3606,7 +3606,7 @@
   }
   .pf-root .app-shell {
     display: block;
-    min-height: 100svh;
+    min-height: var(--altura-util);
   }
   .pf-root .app-main {
     padding-bottom: calc(78px + env(safe-area-inset-bottom));
@@ -3682,8 +3682,8 @@
   }
   .pf-root .drawer {
     width: min(560px, 100vw);
-    height: 100dvh;
-    max-height: 100dvh;
+    height: var(--altura-util);
+    max-height: var(--altura-util);
   }
   .pf-root .drawer-body {
     padding: 14px 13px calc(28px + env(safe-area-inset-bottom));
@@ -4021,7 +4021,7 @@
 @media (min-width: 821px) {
   .pf-root .content-wrap:has(.all-services-page),
 .pf-root .content-wrap:has(.repasse-page) {
-    height: 100dvh;
+    height: var(--altura-util);
     min-height: 0;
     display: flex;
     flex-direction: column;

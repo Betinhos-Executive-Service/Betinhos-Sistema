@@ -1,9 +1,15 @@
-/* Faixa do ambiente (faixaAmbiente.ts). Fica no <html>, fora do <body>; com ela o <body> desce a altura da faixa e vira o
-   bloco de contenção dos elementos fixos (transform), então shell, gavetas e diálogos em inset 0 começam abaixo da faixa e
-   nada a cobre. Página com altura de viewport (100dvh) desconta --faixa-ambiente-h, que vale 0 sem faixa. */
-:root { --faixa-ambiente-h: 0px; }
+/* Faixa do ambiente (faixaAmbiente.ts). Fica no <html>, por cima de tudo, e só o que encosta no topo desce a altura dela:
+   o shell, as gavetas e as folhas (diálogos modais vivem na camada do topo e se medem pela janela). Nada muda de bloco de
+   contenção, então popover posicionado pelo getBoundingClientRect continua no lugar. Altura de janela no CSS usa
+   --altura-util (100dvh menos a faixa; sem faixa, 100dvh), senão o rodapé fica 22 px abaixo da tela. */
+:root { --faixa-ambiente-h: 0px; --altura-util: calc(100dvh - var(--faixa-ambiente-h)); }
 html[data-ambiente] { --faixa-ambiente-h: calc(22px + env(safe-area-inset-top, 0px)); }
-html[data-ambiente] body { position: fixed; inset: var(--faixa-ambiente-h) 0 0 0; margin: 0; transform: translateZ(0); }
+html[data-ambiente] .bt-shell,
+html[data-ambiente] .bt-shell__nav,
+html[data-ambiente] .bt-shell__backdrop { top: var(--faixa-ambiente-h); }
+html[data-ambiente] .bt-drawer,
+html[data-ambiente] .bt-sheet { top: var(--faixa-ambiente-h); height: auto; }
+html[data-ambiente] .bt-toast-region { top: calc(var(--faixa-ambiente-h) + var(--bt-space-4)); }
 
 .faixa-ambiente {
   position: fixed;

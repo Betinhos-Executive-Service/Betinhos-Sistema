@@ -1,6 +1,6 @@
 /* Funções Operacionais: estilos próprios da tela (cards de serviço, agenda do motorista, mini-calendário,
    troca de carro), portados do WebResource new_telafuncoesoperacionais e escopados em .fo-page. Tokens do DS. */
-.fo-page { --gutter: 16px; --content-max: 760px; --nav-height: 0px; --safe-bottom: 0px; --safe-top: 0px; --fo-vh: 100vh; }
+.fo-page { --gutter: 16px; --content-max: 760px; --nav-height: 0px; --safe-bottom: 0px; --safe-top: 0px; --fo-vh: var(--altura-util); }
 .fo-page .driver-filter-panel { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); transform-origin: top right; animation: popover-in var(--bt-duration-normal) var(--bt-ease-out) backwards; }
 .fo-page .driver-filter-panel .field { flex: 1 1 auto; max-width: 240px; }
 .fo-page .list-count { padding: 2px 2px 0; color: var(--bt-color-text-secondary); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }

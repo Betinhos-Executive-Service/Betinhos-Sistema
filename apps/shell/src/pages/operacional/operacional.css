@@ -2,7 +2,7 @@
 .op-split { display: grid; gap: var(--bt-space-4); }
 @media (min-width: 860px) {
   .op-split { grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); align-items: start; }
-  .op-split__detail { position: sticky; top: var(--bt-space-4); max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .op-split__detail { position: sticky; top: var(--bt-space-4); max-height: calc(var(--altura-util) - 32px); overflow-y: auto; }
 }
 
 .op-day { position: sticky; top: 0; z-index: var(--bt-z-index-sticky-header); display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3); background-color: var(--bt-color-surface-neutral); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-lg); touch-action: pan-y; }
