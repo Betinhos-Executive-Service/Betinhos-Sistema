@@ -167,9 +167,11 @@ export const PADRAO_MEDIDAS = ['account', 'annotation', 'appointment', 'contact'
 
 // soLeitura: tabelas da automação em que a administrativa só precisa continuar lendo. Tabelas padrão (PADRAO_MEDIDAS)
 // não travam: o Base copia o Basic User e nenhum perfil dá Global nelas (decisão do Renan, 26/11/2026); a perda é informativa.
+// aceitas (perdaAceita do mapa): tabela cr40f_/new_ cuja perda o Renan aceitou; também só informa.
 // Colunas: quem perde o admin passa a obedecer a segurança de coluna; trava se os perfis diretos não cobrem a leitura
 // de toda coluna protegida das tabelas cr40f_/new_ (perfil de equipe não conta; soAdmin fica só com o admin).
-export function perdasPorPessoa(estado, plano, { fora = new Set(), soLeitura = new Set(), soAdmin = new Set() } = {}) {
+export function perdasPorPessoa(estado, plano, { fora = new Set(), soLeitura = new Set(), soAdmin = new Set(), aceitas = new Set() } = {}) {
+  const informa = (t) => PADRAO_MEDIDAS.includes(t) || aceitas.has(t)
   const depois = aplicarPlano(estado, plano)
   const adm = new Set(administrativos(estado).map((p) => p.id))
   const universo = estado.tabelas.filter((t) => !fora.has(t))
@@ -178,8 +180,8 @@ export function perdasPorPessoa(estado, plano, { fora = new Set(), soLeitura = n
     const antes = efetivos(papeisDe(estado, p)), dep = efetivos(papeisDe(depois, depois.pessoas[i]))
     const linha = { id: p.id, ...perdas(antes, dep, estado.tabelas) }
     if (adm.has(p.id)) {
-      linha.essenciais = universo.filter((t) => !PADRAO_MEDIDAS.includes(t) && perdeEm(antes, dep, t, soLeitura.has(t) ? ['Read'] : ESSENCIAIS))
-      linha.secundarios = universo.filter((t) => perdeEm(antes, dep, t, PADRAO_MEDIDAS.includes(t) ? TUDO : soLeitura.has(t) ? SO_LEITURA_INFORMA : SECUNDARIOS))
+      linha.essenciais = universo.filter((t) => !informa(t) && perdeEm(antes, dep, t, soLeitura.has(t) ? ['Read'] : ESSENCIAIS))
+      linha.secundarios = universo.filter((t) => perdeEm(antes, dep, t, informa(t) ? TUDO : soLeitura.has(t) ? SO_LEITURA_INFORMA : SECUNDARIOS))
       const le = new Set([...(estado.colunas.deUsuario.get(p.id) ?? [])].flatMap((f) => [...(estado.colunas.leitura.get(f) ?? [])]))
       linha.colunas = antes.admin && !dep.admin ? protegidas.filter((c) => !le.has(c)) : []
     }
@@ -259,10 +261,10 @@ export function travasDeFlows(flows, { perdasPorUsuario, servico, manter, equipe
   return travas
 }
 
-export function montarRelatorio({ estado, manter, uso, incertas, flows, referencias = [], fora = new Set(), soLeitura, soAdmin }) {
+export function montarRelatorio({ estado, manter, uso, incertas, flows, referencias = [], fora = new Set(), soLeitura, soAdmin, aceitas }) {
   const erros = conferirManter(estado, manter)
   const plano = planoDoCorte(estado, { manter })
-  const lista = perdasPorPessoa(estado, plano, { fora, soLeitura, soAdmin })
+  const lista = perdasPorPessoa(estado, plano, { fora, soLeitura, soAdmin, aceitas })
   const travasAdmin = lista.filter((p) => p.essenciais?.length).map((p) => ({ id: p.id, tabelas: p.essenciais }))
   const travasColunas = lista.filter((p) => p.colunas?.length).map((p) => ({ id: p.id, colunas: p.colunas }))
   const secundariosAdmin = lista.filter((p) => p.secundarios?.length).map((p) => ({ id: p.id, tabelas: p.secundarios }))
