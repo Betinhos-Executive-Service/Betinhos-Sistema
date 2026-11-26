@@ -25,7 +25,6 @@ import ProjectsView from './views/ProjectsView'
 import type { Host } from '../../host'
 import { ListView } from './views/ListView'
 import ManagementView from './views/ManagementView'
-import { MoreView } from './views/MoreView'
 import { QualityView } from './views/QualityView'
 import QuotesView from './views/QuotesView'
 import { SettingsView } from './views/SettingsView'
@@ -316,7 +315,6 @@ export function PlannerApp({ host }: { host?: Host } = {}) {
           onReorderPersonalTags={reorderPersonalTags}
         />
       );
-    if (active === "more") return <MoreView onNavigate={navigate} canViewManagement={showManagement} />;
     if (active === "quality")
       return state.loading?.quality ? (
         <LoadingFallback view="quality" />
