@@ -9,11 +9,11 @@ const xid = (n: number) => `dddddddd-0000-4000-8000-${String(n).padStart(12, '0'
 /** Projetos de exemplo, genéricos e fictícios. */
 export function createMockProjetos(): Projeto[] {
   return [
-    { id: pid(1), codigo: 'PRJ-1', nome: 'Painel de indicadores', area: 'Dashboard', responsavel: 'Equipe de TI', briefing: 'Quero ver num lugar só os números do mês: serviços feitos, cancelados e o faturamento por cliente.', instrucoes: 'Abra o menu Dashboard.\nEscolha o período no topo da tela.\nOs cartões atualizam sozinhos a cada 5 minutos.' },
-    { id: pid(2), codigo: 'PRJ-2', nome: 'Cadastro de documentos', area: 'Cadastros', responsavel: 'Equipe de TI', briefing: 'Guardar os documentos de cada veículo com a data de vencimento.', instrucoes: '' },
-    { id: pid(3), codigo: 'PRJ-3', nome: 'Aviso de vencimento', area: 'Frota', responsavel: 'Equipe de TI', briefing: '', instrucoes: 'O aviso chega por e-mail 30 dias antes do vencimento.' },
-    { id: pid(4), codigo: 'PRJ-4', nome: 'Relatório mensal automático', area: 'Financeiro', responsavel: '', briefing: 'Gravei um áudio explicando o relatório que preciso.', instrucoes: '' },
-    { id: pid(5), codigo: 'PRJ-5', nome: 'Revisão do fluxo de aprovação', area: 'Operacional', responsavel: 'Equipe de TI', briefing: '', instrucoes: '' },
+    { id: pid(1), codigo: 'PRJ-1', nome: 'Painel de indicadores', briefing: 'Quero ver num lugar só os números do mês: serviços feitos, cancelados e o faturamento por cliente.', checklist: [{ texto: 'Serviços feitos e cancelados', feito: true }, { texto: 'Faturamento por cliente', feito: true }, { texto: 'Filtro por período', feito: false }] },
+    { id: pid(2), codigo: 'PRJ-2', nome: 'Cadastro de documentos', briefing: 'Guardar os documentos de cada veículo com a data de vencimento.', checklist: [{ texto: 'Tela de cadastro', feito: true }, { texto: 'Alerta de vencimento', feito: false }] },
+    { id: pid(3), codigo: 'PRJ-3', nome: 'Aviso de vencimento', briefing: 'O aviso chega por e-mail 30 dias antes do vencimento.', checklist: [] },
+    { id: pid(4), codigo: 'PRJ-4', nome: 'Relatório mensal automático', briefing: 'Gravei um áudio explicando o relatório que preciso.', checklist: [] },
+    { id: pid(5), codigo: 'PRJ-5', nome: 'Revisão do fluxo de aprovação', briefing: '', checklist: [{ texto: 'Definir quem aprova cada valor', feito: false }] },
   ]
 }
 
@@ -31,7 +31,7 @@ export function createMockEtapas(): Etapa[] {
   ]
 }
 
-/** Imagem de exemplo (SVG) usada como anexo de prova no modo mock. */
+/** Imagem de exemplo (SVG) usada como anexo no modo mock. */
 export const mockSvg = (rotulo: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200"><rect width="320" height="200" fill="#e8eef5"/><rect x="16" y="16" width="288" height="28" rx="6" fill="#b8c7da"/><rect x="16" y="60" width="130" height="124" rx="6" fill="#cfd9e6"/><rect x="160" y="60" width="144" height="56" rx="6" fill="#cfd9e6"/><rect x="160" y="128" width="144" height="56" rx="6" fill="#cfd9e6"/><text x="24" y="36" font-family="sans-serif" font-size="14" fill="#2b3a4d">${rotulo}</text></svg>`
 

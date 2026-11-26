@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { STATUS } from '../../projetos/domain/choices'
-import { MAX_ANEXOS } from '../../projetos/domain/anexos'
-import { AVISO_SEM_PROVA, AVISO_SO_RENAN } from '../../projetos/domain/regras'
-import { createMockAtualizacoes, createMockEtapas, createMockProjetos } from '../../projetos/data/mock'
-import { acceptFiles, attachmentKind, cardsByStatus, moveError, namePastedFile, projectCards } from './projectsBoard'
+import { STATUS } from '../projetos/domain/choices'
+import { MAX_ANEXOS } from '../projetos/domain/anexos'
+import { createMockAtualizacoes, createMockEtapas, createMockProjetos } from '../projetos/data/mock'
+import { acceptFiles, attachmentKind, cardsByStatus, namePastedFile, projectCards } from './projectsBoard'
 
 const file = (name: string, type: string, size = 10) => new File([new Uint8Array(size)], name, { type })
 
@@ -19,13 +18,6 @@ describe('quadro de projetos do Planner', () => {
     expect(semEtapa.etapa).toBeNull()
     expect(cardsByStatus(cards).get(STATUS.ideia)).toContain(semEtapa)
     expect([...cardsByStatus(cards).values()].flat()).toHaveLength(cards.length)
-  })
-
-  it('só o Renan move; Pronto exige prova', () => {
-    const card = cards.find((c) => c.projeto.codigo === 'PRJ-2')!
-    expect(moveError(card, STATUS.validacao, 'gestor', atualizacoes)).toBe(AVISO_SO_RENAN)
-    expect(moveError(card, STATUS.validacao, 'renan', atualizacoes)).toBeNull()
-    expect(moveError({ ...card, etapa: null }, STATUS.concluida, 'renan', [])).toBe(AVISO_SEM_PROVA)
   })
 
   it('classifica anexos e nomeia o print colado', () => {

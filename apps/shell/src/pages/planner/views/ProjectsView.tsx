@@ -1,17 +1,19 @@
-// Projetos no Planner: quadro dos projetos do módulo #/projetos (cr40f_projeto), por situação.
+// Projetos no Planner: quadro dos projetos (cr40f_projeto) por situação; clique no cartão abre o detalhe.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, ToastProvider, useToast } from "@betinhos/ui";
-import { ArrowRight, ChevronLeft, CircleCheck, ExternalLink, Film, Image as ImageIcon, Lightbulb, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
+import { Alert, Button, StatusBadge, ToastProvider, useToast } from "@betinhos/ui";
+import { CircleCheck, Film, Image as ImageIcon, Lightbulb, ListChecks, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
 import PageHeader from '../components/PageHeader';
 import { NewProjectDrawer, type CreatedProject } from '../components/NewProjectDrawer';
+import { ProjectDetailDrawer } from '../components/ProjectDetailDrawer';
 import type { Host } from '../../../host';
-import { hrefFor } from '../../../nav/useHashRoute';
-import { createSource, reasonText } from '../../projetos/data/source';
-import { useProjetos } from '../../projetos/useProjetos';
-import { STATUS } from '../../projetos/domain/choices';
-import { codigoEtapa1 } from '../../projetos/domain/regras';
-import type { Perfil } from '../../projetos/domain/types';
-import { BOARD_COLUMNS, attachmentKind, cardsByStatus, moveError, projectCards, type ProjectCard } from '../domain/projectsBoard';
+import { useQueryId } from '../../../nav/queryState';
+import { createSource, reasonText } from '../projetos/data/source';
+import { useProjetos } from '../projetos/useProjetos';
+import { STATUS } from '../projetos/domain/choices';
+import { progresso } from '../projetos/domain/checklist';
+import { codigoEtapa1 } from '../projetos/domain/regras';
+import type { Perfil } from '../projetos/domain/types';
+import { BOARD_COLUMNS, attachmentKind, cardsByStatus, projectCards, type ProjectCard } from '../domain/projectsBoard';
 
 const COLUMN_STYLE: Record<number, { key: string; icon: any; hint: string }> = {
   [STATUS.ideia]: { key: "idea", icon: Lightbulb, hint: "Anotada, ainda sem forma" },
@@ -21,7 +23,6 @@ const COLUMN_STYLE: Record<number, { key: string; icon: any; hint: string }> = {
   [STATUS.pausada]: { key: "paused", icon: PauseCircle, hint: "Parada por enquanto" },
 };
 // Ordem do fluxo para avançar e voltar; Pausado fica fora da sequência.
-const FLOW = [STATUS.ideia, STATUS.andamento, STATUS.validacao, STATUS.concluida];
 const labelOf = (status: number) => BOARD_COLUMNS.find((c) => c.value === status)?.label ?? "Ideia";
 
 function prefersReducedMotion() {
@@ -78,6 +79,7 @@ function Board({ host }: { host?: Host }) {
   const toast = useToast();
   const [perfil, setPerfil] = useState<Perfil>("gestor");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openId, setOpenId] = useQueryId("projeto");
   const [dragId, setDragId] = useState("");
   const [dropStatus, setDropStatus] = useState<number | null>(null);
   const [movingId, setMovingId] = useState("");
@@ -94,12 +96,9 @@ function Board({ host }: { host?: Host }) {
   const cards = useMemo(() => projectCards(data.projetos, data.etapas, data.atualizacoes), [data.projetos, data.etapas, data.atualizacoes]);
   const columns = useMemo(() => cardsByStatus(cards), [cards]);
   const flipRef = useFlip(cards.map((c) => `${c.projeto.id}:${c.status}`).join("|"));
-  const canMove = perfil === "renan";
 
   async function move(card: ProjectCard, novo: number) {
     if (movingId) return;
-    const erro = moveError(card, novo, perfil, data.atualizacoes);
-    if (erro) { toast({ tone: "warning", message: erro }); return; }
     if (novo === card.status) return;
     setMovingId(card.projeto.id);
     try {
@@ -158,8 +157,10 @@ function Board({ host }: { host?: Host }) {
           Não foi possível carregar os projetos. {data.error} Se o erro falar de permissão, peça o papel Projetos.
         </Alert>
       )}
-      {!canMove && data.loaded && (
-        <p className="projects-footnote">Só o Renan muda a situação dos projetos. Você pode registrar novas ideias.</p>
+      {source.mock && (
+        <div className="projects-mock">
+          <StatusBadge tone="info">Dados de exemplo</StatusBadge>
+        </div>
       )}
 
       <div className="projects-board" aria-busy={!data.loaded}>
@@ -188,45 +189,29 @@ function Board({ host }: { host?: Host }) {
               <div className="projects-column-list">
                 {!data.loaded && <span className="projects-card-skeleton" aria-hidden="true" />}
                 {data.loaded && items.length === 0 && (
-                  <p className="projects-empty">{column.value === STATUS.ideia ? "Registre a primeira ideia em Nova ideia." : canMove ? "Arraste um projeto para cá." : "Nenhum projeto aqui."}</p>
+                  <p className="projects-empty">{column.value === STATUS.ideia ? "Registre a primeira ideia em Nova ideia." : "Arraste um projeto para cá."}</p>
                 )}
                 {items.map((card, index) => {
-                  const flowIndex = FLOW.indexOf(card.status as (typeof FLOW)[number]);
-                  const previous = flowIndex > 0 ? FLOW[flowIndex - 1] : null;
-                  const next = flowIndex >= 0 && flowIndex < FLOW.length - 1 ? FLOW[flowIndex + 1] : card.status === STATUS.pausada ? STATUS.andamento : null;
                   const id = card.projeto.id;
+                  const checklist = progresso(card.projeto.checklist);
                   return (
                     <article
                       key={id}
                       ref={flipRef(id)}
                       className={`projects-card${dragId === id ? " is-dragging" : ""}${freshId === id ? " is-fresh" : ""}${movingId === id ? " is-moving" : ""}`}
                       style={{ "--i": Math.min(index, 8) } as any}
-                      draggable={canMove && !movingId}
+                      draggable={!movingId}
                       aria-busy={movingId === id}
                       onDragStart={(event) => { setDragId(id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", id); }}
                       onDragEnd={() => { setDragId(""); setDropStatus(null); }}
                     >
                       <span className="projects-card-code">{card.projeto.codigo || "Novo"}</span>
-                      <h3>{card.projeto.nome}</h3>
+                      <h3><button type="button" className="projects-card-open" onClick={() => setOpenId(id)}>{card.projeto.nome}</button></h3>
                       {card.projeto.briefing && <p>{card.projeto.briefing}</p>}
-                      {card.etapa?.nome && <p className="projects-card-next"><strong>Falta:</strong> {card.etapa.nome}</p>}
-                      {flowIndex >= 0 && (
-                        <div className="projects-progress" role="img" aria-label={`Etapa ${flowIndex + 1} de ${FLOW.length}: ${column.label}`}>
-                          {FLOW.map((step, i) => <span key={step} className={i <= flowIndex ? "is-done" : ""} />)}
-                        </div>
-                      )}
                       <footer className="projects-card-foot">
-                        <AttachmentCounts card={card} />
-                        <span className="projects-card-actions">
-                          <a className="projects-icon-button" href={hrefFor("projetos", { projeto: id })} aria-label={`Abrir ${card.projeto.nome} em Projetos`} title="Abrir no módulo Projetos"><ExternalLink size={15} /></a>
-                          {canMove && previous != null && (
-                            <button className="projects-icon-button" type="button" disabled={Boolean(movingId)} onClick={() => void move(card, previous)} aria-label={`Voltar ${card.projeto.nome} para ${labelOf(previous)}`} title={`Voltar para ${labelOf(previous)}`}><ChevronLeft size={15} /></button>
-                          )}
-                          {canMove && next != null && (
-                            <button className="projects-chip-button" type="button" disabled={Boolean(movingId)} onClick={() => void move(card, next)} aria-label={`Mover ${card.projeto.nome} para ${labelOf(next)}`}>
-                              {labelOf(next)} <ArrowRight size={14} />
-                            </button>
-                          )}
+                        <span className="projects-card-meta">
+                          {checklist && <span className="projects-card-media" aria-label={`Checklist ${checklist}`}><span><ListChecks size={13} aria-hidden="true" />{checklist}</span></span>}
+                          <AttachmentCounts card={card} />
                         </span>
                       </footer>
                     </article>
@@ -238,6 +223,10 @@ function Board({ host }: { host?: Host }) {
         })}
       </div>
 
+      {data.loaded && (
+        <ProjectDetailDrawer projeto={data.projetos.find((p) => p.id === openId) ?? null} atualizacoes={data.atualizacoes}
+          perfil={perfil} source={source} onClose={() => setOpenId(null)} onSaved={data.upsert} onAtualizacao={data.addAtualizacao} />
+      )}
       <NewProjectDrawer open={drawerOpen} source={source} perfil={perfil} onClose={() => setDrawerOpen(false)} onCreated={onCreated} />
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>

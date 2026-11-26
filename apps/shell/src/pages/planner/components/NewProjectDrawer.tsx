@@ -2,11 +2,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Dialog, Drawer, Field, Input, Textarea } from "@betinhos/ui";
 import { FileText, ImagePlus, Paperclip, Plus, Trash2, UploadCloud } from "lucide-react";
-import { reasonText, type Source } from "../../projetos/data/source";
-import { STATUS, autorDoPerfil } from "../../projetos/domain/choices";
-import { MAX_ANEXOS } from "../../projetos/domain/anexos";
-import { codigoEtapa1 } from "../../projetos/domain/regras";
-import type { Atualizacao, Etapa, Perfil, Projeto } from "../../projetos/domain/types";
+import { reasonText, type Source } from "../projetos/data/source";
+import { STATUS, autorDoPerfil } from "../projetos/domain/choices";
+import { MAX_ANEXOS } from "../projetos/domain/anexos";
+import { codigoEtapa1 } from "../projetos/domain/regras";
+import type { Atualizacao, Etapa, Perfil, Projeto } from "../projetos/domain/types";
 import { acceptFiles, attachmentKind, namePastedFile } from "../domain/projectsBoard";
 import { AudioRecorder } from "./AudioRecorder";
 
@@ -121,7 +121,7 @@ export function NewProjectDrawer({ open, source, perfil, onClose, onCreated }: P
       created = await source.createProjeto({ cr40f_name: nome, ...(texto ? { cr40f_briefing: texto } : {}) });
       const codigo = codigoEtapa1(created.codigo);
       const etapaId = await source.createEtapa({ cr40f_status: STATUS.ideia }, { projetoId: created.id, numero: 1, codigo });
-      const projeto: Projeto = { id: created.id, codigo: created.codigo, nome, area: "", responsavel: "", briefing: texto, instrucoes: "" };
+      const projeto: Projeto = { id: created.id, codigo: created.codigo, nome, briefing: texto, checklist: [] };
       const etapa: Etapa = { id: etapaId, projetoId: created.id, numero: 1, codigo, nome: "", status: STATUS.ideia, prazo: null, andamento: 0, linkPr: "", publicadoProd: null };
       let atualizacao: Atualizacao | null = null;
       let warning: string | null = null;

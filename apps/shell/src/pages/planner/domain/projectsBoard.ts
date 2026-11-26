@@ -1,8 +1,8 @@
-// Quadro de Projetos do Planner: os mesmos projetos do módulo #/projetos (cr40f_projeto), em colunas por situação.
-import { STATUS, STATUS_OPTIONS } from '../../projetos/domain/choices'
-import { MAX_ANEXOS, erroDoAnexo } from '../../projetos/domain/anexos'
-import { erroDeStatus, etapaDoProjeto } from '../../projetos/domain/regras'
-import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from '../../projetos/domain/types'
+// Quadro de Projetos do Planner: projetos do cr40f_projeto (pasta planner/projetos), em colunas por situação.
+import { STATUS, STATUS_OPTIONS } from '../projetos/domain/choices'
+import { MAX_ANEXOS, erroDoAnexo } from '../projetos/domain/anexos'
+import { etapaDoProjeto } from '../projetos/domain/regras'
+import type { Anexo, Atualizacao, Etapa, Projeto } from '../projetos/domain/types'
 
 export const BOARD_COLUMNS = STATUS_OPTIONS
 
@@ -36,11 +36,6 @@ export function cardsByStatus(cards: ProjectCard[]): Map<number, ProjectCard[]> 
   return map
 }
 
-/** Erro ao mover o cartão para `novo` (null = pode). Mesma regra do módulo: só o Renan; Pronto exige prova. */
-export function moveError(card: ProjectCard, novo: number, perfil: Perfil, atualizacoes: Atualizacao[]): string | null {
-  return erroDeStatus({ novo, atual: card.status, perfil, etapaId: card.etapa?.id ?? '', atualizacoes })
-}
-
 export type AttachmentKind = 'audio' | 'image' | 'video' | 'file'
 export function attachmentKind(type: string): AttachmentKind {
   if (type.startsWith('audio/')) return 'audio'
@@ -65,7 +60,7 @@ export function acceptFiles(current: File[], incoming: File[]): { accepted: File
   for (const file of incoming) {
     const erro = erroDoAnexo(file)
     if (erro) { errors.push(erro); continue }
-    if (current.length + accepted.length >= MAX_ANEXOS) { errors.push(`Até ${MAX_ANEXOS} anexos por ideia; ${file.name} ficou de fora.`); continue }
+    if (current.length + accepted.length >= MAX_ANEXOS) { errors.push(`Até ${MAX_ANEXOS} anexos por vez; ${file.name} ficou de fora.`); continue }
     accepted.push(file)
   }
   return { accepted, errors }

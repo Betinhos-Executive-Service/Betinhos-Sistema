@@ -170,6 +170,8 @@ describe('cotações (quotesUiContract)', () => {
   it('app usa o select compartilhado; nenhum <select> nativo fora do SearchableSelect', () => {
     for (const path of walk(DIR)) {
       if (path.endsWith('SearchableSelect.tsx')) continue
+      // Formulário do projeto (pasta projetos/) usa o Select do DS, como o resto do shell.
+      if (path.includes('/projetos/')) continue
       expect(readFileSync(path, 'utf8'), path).not.toMatch(/<select\b/i)
     }
   })

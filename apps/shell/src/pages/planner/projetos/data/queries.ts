@@ -1,6 +1,7 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
 import type { Anexo, Atualizacao, Etapa, Projeto } from '../domain/types'
 import { AUTOR, STATUS } from '../domain/choices'
+import { lerChecklist } from '../domain/checklist'
 
 export const ENTITIES = { projeto: 'cr40f_projeto', etapa: 'cr40f_projetoetapa', atualizacao: 'cr40f_projetoatualizacao' } as const
 export type EntitySets = Record<keyof typeof ENTITIES, string>
@@ -10,7 +11,7 @@ export const NAV_ETAPA = 'cr40f_Etapa'
 /** Anexos (notas) da atualização: coleção da relação padrão annotation → tabela. */
 export const NAV_ANEXOS = 'cr40f_projetoatualizacao_Annotations'
 
-const PROJETO_SELECT = ['cr40f_projetoid', 'cr40f_codigo', 'cr40f_name', 'cr40f_area', 'cr40f_responsavel', 'cr40f_briefing', 'cr40f_instrucoes']
+const PROJETO_SELECT = ['cr40f_projetoid', 'cr40f_codigo', 'cr40f_name', 'cr40f_briefing', 'cr40f_checklist']
 const ETAPA_SELECT = [
   'cr40f_projetoetapaid', '_cr40f_projeto_value', 'cr40f_numero', 'cr40f_codigo', 'cr40f_name', 'cr40f_status',
   'cr40f_prazo', 'cr40f_andamento', 'cr40f_linkpr', 'cr40f_publicadoprod',
@@ -36,8 +37,8 @@ export const atualizacoesPath = (set: string) =>
 export const anexoPath = (id: string) => `annotations(${cleanId(id)})?$select=documentbody,mimetype,filename`
 
 export const mapProjeto = (row: Row): Projeto => ({
-  id: cleanId(str(row.cr40f_projetoid)), codigo: text(row.cr40f_codigo), nome: text(row.cr40f_name), area: text(row.cr40f_area),
-  responsavel: text(row.cr40f_responsavel), briefing: str(row.cr40f_briefing), instrucoes: str(row.cr40f_instrucoes),
+  id: cleanId(str(row.cr40f_projetoid)), codigo: text(row.cr40f_codigo), nome: text(row.cr40f_name), briefing: str(row.cr40f_briefing),
+  checklist: lerChecklist(row.cr40f_checklist),
 })
 
 export const mapEtapa = (row: Row): Etapa => ({
@@ -82,4 +83,4 @@ export const anexoPayload = (atualizacaoSet: string, atualizacaoId: string, nome
 })
 
 // Papéis do Renan (administrador do ambiente) e leitura dos papéis do usuário: `app/papeisUsuario.ts`, comum a outras telas.
-export { PAPEIS_RENAN, papeisPath } from '../../../app/papeisUsuario'
+export { PAPEIS_RENAN, papeisPath } from '../../../../app/papeisUsuario'

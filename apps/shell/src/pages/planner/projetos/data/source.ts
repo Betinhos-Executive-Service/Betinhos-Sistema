@@ -1,7 +1,8 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
-import type { Host } from '../../../host'
-import { latenciaMock } from '../../../app/latenciaMock'
+import type { Host } from '../../../../host'
+import { latenciaMock } from '../../../../app/latenciaMock'
 import { STATUS } from '../domain/choices'
+import { lerChecklist } from '../domain/checklist'
 import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from '../domain/types'
 import { createMockArquivos, createMockAtualizacoes, createMockEtapas, createMockProjetos } from './mock'
 import {
@@ -29,7 +30,7 @@ export type Source = {
   addAtualizacao: (nova: NovaAtualizacao, arquivos: File[]) => Promise<Atualizacao>
   /** Conteúdo do anexo (miniatura, áudio e abertura em nova aba). */
   baixarAnexo: (anexo: Anexo) => Promise<Blob>
-  /** Renan = usuário com papel de administrador do ambiente; qualquer outro (ou erro na leitura) = gestor. */
+  /** Autor dos anexos: Renan = usuário com papel de administrador do ambiente; qualquer outro (ou erro na leitura) = gestor. */
   perfil: () => Promise<Perfil>
 }
 
@@ -73,7 +74,7 @@ function createMockSource(): Source {
     },
     async createProjeto(c) {
       await wait(400)
-      const p: Projeto = { id: next('bbbbbbbb'), codigo: `PRJ-${++codigo}`, nome: s(c.cr40f_name), area: s(c.cr40f_area), responsavel: s(c.cr40f_responsavel), briefing: s(c.cr40f_briefing), instrucoes: s(c.cr40f_instrucoes) }
+      const p: Projeto = { id: next('bbbbbbbb'), codigo: `PRJ-${++codigo}`, nome: s(c.cr40f_name), briefing: s(c.cr40f_briefing), checklist: lerChecklist(c.cr40f_checklist) }
       projetos = [...projetos, p]
       return { id: p.id, codigo: p.codigo }
     },
@@ -105,7 +106,6 @@ function createMockSource(): Source {
       if (!arquivo) throw new Error('Arquivo não encontrado.')
       return arquivo
     },
-    // No pnpm dev o perfil é escolhido na própria tela (seletor "Perfil (exemplo)").
     perfil: async () => 'renan',
   }
 }
@@ -154,10 +154,10 @@ export function createSource(host: Host): Source {
           anexos.push({ id: anexoId, nome: f.name, tipo: f.type, tamanho: f.size })
         }
       } catch (reason) {
-        // Sem os anexos a atualização perderia a prova: exclui (as notas gravadas vão junto) e mostra o erro original.
+        // Atualização sem os anexos não serve: exclui (as notas gravadas vão junto) e mostra o erro original.
         const removida = await host.client.remove(st.atualizacao, id).then(() => true, () => false)
         if (removida) throw reason
-        throw new Error(`${reasonText(reason)} A atualização ficou registrada sem todos os anexos e não pôde ser excluída; confira a linha do tempo antes de tentar de novo.`)
+        throw new Error(`${reasonText(reason)} A atualização ficou registrada sem todos os anexos e não pôde ser excluída; atualize a tela antes de tentar de novo.`)
       }
       return { id, projetoId: cleanId(nova.projetoId), etapaId: nova.etapaId ? cleanId(nova.etapaId) : null, data: nova.data, autor: nova.autor, texto: nova.texto, prova: nova.prova, transcricao: '', anexos }
     },
