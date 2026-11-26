@@ -75,12 +75,14 @@ namespace Betinhos.DriverRecordSharing
 
             // Serviço programado que deixa de existir para o motorista anterior: cancelado pelo status ou pela troca
             // para o funcionário "Cancelado", em qualquer ordem. Cancelado com ressalvas fica de fora (decisão do Renan).
+            // Requer Análise só conta vindo da sincronização (cliente cancelou); o "cancelado no local" do App é o próprio motorista.
+            var canceledBySync = finalStatus == PluginConfig.ServiceStatusRequiresAnalysis && target.Contains(PluginConfig.ServiceSyncSnapshot);
             if (previousDriver != null &&
                 previousStatus == PluginConfig.ServiceStatusProgrammed &&
-                (driverChanged || finalStatus == PluginConfig.ServiceStatusCanceled) &&
+                (driverChanged || finalStatus == PluginConfig.ServiceStatusCanceled || canceledBySync) &&
                 !isCanceledEmployee(previousDriver))
             {
-                var canceled = finalStatus == PluginConfig.ServiceStatusCanceled || (finalDriver != null && isCanceledEmployee(finalDriver));
+                var canceled = finalStatus == PluginConfig.ServiceStatusCanceled || canceledBySync || (finalDriver != null && isCanceledEmployee(finalDriver));
                 notices.Add(new PlannedDriverNotice(canceled ? DriverNoticeKind.Cancelado : DriverNoticeKind.Retirado, previousDriver));
             }
 

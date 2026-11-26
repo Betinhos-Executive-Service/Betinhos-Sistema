@@ -23,6 +23,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         private const int Solicitado = 202410004;
         private const int StatusCancelado = 202410002;
         private const int CanceladoComRessalvas = 202410010;
+        private const int RequerAnalise = 100000001;
         private const int Novo = 100000000;
         private const int Retirado = 100000001;
         private const int TipoCancelado = 100000002;
@@ -206,6 +207,31 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(Pendente, Option(aviso, "new_situacao"));
             Assert.False(aviso.Contains("new_prazovisualizacao"));
             Assert.Equal($"{correlationId:N}:{serviceId:N}:{driverA:N}:Cancelado", aviso.GetAttributeValue<string>("new_chaveidempotencia"));
+        }
+
+        [Fact]
+        public void SincronizacaoLevandoProgramadoParaRequerAnaliseGeraCancelado()
+        {
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", "{}"), Pre(driverA, Programado));
+
+            AssertOnly(TipoCancelado, driverA);
+        }
+
+        [Fact]
+        public void RequerAnaliseSemSnapshotNaoGeraAviso()
+        {
+            // O motorista cancela no local pelo App: ele mesmo fez a ação.
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise)), Pre(driverA, Programado));
+
+            Assert.Empty(Notices());
+        }
+
+        [Fact]
+        public void SincronizacaoLevandoConfirmadoParaRequerAnaliseNaoGeraAviso()
+        {
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", "{}"), Pre(driverA, Confirmado));
+
+            Assert.Empty(Notices());
         }
 
         [Fact]

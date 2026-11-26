@@ -107,6 +107,9 @@ namespace Betinhos.DriverRecordSharing
         public const int ServiceStatusProgrammed = 202410005;
         public const int ServiceStatusPreReservation = 202410000;
         public const int ServiceStatusRequested = 202410004;
+        public const int ServiceStatusRequiresAnalysis = 100000001;
+        /// <summary>Snapshot da planilha: só a sincronização (flow Tenaris) grava a reserva com ele.</summary>
+        public const string ServiceSyncSnapshot = "new_snapshotsharepoint";
         // Serviço que ainda não começou: o carro da posse pode ser preenchido (terceiro) ou limpo (colaborador).
         public static readonly int[] ServiceNotStartedStatuses = { ServiceStatusPreReservation, ServiceStatusRequested, ServiceStatusConfirmed, ServiceStatusProgrammed };
         public static readonly int[] ServiceBackfillCategories = { 100000000, 100000001 };
