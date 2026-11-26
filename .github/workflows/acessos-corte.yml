@@ -4,9 +4,11 @@ name: Corte dos acessos
 # pela Produção (main → PROD, environment prod-front), sempre na conta de serviço. O modo vem de
 # packages/deploy/acessos/corte.json:
 #  - esperar: só garante os membros do perfil de coluna "Passageiros - automação" (se existir);
+#  - preparar: só adiciona às administrativas (equipe MDA + Administrador do Sistema direto) os Gestores, Projetos, Base
+#    e os perfis de coluna dos Gestores; foto cifrada do que entrou, tag e aplica; nada sai;
 #  - cortar: relatório (trava vermelho se não zerar); se houver o que tirar, foto cifrada (90 dias), tag
 #    acessos-corte-<ambiente> e corte; ambiente já cortado = nada;
-#  - desfazer: com a tag, baixa todas as fotos, devolve os papéis e apaga a tag; sem a tag, nada.
+#  - desfazer: com a tag, baixa todas as fotos, devolve os papéis, tira o que o preparo pôs e apaga a tag; sem a tag, nada.
 # Log público: contagens e ids curtos com hash. Relatório e foto com ids reais só cifrados (PACOTES_SENHA).
 on:
   workflow_call:
@@ -58,7 +60,7 @@ jobs:
           echo "Quem lê: $(wc -l < "$RUNNER_TEMP/corte/relatorio/quem-le.txt") linha(s) no relatório cifrado."
       - name: Avaliar o corte
         id: avaliar
-        if: steps.modo.outputs.modo == 'cortar'
+        if: steps.modo.outputs.modo == 'cortar' || steps.modo.outputs.modo == 'preparar'
         run: |
           set +e
           node packages/deploy/acessos/corte.mjs --etapa avaliar --ambiente "$AMB" --pasta "$RUNNER_TEMP/corte"
@@ -66,14 +68,14 @@ jobs:
           echo "estado=$(cat "$RUNNER_TEMP/corte/estado.txt" 2>/dev/null || echo erro)" >> "$GITHUB_OUTPUT"
           exit $codigo
       - name: Cifrar o relatório
-        if: always() && steps.modo.outputs.modo == 'cortar'
+        if: always() && (steps.modo.outputs.modo == 'cortar' || steps.modo.outputs.modo == 'preparar')
         env:
           PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
         run: |
           [ -d "$RUNNER_TEMP/corte/relatorio" ] || { echo "Sem relatório."; exit 0; }
           bash packages/deploy/solucoes/artefato-cifrado.sh cifrar "$RUNNER_TEMP/corte/relatorio" "$RUNNER_TEMP/saida/relatorio.enc"
       - uses: actions/upload-artifact@v4
-        if: always() && steps.modo.outputs.modo == 'cortar'
+        if: always() && (steps.modo.outputs.modo == 'cortar' || steps.modo.outputs.modo == 'preparar')
         with:
           name: acessos-relatorio-${{ inputs.ambiente }}
           path: ${{ runner.temp }}/saida/relatorio.enc
@@ -95,11 +97,23 @@ jobs:
       - name: Marcar o início do corte
         if: steps.avaliar.outputs.estado == 'aplicar'
         run: |
-          git tag -f "acessos-corte-$AMB" "$GITHUB_SHA"
-          git push -f origin "refs/tags/acessos-corte-$AMB"
+          # A tag marca o início do ciclo (preparar e cortar): criada uma vez, com o run id; o desfazer só usa as fotos
+          # deste run em diante, e as de ciclos já desfeitos ficam de fora.
+          if ! git ls-remote --exit-code --tags origin "refs/tags/acessos-corte-$AMB" > /dev/null; then
+            git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+              tag -a "acessos-corte-$AMB" -m "$GITHUB_RUN_ID" "$GITHUB_SHA"
+            git push origin "refs/tags/acessos-corte-$AMB"
+          fi
       - name: Aplicar o corte
         if: steps.avaliar.outputs.estado == 'aplicar'
         run: node packages/deploy/acessos/corte.mjs --etapa aplicar --ambiente "$AMB" --pasta "$RUNNER_TEMP/corte" --aplicar
+      # Marca que o corte (não só o preparo) passou: é o que a trava do passageiro no CI confere.
+      - name: Marcar o corte feito
+        if: steps.avaliar.outputs.estado == 'aplicar' && steps.modo.outputs.modo == 'cortar'
+        run: |
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+            tag -f -a "acessos-cortado-$AMB" -m "$GITHUB_RUN_ID" "$GITHUB_SHA"
+          git push -f origin "refs/tags/acessos-cortado-$AMB"
       - name: Baixar as fotos
         id: fotos
         if: steps.modo.outputs.modo == 'desfazer'
@@ -114,8 +128,12 @@ jobs:
           fi
           # Só vale foto de execução da branch do ambiente: artefato de outra branch não pode alimentar o desfazer.
           if [ "$AMB" = "prod" ]; then RAMO=main; else RAMO=develop; fi
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=acessos-foto-$AMB&per_page=100" \
-            --jq ".artifacts[] | select(.expired == false and .workflow_run.head_branch == \"$RAMO\") | .id" > "$RUNNER_TEMP/ids.txt"
+          git fetch -q -f origin "refs/tags/acessos-corte-$AMB:refs/tags/acessos-corte-$AMB"
+          INICIO=$(git tag -l --format='%(contents:subject)' "acessos-corte-$AMB")
+          # Tag antiga (sem run id): vale tudo, como antes.
+          [[ "$INICIO" =~ ^[0-9]+$ ]] || INICIO=0
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?name=acessos-foto-$AMB&per_page=100" \
+            --jq ".artifacts[] | select(.expired == false and .workflow_run.head_branch == \"$RAMO\" and .workflow_run.id >= $INICIO) | .id" > "$RUNNER_TEMP/ids.txt"
           if [ ! -s "$RUNNER_TEMP/ids.txt" ]; then
             echo "::error::Nenhuma foto do corte nos últimos 90 dias; o desfazer automático não tem o que devolver."
             exit 1
@@ -132,4 +150,6 @@ jobs:
         run: node packages/deploy/acessos/corte.mjs --etapa desfazer --ambiente "$AMB" --fotos "$RUNNER_TEMP/fotos" --aplicar
       - name: Apagar a tag do corte
         if: steps.fotos.outputs.ha == 'sim'
-        run: git push origin ":refs/tags/acessos-corte-$AMB"
+        run: |
+          git push origin ":refs/tags/acessos-corte-$AMB"
+          git push origin ":refs/tags/acessos-cortado-$AMB" || true

@@ -232,6 +232,14 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_anexorecebimento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_anexorecebimento_v2": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -265,6 +273,14 @@
           "Write": "Global"
         },
         "cr40f_clientes1": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cobrancastripe": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -328,7 +344,79 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_fluxocaixacategoria": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaconfiguracao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaconta": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixacontraparte": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaevento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaferiado": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaimportacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_fluxocaixalancamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixarecorrencia": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaregra": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -347,6 +435,14 @@
         "cr40f_funcionarios": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "cr40f_geracaopagantesoperacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_itempagamentoaterceiro": {
           "Append": "Global",
@@ -392,6 +488,30 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_recibopersonalizado": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_recibos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_recibos_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_reservadeveculos": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -401,6 +521,14 @@
         "cr40f_servicosporpassageiro": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "cr40f_sincronizacaofinanceira": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_terceirofavorecido": {
           "Append": "Global",
@@ -484,6 +612,13 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_anexorecebimento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_anexorecebimento_v2": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -513,6 +648,13 @@
           "Write": "Global"
         },
         "cr40f_clientes1": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cobrancastripe": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -570,7 +712,70 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_fluxocaixacategoria": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaconfiguracao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaconta": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixacontraparte": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaevento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaferiado": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaimportacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_fluxocaixalancamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixarecorrencia": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixaregra": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -587,6 +792,13 @@
         "cr40f_funcionarios": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "cr40f_geracaopagantesoperacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_itempagamentoaterceiro": {
           "Append": "Global",
@@ -628,6 +840,27 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_recibopersonalizado": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_recibos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_recibos_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_reservadeveculos": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -637,6 +870,13 @@
         "cr40f_servicosporpassageiro": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "cr40f_sincronizacaofinanceira": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_terceirofavorecido": {
           "Append": "Global",
@@ -706,6 +946,22 @@
           "AppendTo": "Global",
           "Read": "Global"
         },
+        "cr40f_anexocolisao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_anexocolisao_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_anexodespesaoperacional": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -715,6 +971,14 @@
           "Write": "Global"
         },
         "cr40f_baselinepreventiva": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_colisao": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -785,9 +1049,11 @@
         "cr40f_multas": {
           "Append": "Global",
           "AppendTo": "Global",
+          "Assign": "Global",
           "Create": "Global",
           "Delete": "Global",
           "Read": "Global",
+          "Share": "Global",
           "Write": "Global"
         },
         "cr40f_reservadeveculos": {
@@ -797,7 +1063,23 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_tipoequipamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_veiculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_avaliacaoposto": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -849,6 +1131,14 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "new_notamotorista": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "new_parcelamultafolha": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -865,11 +1155,35 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "new_postocombustivel": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_resumocombustivelmensal": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "new_telemetriadiariainfleet": {
           "AppendTo": "Global",
           "Read": "Global"
         },
         "new_termomulta": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_textotermomulta": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -896,6 +1210,20 @@
           "AppendTo": "Global",
           "Read": "Global"
         },
+        "cr40f_anexocolisao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_anexocolisao_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_anexodespesaoperacional": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -904,6 +1232,13 @@
           "Write": "Global"
         },
         "cr40f_baselinepreventiva": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_colisao": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -967,8 +1302,10 @@
         "cr40f_multas": {
           "Append": "Global",
           "AppendTo": "Global",
+          "Assign": "Global",
           "Create": "Global",
           "Read": "Global",
+          "Share": "Global",
           "Write": "Global"
         },
         "cr40f_reservadeveculos": {
@@ -978,7 +1315,21 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_tipoequipamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_veiculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_avaliacaoposto": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -1024,6 +1375,13 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "new_notamotorista": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "new_parcelamultafolha": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -1038,11 +1396,32 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "new_postocombustivel": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_resumocombustivelmensal": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "new_telemetriadiariainfleet": {
           "AppendTo": "Global",
           "Read": "Global"
         },
         "new_termomulta": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_textotermomulta": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -1073,12 +1452,39 @@
           "Read": "Global"
         },
         "cr40f_agenteproposta": {
+          "Append": "Global",
           "AppendTo": "Global",
-          "Read": "Global"
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_anexorecebimento_v2": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "cr40f_appconfigpessoa": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_appconfigversao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_avaliacaoservico": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_bancodedados": {
           "Append": "Global",
@@ -1088,11 +1494,33 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_cidade": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_clientes1": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
           "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_compromissofds": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_comunicadohome": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
           "Read": "Global",
           "Write": "Global"
         },
@@ -1121,8 +1549,11 @@
           "Write": "Global"
         },
         "cr40f_errodosistema": {
+          "Append": "Global",
           "AppendTo": "Global",
-          "Read": "Global"
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_errooperacional": {
           "Append": "Global",
@@ -1140,19 +1571,66 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_escalafds": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_financeiro": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "cr40f_fontenoticia": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_funcionarios": {
           "AppendTo": "Global",
           "Read": "Global"
         },
+        "cr40f_liberacaoanexo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_linkcadastro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_manutencoes": {
           "AppendTo": "Global",
           "Read": "Global"
         },
+        "cr40f_noticiaexterna": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_pedidodecotacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_provamidia": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -1197,8 +1675,27 @@
           "Read": "Global"
         },
         "new_appmotoristaslog": {
+          "Append": "Global",
           "AppendTo": "Global",
-          "Read": "Global"
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_avisomotorista": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_centraldenotificacoes": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "new_comunicadodestinatario": {
           "Append": "Global",
@@ -1213,6 +1710,13 @@
           "AppendTo": "Global",
           "Create": "Global",
           "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_localdebase": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
           "Read": "Global",
           "Write": "Global"
         },
@@ -1254,6 +1758,27 @@
           "AppendTo": "Global",
           "Read": "Global"
         },
+        "cr40f_appconfigpessoa": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_appconfigversao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_avaliacaoservico": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_bancodedados": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -1262,6 +1787,13 @@
           "Write": "Global"
         },
         "cr40f_clientes1": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_compromissofds": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -1309,19 +1841,54 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_escalafds": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_financeiro": {
           "AppendTo": "Global",
           "Read": "Global"
         },
+        "cr40f_fontenoticia": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_funcionarios": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "cr40f_liberacaoanexo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_linkcadastro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "cr40f_manutencoes": {
           "AppendTo": "Global",
           "Read": "Global"
         },
         "cr40f_pedidodecotacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_provamidia": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -1363,6 +1930,20 @@
         "new_appmotoristaslog": {
           "AppendTo": "Global",
           "Read": "Global"
+        },
+        "new_avisomotorista": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_centraldenotificacoes": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
         },
         "new_comunicadodestinatario": {
           "Append": "Global",
@@ -1421,6 +2002,14 @@
           "Write": "Global"
         },
         "cr40f_funcionarios": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_jornadacolaborador": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",
@@ -1520,6 +2109,13 @@
           "Write": "Global"
         },
         "cr40f_funcionarios": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_jornadacolaborador": {
           "Append": "Global",
           "AppendTo": "Global",
           "Create": "Global",

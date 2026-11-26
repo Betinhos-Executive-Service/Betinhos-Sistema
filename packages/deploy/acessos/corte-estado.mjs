@@ -1,9 +1,8 @@
 // Lê do Dataverse o estado que corte-regras.mjs avalia. Somente GET.
-import { ADMIN, EQUIPE, NIVEL, PAPEL_BASE, tabelasDoFlow } from './corte-regras.mjs'
+import { ADMIN, EQUIPE, NIVEL, PADRAO_MEDIDAS, PAPEL_BASE, tabelasDoFlow } from './corte-regras.mjs'
 
 // Tabelas padrão medidas além das customizadas (as que a operação cria e altera no dia a dia).
 const PREFIXOS = /^(cr40f|new)_/
-export const PADRAO_MEDIDAS = ['account', 'annotation', 'appointment', 'contact', 'email', 'phonecall', 'task']
 
 function agrupar(linhas, chave, valor) {
   const mapa = new Map()
@@ -41,13 +40,16 @@ export async function lerEstado(dv) {
   const membros = await dv.ligacao('teammembership', 'teamid,systemuserid')
   const userroles = await dv.ligacao('systemuserroles', 'systemuserid,roleid')
   // accessmode 3 (suporte) e 5 (admin delegado) são contas da Microsoft: fora da avaliação.
-  const usuarios = await dv.todos('systemusers?$select=systemuserid,applicationid,accessmode&$filter=isdisabled eq false')
+  const usuarios = await dv.todos('systemusers?$select=systemuserid,applicationid,accessmode,_businessunitid_value&$filter=isdisabled eq false')
   const equipesPapeis = agrupar(teamroles, 'teamid', 'roleid')
   const equipesDe = agrupar(membros, 'systemuserid', 'teamid')
   const diretosDe = agrupar(userroles, 'systemuserid', 'roleid')
   const pessoas = usuarios
     .filter((u) => u.accessmode !== 3 && u.accessmode !== 5)
-    .map((u) => ({ id: u.systemuserid, app: u.applicationid != null, equipes: equipesDe.get(u.systemuserid) ?? [], diretos: diretosDe.get(u.systemuserid) ?? [] }))
+    .map((u) => ({
+      id: u.systemuserid, bu: u._businessunitid_value, app: u.applicationid != null, modo: u.accessmode,
+      equipes: equipesDe.get(u.systemuserid) ?? [], diretos: diretosDe.get(u.systemuserid) ?? [],
+    }))
   const usados = new Set([
     base.roleid,
     ...(equipe ? equipesPapeis.get(equipe.id) ?? [] : []),
@@ -69,9 +71,24 @@ export async function lerEstado(dv) {
         return [{ ...i, nivel: NIVEL[p.Depth] }]
       })
     }
-    papeis.set(r.roleid, { id: r.roleid, nome: r.name, admin, privilegios })
+    papeis.set(r.roleid, { id: r.roleid, nome: r.name, bu: r._businessunitid_value, admin, privilegios })
   }
-  return { servico: UserId.toLowerCase(), equipe, base: base.roleid, papeis, equipes: equipesPapeis, pessoas, tabelas, catalogo, conjuntoDe }
+  // Perfis de coluna diretos (o preparo dá os dos Gestores; o de equipe não conta).
+  const perfis = await dv.todos('fieldsecurityprofiles?$select=fieldsecurityprofileid,name')
+  const deUsuario = new Map()
+  for (const l of await dv.ligacao('systemuserprofiles', 'systemuserid,fieldsecurityprofileid')) {
+    deUsuario.set(l.systemuserid, (deUsuario.get(l.systemuserid) ?? new Set()).add(l.fieldsecurityprofileid))
+  }
+  // Colunas protegidas das tabelas próprias ('tabela|coluna') e o que cada perfil deixa ler (canread 4 = permitido).
+  const protegidas = new Set(), leitura = new Map()
+  for (const f of await dv.todos('fieldpermissions?$select=entityname,attributelogicalname,canread,_fieldsecurityprofileid_value')) {
+    if (!/^(cr40f|new)_/.test(f.entityname)) continue
+    const c = `${f.entityname}|${f.attributelogicalname}`
+    protegidas.add(c)
+    if (f.canread === 4) leitura.set(f._fieldsecurityprofileid_value, (leitura.get(f._fieldsecurityprofileid_value) ?? new Set()).add(c))
+  }
+  const colunas = { perfis: new Map(perfis.map((p) => [p.name, p.fieldsecurityprofileid])), deUsuario, protegidas, leitura }
+  return { servico: UserId.toLowerCase(), equipe, base: base.roleid, papeis, equipes: equipesPapeis, pessoas, tabelas, catalogo, conjuntoDe, colunas }
 }
 
 export async function lerUso(dv, tabelas, conjuntoDe, desdeIso) {

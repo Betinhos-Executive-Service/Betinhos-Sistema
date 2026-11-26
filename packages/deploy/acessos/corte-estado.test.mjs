@@ -35,7 +35,7 @@ const rotas = () => [
   ['ligacao:systemuserroles', [{ systemuserid: SERV, roleid: P.admin }]],
   ['systemusers?', [
     { systemuserid: SERV, applicationid: ID(500), accessmode: 4 },
-    { systemuserid: ANA, applicationid: null, accessmode: 0 },
+    { systemuserid: ANA, applicationid: null, accessmode: 0, _businessunitid_value: BU },
     { systemuserid: ID(300), applicationid: null, accessmode: 3 },
     { systemuserid: ID(301), applicationid: null, accessmode: 5 },
   ]],
@@ -48,6 +48,13 @@ const rotas = () => [
   ] }],
   [`RetrieveRolePrivilegesRole(RoleId=@p)?@p=${P.antigo}`, { RolePrivileges: [{ PrivilegeId: ID(600), Depth: 'Global' }, { PrivilegeId: ID(999), Depth: 'Global' }] }],
   [`RetrieveRolePrivilegesRole(RoleId=@p)?@p=${P.base}`, { RolePrivileges: [] }],
+  ['fieldsecurityprofiles?', [{ fieldsecurityprofileid: ID(700), name: 'Perfil - RH - Gestor' }]],
+  ['ligacao:systemuserprofiles', [{ systemuserid: ANA, fieldsecurityprofileid: ID(700) }]],
+  ['fieldpermissions?', [
+    { entityname: 'cr40f_funcionarios', attributelogicalname: 'cr40f_cpf', canread: 4, _fieldsecurityprofileid_value: ID(700) },
+    { entityname: 'cr40f_funcionarios', attributelogicalname: 'cr40f_salario', canread: 0, _fieldsecurityprofileid_value: ID(700) },
+    { entityname: 'contact', attributelogicalname: 'birthdate', canread: 4, _fieldsecurityprofileid_value: ID(700) },
+  ]],
 ]
 
 test('lerEstado monta equipe, pessoas, papéis e catálogo', async () => {
@@ -57,9 +64,15 @@ test('lerEstado monta equipe, pessoas, papéis e catálogo', async () => {
   assert.deepEqual(e.equipe, { id: EQ, bu: BU })
   assert.equal(e.base, P.base)
   assert.deepEqual(e.pessoas, [
-    { id: SERV, app: true, equipes: [], diretos: [P.admin] },
-    { id: ANA, app: false, equipes: [EQ], diretos: [] },
+    { id: SERV, bu: undefined, app: true, equipes: [], diretos: [P.admin], modo: 4 },
+    { id: ANA, bu: BU, app: false, equipes: [EQ], diretos: [], modo: 0 },
   ])
+  assert.equal(e.papeis.get(P.base).bu, BU)
+  assert.equal(e.colunas.perfis.get('Perfil - RH - Gestor'), ID(700))
+  assert.ok(e.colunas.deUsuario.get(ANA).has(ID(700)))
+  // Só tabelas próprias entram; canread 0 é protegida mas não lida.
+  assert.deepEqual([...e.colunas.protegidas].sort(), ['cr40f_funcionarios|cr40f_cpf', 'cr40f_funcionarios|cr40f_salario'])
+  assert.deepEqual([...e.colunas.leitura.get(ID(700))], ['cr40f_funcionarios|cr40f_cpf'])
   assert.deepEqual(e.papeis.get(P.antigo).privilegios, [{ tabela: 'cr40f_financeiro', tipo: 'Write', nivel: 8 }])
   assert.equal(e.papeis.get(P.admin).admin, true)
   assert.deepEqual(e.papeis.get(P.solto).privilegios, [])
