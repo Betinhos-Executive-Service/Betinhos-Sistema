@@ -29,6 +29,7 @@ $employeesTable = "cr40f_funcionarioses"
 $subscriptionsTable = "new_inscricaopushmotoristas"
 $webPushVariable = "Web_Push_Entregue"
 $tipoNovo = 100000000
+$tipoCancelado = 100000002
 $pendente = 100000000
 $enviado = 100000001
 $falhou = 100000002
@@ -154,6 +155,7 @@ $reservaId = "@outputs('Get_aviso')?['body/_new_reserva_value']"
 $reservaIdInline = "@{outputs('Get_aviso')?['body/_new_reserva_value']}"
 $email = "outputs('Get_funcionario')?['body/cr40f_emailmicrosoft']"
 $isNovo = "equals(outputs('Get_aviso')?['body/new_tipo'], $tipoNovo)"
+$isCancelado = "equals(outputs('Get_aviso')?['body/new_tipo'], $tipoCancelado)"
 $stillValid = "or(not($isNovo), and(equals(outputs('Get_reserva')?['body/cr40f_status'], $programado), equals(outputs('Get_reserva')?['body/_cr40f_motorista_value'], outputs('Get_aviso')?['body/_new_funcionario_value'])))"
 $attempts = "@add(coalesce(outputs('Get_aviso')?['body/new_tentativas'], 0), 1)"
 # Rotulo de dia: Hoje/Amanhã/Ontem às HH:mm (senão dd/MM às HH:mm), no fuso de Sao Paulo.
@@ -163,8 +165,8 @@ $time = "formatDateTime(convertFromUtc($departureUtc, '$tz'), 'HH:mm')"
 $today = "convertFromUtc(utcNow(), '$tz')"
 $day = "if(empty($departureUtc), 'Horário a definir', if(equals($departureDay, formatDateTime($today, 'yyyy-MM-dd')), concat('Hoje às ', $time), if(equals($departureDay, formatDateTime(addDays($today, 1), 'yyyy-MM-dd')), concat('Amanhã às ', $time), if(equals($departureDay, formatDateTime(addDays($today, -1), 'yyyy-MM-dd')), concat('Ontem às ', $time), formatDateTime(convertFromUtc($departureUtc, '$tz'), 'dd/MM ''às'' HH:mm')))))"
 # Notificação em duas partes: título diz o que aconteceu, corpo diz qual serviço e quando (sem caixa alta).
-$title = "@{if($isNovo, 'Novo serviço na sua agenda', 'Serviço retirado da sua agenda')}"
-$message = "@{outputs('Get_reserva')?['body/cr40f_id']} · @{$day}`n@{if($isNovo, 'Adicionado pelo gestor. Toque para ver os detalhes.', 'Removido pelo gestor. Toque para ver a agenda atualizada.')}"
+$title = "@{if($isNovo, 'Novo serviço na sua agenda', if($isCancelado, 'Serviço cancelado', 'Serviço retirado da sua agenda'))}"
+$message = "@{outputs('Get_reserva')?['body/cr40f_id']} · @{$day}`n@{if($isNovo, 'Adicionado pelo gestor. Toque para ver os detalhes.', if($isCancelado, 'Cancelado pelo gestor. Toque para ver a agenda atualizada.', 'Removido pelo gestor. Toque para ver a agenda atualizada.'))}"
 
 $sendPush = @{
   type = "OpenApiConnection"
@@ -203,7 +205,7 @@ $worker = @{
       "body/subscriptions" = "@body('Select_subs')"
       "body/payload/title" = $title
       "body/payload/body" = "@outputs('Compose_mensagem')"
-      # Serviço retirado abre direto a agenda (Serviços); novo abre o detalhe.
+      # Serviço retirado ou cancelado abre direto a agenda (Serviços); novo abre o detalhe.
       "body/payload/url" = "@{if($isNovo, concat('/WebResources/new_app-motoristas-v2?servicoId=', outputs('Get_aviso')?['body/_new_reserva_value']), '/WebResources/new_app-motoristas-v2?agenda=1')}"
       "body/payload/tag" = "cr40f_reservadeveculos-$reservaIdInline"
     }
@@ -528,7 +530,7 @@ $watchClientData = @{
 } | ConvertTo-Json -Depth 100 -Compress
 
 $flows = @(
-  @{ Name = $sendName; Description = "Entrega o aviso de serviço novo ou retirado ao motorista (new_avisomotorista). Não lê a audit."; ClientData = $sendClientData },
+  @{ Name = $sendName; Description = "Entrega o aviso de serviço novo, retirado ou cancelado ao motorista (new_avisomotorista). Não lê a audit."; ClientData = $sendClientData },
   @{ Name = $watchName; Description = "A cada 10 min concilia os avisos, reenvia o push ao motorista 4 h antes da saída e alerta a operação 3 h antes."; ClientData = $watchClientData }
 )
 
