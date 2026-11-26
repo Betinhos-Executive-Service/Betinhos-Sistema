@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Microsoft.Xrm.Sdk;
 
 namespace Betinhos.DriverRecordSharing
@@ -30,6 +31,8 @@ namespace Betinhos.DriverRecordSharing
     /// </summary>
     public static class DriverNoticeRules
     {
+        // Snapshot da planilha do cliente (JSON de texto) com o status Cancelado.
+        private static readonly Regex SyncSnapshotCanceled = new Regex("\"cr40f_status\"\\s*:\\s*\"202410002\"", RegexOptions.CultureInvariant);
         private static readonly TimeSpan ViewWindow = TimeSpan.FromMinutes(30);
         private static readonly TimeSpan ImminentDeparture = TimeSpan.FromHours(2);
 
@@ -75,8 +78,10 @@ namespace Betinhos.DriverRecordSharing
 
             // Serviço programado que deixa de existir para o motorista anterior: cancelado pelo status ou pela troca
             // para o funcionário "Cancelado", em qualquer ordem. Cancelado com ressalvas fica de fora (decisão do Renan).
-            // Requer Análise só conta vindo da sincronização (cliente cancelou); o "cancelado no local" do App é o próprio motorista.
-            var canceledBySync = finalStatus == PluginConfig.ServiceStatusRequiresAnalysis && target.Contains(PluginConfig.ServiceSyncSnapshot);
+            // Requer Análise só conta quando a sincronização trouxe Cancelado no snapshot (o Cr40f.Protecao.Plugin converteu);
+            // Requer Análise vindo da planilha ou o "cancelado no local" do App não avisam.
+            var canceledBySync = finalStatus == PluginConfig.ServiceStatusRequiresAnalysis &&
+                SyncSnapshotCanceled.IsMatch(target.GetAttributeValue<string>(PluginConfig.ServiceSyncSnapshot) ?? string.Empty);
             if (previousDriver != null &&
                 previousStatus == PluginConfig.ServiceStatusProgrammed &&
                 (driverChanged || finalStatus == PluginConfig.ServiceStatusCanceled || canceledBySync) &&

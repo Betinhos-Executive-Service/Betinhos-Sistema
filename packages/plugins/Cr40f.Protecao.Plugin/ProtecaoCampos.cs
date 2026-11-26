@@ -28,7 +28,9 @@ public static class ProtecaoCampos
     public const string Lista = "new_camposprotegidos";
     public const string Snapshot = "new_snapshotsharepoint";
     public const string Status = "cr40f_status";
-    const int Cancelado = 202410002, CanceladoComRessalvas = 202410010, RequerAnalise = 100000001, Concluido = 202410008;
+    const int Cancelado = 202410002, RequerAnalise = 100000001;
+    // Abertos: Pré-reserva, Solicitado, Confirmado, Programado, Em execução. Status novo fica barrado até entrar aqui.
+    static readonly int[] Abertos = { 202410000, 202410004, 202410001, 202410005, 202410006 };
     public static readonly string[] Monitorados =
     {
         "cr40f_destino", "cr40f_endereodesada", "cr40f_dataehorriodesada", "cr40f_obsdeoperao", "cr40f_horrioprevistoderetorno",
@@ -63,7 +65,7 @@ public static class ProtecaoCampos
     {
         if (!protegidos.Contains(Status) || alvo.GetAttributeValue<OptionSetValue>(Status)?.Value != Cancelado) return false;
         var atual = anterior?.GetAttributeValue<OptionSetValue>(Status)?.Value;
-        return atual is int valor && valor != Concluido && valor != RequerAnalise && valor != Cancelado && valor != CanceladoComRessalvas;
+        return atual is int valor && Abertos.Contains(valor);
     }
 
     static List<string> LerLista(string? texto) =>

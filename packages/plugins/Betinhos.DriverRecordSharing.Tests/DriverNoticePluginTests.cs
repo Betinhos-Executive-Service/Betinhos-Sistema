@@ -24,6 +24,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         private const int StatusCancelado = 202410002;
         private const int CanceladoComRessalvas = 202410010;
         private const int RequerAnalise = 100000001;
+        private const string SnapshotCancelado = "{\"cr40f_cr\":\"501019731\",\"cr40f_status\":\"202410002\"}";
         private const int Novo = 100000000;
         private const int Retirado = 100000001;
         private const int TipoCancelado = 100000002;
@@ -212,7 +213,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         [Fact]
         public void SincronizacaoLevandoProgramadoParaRequerAnaliseGeraCancelado()
         {
-            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", "{}"), Pre(driverA, Programado));
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", SnapshotCancelado), Pre(driverA, Programado));
 
             AssertOnly(TipoCancelado, driverA);
         }
@@ -227,9 +228,18 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void RequerAnaliseVindoDaPlanilhaNaoGeraAviso()
+        {
+            // A planilha do cliente trouxe "Requer Análise" com o status não protegido: ninguém cancelou.
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", "{\"cr40f_status\":\"100000001\"}"), Pre(driverA, Programado));
+
+            Assert.Empty(Notices());
+        }
+
+        [Fact]
         public void SincronizacaoLevandoConfirmadoParaRequerAnaliseNaoGeraAviso()
         {
-            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", "{}"), Pre(driverA, Confirmado));
+            RunPost(Target(Status, new OptionSetValue(RequerAnalise), "new_snapshotsharepoint", SnapshotCancelado), Pre(driverA, Confirmado));
 
             Assert.Empty(Notices());
         }

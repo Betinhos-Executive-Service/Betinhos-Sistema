@@ -41,6 +41,8 @@ public class ProtecaoCamposTests
     }
 
     [Theory]
+    [InlineData(202410000)] // Pré-reserva
+    [InlineData(202410004)] // Solicitado
     [InlineData(202410005)] // Programado
     [InlineData(202410001)] // Confirmado
     [InlineData(202410006)] // Em execução
@@ -67,6 +69,15 @@ public class ProtecaoCamposTests
         var r = ProtecaoCampos.Aplicar(alvo, anterior);
         Assert.False(alvo.Contains("cr40f_status"));
         Assert.Equal(new[] { "cr40f_status" }, r.Barrados);
+    }
+
+    [Fact]
+    public void Cancelado_da_sincronizacao_sem_status_anterior_e_barrado()
+    {
+        var anterior = Anterior("cr40f_status"); anterior.Attributes.Remove("cr40f_status");
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.False(alvo.Contains("cr40f_status"));
     }
 
     [Fact]
