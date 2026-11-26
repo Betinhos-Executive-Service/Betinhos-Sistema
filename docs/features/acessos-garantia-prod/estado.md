@@ -1,9 +1,9 @@
 # Garantia de acesso no corte do PROD
 
 - Nível: 3 (muda permissões; o alvo final é o PROD)
-- Etapa: 5 de 7 Construir
-- Próximo passo: verificar-acessos, commit e PR para a develop · sozinho
-- Branch e PR: feat/acessos-garantia-prod · ainda não
+- Etapa: 6 de 7 Entregar (PR aberto)
+- Próximo passo: CI verde e merge do PR #765 na develop; depois do Deploy, card da ação crítica A (preparar no DEV) · com você
+- Branch e PR: feat/acessos-garantia-prod · https://github.com/Betinhos-Executive-Service/Betinhos-Sistema/pull/765
 - Protótipo: sem protótipo
 - Go: aprovado em 26/11/2026 11:32 (construir no DEV e abrir PR para a develop; card antes de cada ação crítica no DEV)
 - PROD: ainda não
