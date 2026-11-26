@@ -25,7 +25,7 @@ const app = ['PlannerApp.tsx', 'usePlanner.ts', 'constants.ts', 'pageHelpers.ts'
   'components/WaitingContextFields.tsx', 'components/NotificationsPanel.tsx', 'components/PlannerAppShell.tsx', 'components/TaskSelectors.tsx',
   'components/TaskCard.tsx', 'views/BoardView.tsx', 'components/PersonalTags.tsx', 'components/FilterBar.tsx', 'views/ListView.tsx',
   'views/CalendarView.tsx', 'views/QualityView.tsx', 'views/SettingsView.tsx', 'components/attachmentFiles.ts', 'components/Attachments.tsx',
-  'views/MoreView.tsx', 'components/TaskDrawer.tsx', 'components/WaitingStatusModal.tsx', 'components/WaitingReturnModal.tsx',
+  'components/TaskDrawer.tsx', 'components/WaitingStatusModal.tsx', 'components/WaitingReturnModal.tsx',
   'components/NewTaskDrawer.tsx'].map(read).join('\n')
 const styles = readFileSync(join(DIR, 'planner.css'), 'utf8')
 const dataverse = readFileSync(join(DIR, 'data/dataverse.ts'), 'utf8')

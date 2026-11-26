@@ -10,7 +10,6 @@ const VALID_VIEWS = new Set([
   'board',
   'list',
   'calendar',
-  'more',
   'quality',
   'settings',
   'projects',
