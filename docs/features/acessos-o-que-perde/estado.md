@@ -1,13 +1,13 @@
 # O que a pessoa deixa de ter
 
 - Nível: 3 (é a tela que vai tirar acesso no PROD)
-- Etapa: 2 de 7 Spec
-- Próximo passo: Go no card · com você
+- Etapa: 5 de 7 Construir
+- Próximo passo: tarefa 1 (regra C# e prévia) · sozinho
 - Branch e PR: feat/acessos-o-que-perde · ainda não
 - Protótipo: sem protótipo
-- Go: pendente
+- Go: 26/11/2026 16:04 (Renan, card)
 - PROD: ainda não
-- Atualizado: 26/11/2026 15:50
+- Atualizado: 26/11/2026 16:04
 
 ## Decisões
 | Data | Decisão | Por quê | Quem decidiu |
@@ -16,6 +16,8 @@
 | 26/11/2026 | Prévia com acesso e uso de 90 dias | mostrar o que a pessoa vê e usa | Renan |
 | 26/11/2026 | Confirmação com a lista ao salvar perda usada | evitar corte por engano | Renan |
 | 26/11/2026 | Preparar roda no DEV e fica | base para provar a prévia | Renan |
+| 26/11/2026 | Grupo do Entra: manual, com aviso na tela | sem segredo com escrita em grupos | Renan |
+| 26/11/2026 | Coluna `cr40f_amplo` e botão "Devolver acesso amplo" | desfazer pela tela com registro do que saiu | Renan |
 
 ## Tarefas e provas
 | # | Tarefa | Depende de | Cenário (ação → resultado) | Prova | Nível | Resultado |
