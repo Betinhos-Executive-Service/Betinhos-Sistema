@@ -237,4 +237,15 @@ describe('Projetos no Planner: detalhe do cartão', () => {
     fireEvent.click(within(p).getByRole('button', { name: 'Salvar' }))
     await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_tags: 'Relatórios, Frota', cr40f_prazo: '2026-12-20', cr40f_prazotipo: 100000001 }))
   })
+
+  it('tag digitada sem Enter pede descartar ao fechar e entra no Salvar', async () => {
+    const updateProjeto = vi.fn(async () => undefined)
+    stubSource(() => ({ updateProjeto }))
+    const p = await abrir('PRJ-4')
+    fireEvent.change(within(p).getByRole('textbox', { name: 'Nova tag' }), { target: { value: 'Urgente' } })
+    fireEvent.click(within(p).getByRole('button', { name: 'Fechar painel' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Continuar editando' }))
+    fireEvent.click(within(await painel('PRJ-4')).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_tags: 'Urgente' }))
+  })
 })

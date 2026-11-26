@@ -3,10 +3,10 @@ import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { MAX_TAG, MAX_TAGS, addTag, corDaTag } from "../domain/tags";
 
-type Props = { value: string[]; onChange: (tags: string[]) => void; sugestoes: string[]; disabled?: boolean };
+// O texto digitado fica com o pai: tag sem Enter conta como alteração e entra no Salvar.
+type Props = { value: string[]; onChange: (tags: string[]) => void; texto: string; onTexto: (texto: string) => void; sugestoes: string[]; disabled?: boolean };
 
-export function TagsInput({ value, onChange, sugestoes, disabled }: Props) {
-  const [texto, setTexto] = useState("");
+export function TagsInput({ value, onChange, texto, onTexto: setTexto, sugestoes, disabled }: Props) {
   const [aberto, setAberto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cheio = value.length >= MAX_TAGS;

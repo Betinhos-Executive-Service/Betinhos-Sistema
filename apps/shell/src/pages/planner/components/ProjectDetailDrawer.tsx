@@ -11,7 +11,7 @@ import { autorDoPerfil } from "../projetos/domain/choices";
 import { MAX_ITEM, gravarChecklist, progresso, type ChecklistItem } from "../projetos/domain/checklist";
 import type { Atualizacao, Perfil, Projeto } from "../projetos/domain/types";
 import { gravarPrazo, mesmoPrazo, type Prazo } from "../projetos/domain/prazo";
-import { gravarTags, mesmasTags } from "../projetos/domain/tags";
+import { addTag, gravarTags, mesmasTags } from "../projetos/domain/tags";
 import { PrazoPicker } from "../projetos/components/PrazoPicker";
 import { TagsInput } from "../projetos/components/TagsInput";
 import { acceptFiles, namePastedFile } from "../domain/projectsBoard";
@@ -43,6 +43,7 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
   const [itens, setItens] = useState<ChecklistItem[]>(projeto.checklist);
   const [novoItem, setNovoItem] = useState("");
   const [tags, setTags] = useState<string[]>(projeto.tags);
+  const [novaTag, setNovaTag] = useState("");
   const [prazo, setPrazo] = useState<Prazo | null>(projeto.prazo);
   const [nomeErro, setNomeErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -56,7 +57,7 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
   const enviando = envios > 0;
   const ocupado = salvando || enviando;
   const sujo = nome.trim() !== projeto.nome || descricao.trim() !== projeto.briefing.trim() || gravarChecklist(itens) !== gravarChecklist(projeto.checklist) || Boolean(novoItem.trim())
-    || !mesmasTags(tags, projeto.tags) || !mesmoPrazo(prazo, projeto.prazo);
+    || Boolean(novaTag.trim()) || !mesmasTags(tags, projeto.tags) || !mesmoPrazo(prazo, projeto.prazo);
   const doProjeto = useMemo(() => atualizacoes.filter((a) => a.projetoId === projeto.id).sort((a, b) => b.data.localeCompare(a.data)), [atualizacoes, projeto.id]);
   // A transcrição é da atualização: aparece só sob o primeiro áudio dela.
   const anexos = doProjeto.flatMap((a) => {
@@ -87,6 +88,7 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
     setNomeErro("");
     // Item digitado e não adicionado entra junto, para não se perder.
     const lista = novoItem.trim() ? [...itens, { texto: novoItem.trim(), feito: false }] : itens;
+    const listaTags = addTag(tags, novaTag);
     const texto = descricao.trim();
     // Só as colunas que mudaram: não sobrescreve o que um agente gravou nas outras
     // nem apaga um checklist que a tela não soube ler.
@@ -94,7 +96,7 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
     if (titulo !== projeto.nome) changes.cr40f_name = titulo;
     if (texto !== projeto.briefing.trim()) changes.cr40f_briefing = texto || null;
     if (gravarChecklist(lista) !== gravarChecklist(projeto.checklist)) changes.cr40f_checklist = gravarChecklist(lista);
-    if (!mesmasTags(tags, projeto.tags)) changes.cr40f_tags = gravarTags(tags);
+    if (!mesmasTags(listaTags, projeto.tags)) changes.cr40f_tags = gravarTags(listaTags);
     if (!mesmoPrazo(prazo, projeto.prazo)) Object.assign(changes, gravarPrazo(prazo));
     setSalvando(true);
     try {
@@ -102,7 +104,9 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
       setErroSalvar("");
       setItens(lista);
       setNovoItem("");
-      onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista, tags, prazo });
+      setTags(listaTags);
+      setNovaTag("");
+      onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista, tags: listaTags, prazo });
       toast({ tone: "success", message: `${projeto.codigo} salvo.` });
     } catch (reason) {
       setErroSalvar(`Não foi possível salvar. ${reasonText(reason)}`);
@@ -180,7 +184,7 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
 
           <section className="pj-bloco" aria-labelledby="pj-tags">
             <h3 id="pj-tags" className="pj-lbl">Tags <span className="pj-opcional">opcional</span></h3>
-            <TagsInput value={tags} onChange={setTags} sugestoes={tagsEmUso} disabled={salvando} />
+            <TagsInput value={tags} onChange={setTags} texto={novaTag} onTexto={setNovaTag} sugestoes={tagsEmUso} disabled={salvando} />
           </section>
 
           <section className="pj-bloco" aria-labelledby="pj-checklist">
