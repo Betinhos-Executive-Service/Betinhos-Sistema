@@ -1,12 +1,18 @@
-// Porte de Tela Planner/src/App.jsx (sem mudança de comportamento).
-import { CENTRAL_NAV_ITEMS, MOBILE_NAV_ITEMS, TODAY_LABEL_FORMATTER } from '../constants'
+// Porte de Tela Planner/src/App.jsx; navegação pelo ModuleNav do DS (faixa no desktop, barra flutuante no celular).
+import { CENTRAL_NAV_ITEMS, TODAY_LABEL_FORMATTER } from '../constants'
 import { isTaskVisibleToEmployee, taskStats } from '../domain/domain'
 import { canViewManagement } from '../domain/management'
 import { unreadCount } from '../domain/notifications'
 import { useMentionController } from './MentionableField'
 import { NotificationsPanel, notificationsVisibleToEmployee } from './NotificationsPanel'
 import { BellRing, Plus, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
+import { Button, ModuleNav, useShellHeader } from '@betinhos/ui'
+import { useMemo, useState } from 'react'
+
+/** Rótulos da barra do celular para nomes que não cabem (~10 caracteres). */
+const SHORT_LABELS: Record<string, string> = { ideas: "Ideias", settings: "Ajustes" };
+/** Título do cabeçalho do celular nas telas que não têm aba própria. */
+const VIEW_TITLES: Record<string, string> = { contacts: "Contatos", quality: "Qualidade" };
 
 
 export function AppShell({
@@ -42,129 +48,91 @@ export function AppShell({
   const stats = personalStats || taskStats(visibleTasks);
   const visibleNotifications = notificationsVisibleToEmployee(notifications, tasks, currentEmployee, teams);
   const todayLabel = TODAY_LABEL_FORMATTER.format(new Date()).replace(".", "");
-  const desktopNavActive =
+  const unread = unreadCount(notifications);
+  const navActive =
     active === "team"
       ? "dashboard"
       : ["board", "list", "calendar"].includes(active)
         ? "board"
         : active;
-  const mobileNavActive = ["ideas", "quality", "settings", "projects"].includes(active)
-    ? "more"
-    : desktopNavActive;
-  const activeLabel: any =
-    MOBILE_NAV_ITEMS.find(([id]: any) => id === mobileNavActive)?.[1] || (active === "contacts" ? "Contatos" : "Central");
+  const navItems = useMemo(
+    () =>
+      CENTRAL_NAV_ITEMS.filter(([id]: any) => id !== "management" || canViewManagement)
+        .sort(([a]: any, [b]: any) => Number(a === "settings") - Number(b === "settings"))
+        .map(([id, label, Icon]: any) => ({
+          value: id,
+          label,
+          shortLabel: SHORT_LABELS[id],
+          icon: <Icon size={16} />,
+          count: id === "board" ? openTaskCount : undefined,
+        })),
+    [canViewManagement, openTaskCount],
+  );
   const canCreateTask = ["dashboard", "team", "board", "list", "calendar"].includes(active);
+  const openNotifications = () => setNotificationsOpen(true);
+  const refresh = () => onRefresh?.({ silent: false });
+  const notificationLabel = `Abrir notificações${unread ? `, ${unread} não lidas` : ""}`;
+  const refreshLabel = refreshing ? "Atualizando dados" : "Atualizar dados";
+  // No celular as ações sobem para o cabeçalho do AppShell (fora de .planner-page): botões do DS.
+  // Memo porque useShellHeader registra de novo a cada referência nova.
+  const mobileActions = useMemo(
+    () => (
+      <>
+        <Button variant="secondary" icon={<BellRing size={18} />} aria-label={notificationLabel} title="Notificações" onClick={openNotifications}>
+          {unread > 0 ? (unread > 99 ? "99+" : unread) : null}
+        </Button>
+        <Button variant="secondary" icon={<RotateCcw size={18} />} aria-label={refreshLabel} title={refreshLabel} loading={refreshing} onClick={refresh} />
+      </>
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [unread, refreshing, onRefresh],
+  );
+  // O cabeçalho do celular é registrado aqui (shellHeader={false}) para ter título também em Contatos e Qualidade.
+  const mobileTitle = navItems.find((item: any) => item.value === navActive)?.label ?? VIEW_TITLES[active];
+  useShellHeader({ title: mobileTitle, actions: mobileActions });
   return (
     <div className="app-shell">
       <main className="main-area">
-        <header className="planner-header">
-          <nav className="planner-tabs" aria-label="Seções da Central de Trabalho">
-            {CENTRAL_NAV_ITEMS.filter(([id]: any) => id !== "management" || canViewManagement)
-              .sort(([a]: any, [b]: any) => Number(a === "settings") - Number(b === "settings"))
-              .map(([id, label, Icon]: any) => (
-              <button
-                key={id}
-                type="button"
-                className={`planner-tab${desktopNavActive === id ? " active" : ""}`}
-                aria-current={desktopNavActive === id ? "page" : undefined}
-                onClick={() => onNavigate(id)}
+        <ModuleNav
+          aria-label="Seções da Central de Trabalho"
+          items={navItems}
+          value={navActive}
+          onNavigate={onNavigate}
+          shellHeader={false}
+          actions={
+            <>
+              <span
+                className="planner-day-chip"
+                title={`Hoje, ${todayLabel}: ${stats.open} pendências`}
+                aria-label={`Hoje, ${stats.open} pendências e ${stats.overdue} atrasados`}
               >
-                <Icon size={15} aria-hidden="true" />
-                <span>{label}</span>
-                {id === "board" && <span className="planner-tab-count">{openTaskCount}</span>}
-                {id === "dashboard" && personalStats?.alertCount > 0 && (
-                  <span className="planner-tab-count planner-tab-count-alert">{personalStats.alertCount}</span>
-                )}
-              </button>
-            ))}
-          </nav>
-          <div className="planner-header-actions" aria-label="Ações do aplicativo">
-            <span
-              className="planner-day-chip"
-              title={`Hoje, ${todayLabel}: ${stats.open} pendências`}
-              aria-label={`Hoje, ${stats.open} pendências e ${stats.overdue} atrasados`}
-            >
-              <b>{stats.open}</b> hoje
-            </span>
-            {stats.overdue > 0 && (
-              <span className="planner-day-chip planner-day-chip-overdue">
-                <b>{stats.overdue}</b> {stats.overdue === 1 ? "atrasada" : "atrasadas"}
+                <b>{stats.open}</b> hoje
               </span>
-            )}
-            {!currentEmployee && <span className="planner-day-chip">Sem vínculo</span>}
-            <button
-              className="notification-trigger"
-              type="button"
-              onClick={() => setNotificationsOpen(true)}
-              aria-label={`Abrir notificações${unreadCount(notifications) ? `, ${unreadCount(notifications)} não lidas` : ""}`}
-              title="Notificações"
-            >
-              <BellRing size={16} />
-              {unreadCount(notifications) > 0 && <b>{unreadCount(notifications)}</b>}
-            </button>
-            <button
-              className={`refresh-trigger${refreshing ? " is-refreshing" : ""}`}
-              type="button"
-              onClick={() => onRefresh?.({ silent: false })}
-              disabled={refreshing}
-              aria-label={refreshing ? "Atualizando dados" : "Atualizar dados"}
-              title={refreshing ? "Atualizando dados" : "Atualizar dados"}
-            >
-              <RotateCcw size={15} />
-            </button>
-          </div>
-        </header>
-        <header className="mobile-header">
-          <div className="mobile-header-copy">
-            <strong>{activeLabel}</strong>
-            <span>Central de Trabalho</span>
-          </div>
-          <button
-            className="notification-trigger mobile-notification-trigger"
-            type="button"
-            onClick={() => setNotificationsOpen(true)}
-            aria-label={`Abrir notificações${unreadCount(notifications) ? `, ${unreadCount(notifications)} não lidas` : ""}`}
-          >
-            <BellRing size={18} />
-            {unreadCount(notifications) > 0 && (
-              <b>{unreadCount(notifications)}</b>
-            )}
-          </button>
-          <button
-            className={`refresh-trigger mobile-refresh-trigger${refreshing ? " is-refreshing" : ""}`}
-            type="button"
-            onClick={() => onRefresh?.({ silent: false })}
-            disabled={refreshing}
-            aria-label={refreshing ? "Atualizando dados" : "Atualizar dados"}
-            title={refreshing ? "Atualizando dados" : "Atualizar dados"}
-          >
-            <RotateCcw size={16} />
-          </button>
-        </header>
+              {stats.overdue > 0 && (
+                <span className="planner-day-chip planner-day-chip-overdue">
+                  <b>{stats.overdue}</b> {stats.overdue === 1 ? "atrasada" : "atrasadas"}
+                </span>
+              )}
+              {!currentEmployee && <span className="planner-day-chip">Sem vínculo</span>}
+              <button className="notification-trigger" type="button" onClick={openNotifications} aria-label={notificationLabel} title="Notificações">
+                <BellRing size={16} />
+                {unread > 0 && <b>{unread}</b>}
+              </button>
+              <button
+                className={`refresh-trigger${refreshing ? " is-refreshing" : ""}`}
+                type="button"
+                onClick={refresh}
+                disabled={refreshing}
+                aria-label={refreshLabel}
+                title={refreshLabel}
+              >
+                <RotateCcw size={15} />
+              </button>
+            </>
+          }
+        />
         {children}
       </main>
-      <nav className="mobile-bottom-nav" aria-label="Navegação principal">
-        {MOBILE_NAV_ITEMS.map(([id, label, Icon]: any) => (
-          <button
-            key={id}
-            className={
-              mobileNavActive === id
-                ? "mobile-nav-item active"
-                : "mobile-nav-item"
-            }
-            type="button"
-            onClick={() => onNavigate(id)}
-            aria-current={mobileNavActive === id ? "page" : undefined}
-          >
-            <Icon size={19} strokeWidth={mobileNavActive === id ? 2.4 : 2} />
-            <span>{label}</span>
-            {id === "board" && openTaskCount > 0 && <b>{openTaskCount}</b>}
-            {id === "dashboard" && personalStats?.alertCount > 0 && (
-              <b>{personalStats.alertCount}</b>
-            )}
-          </button>
-        ))}
-      </nav>
       {canCreateTask && (
         <button
           className="mobile-fab"
