@@ -55,131 +55,131 @@ async function abrir(codigo: string, render0 = true) {
 }
 
 describe('Projetos no Planner: detalhe do cartão', () => {
-  it('cartão abre o detalhe e grava ?projeto= no endereço; sem link para o módulo antigo', async () => {
-    const p = await abrir('PRJ-1')
-    expect(within(p).getByRole('heading', { name: 'Painel de indicadores' })).toBeTruthy()
+  it('cartão abre o detalhe com título, descrição e checklist; mostra o progresso no cartão', async () => {
+    render(<ProjectsView host={{ mode: 'mock' }} />)
+    expect(await screen.findByLabelText('Checklist 2/3')).toBeTruthy()
+    const p = await abrir('PRJ-1', false)
+    expect((within(p).getByRole('textbox', { name: /^Título/ }) as HTMLInputElement).value).toBe('Painel de indicadores')
+    expect(within(p).getByRole('checkbox', { name: 'Filtro por período' })).toBeTruthy()
     expect(window.location.hash).toMatch(/projeto=/)
     expect(document.querySelector('a[href*="#/projetos"]')).toBeNull()
+    expect(within(p).queryByText(/Marcar como Pronto/)).toBeNull()
   })
 
-
-
-
-
-
-
-  it('Marcar como Pronto fica travado sem prova; com prova registrada, grava', async () => {
-    const updateEtapa = vi.fn(async () => undefined)
-    stubSource(() => ({ updateEtapa }))
+  it('edita título, descrição e checklist (adicionar com Enter, marcar e remover) e salva no projeto', async () => {
+    const updateProjeto = vi.fn(async () => undefined)
+    stubSource(() => ({ updateProjeto }))
     const p = await abrir('PRJ-2')
-    expect((within(p).getByRole('button', { name: 'Marcar como Pronto (falta prova)' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(within(p).getByRole('button', { name: 'Nova atualização' }))
-    fireEvent.change(within(p).getByRole('textbox', { name: /^Texto/ }), { target: { value: 'Seletor publicado no DEV.' } })
-    fireEvent.change(within(p).getByLabelText('Escolher anexos'), { target: { files: [new File(['x'], 'seletor.png', { type: 'image/png' })] } })
-    fireEvent.click(within(p).getByRole('checkbox', { name: /É prova/ }))
-    fireEvent.click(within(p).getByRole('button', { name: 'Registrar atualização' }))
-    expect((await within(p).findAllByRole('button', { name: /Abrir anexo seletor.png/ })).length).toBeGreaterThan(0)
-    const pronto = within(p).getByRole('button', { name: 'Marcar como Pronto' }) as HTMLButtonElement
-    expect(pronto.disabled).toBe(false)
-    fireEvent.click(pronto)
-    await waitFor(() => expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_status: 100000003 }))
-    expect(await within(p).findByRole('img', { name: /Fase 5 de 5/ })).toBeTruthy()
+    const salvar = within(p).getByRole('button', { name: 'Salvar' }) as HTMLButtonElement
+    expect(salvar.disabled).toBe(true)
+    fireEvent.change(within(p).getByRole('textbox', { name: /^Título/ }), { target: { value: 'Documentos da frota' } })
+    fireEvent.change(within(p).getByRole('textbox', { name: /^Descrição/ }), { target: { value: 'Com vencimento.' } })
+    const novo = within(p).getByRole('textbox', { name: 'Novo item do checklist' })
+    fireEvent.change(novo, { target: { value: 'Testar no DEV' } })
+    fireEvent.keyDown(novo, { key: 'Enter' })
+    fireEvent.click(within(p).getByRole('checkbox', { name: 'Alerta de vencimento' }))
+    fireEvent.click(within(p).getByRole('button', { name: 'Remover Tela de cadastro' }))
+    fireEvent.click(salvar)
+    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), {
+      cr40f_name: 'Documentos da frota', cr40f_briefing: 'Com vencimento.',
+      cr40f_checklist: JSON.stringify([{ texto: 'Alerta de vencimento', feito: true }, { texto: 'Testar no DEV', feito: false }]),
+    }))
+    expect(await screen.findByText('PRJ-2 salvo.')).toBeTruthy()
   })
 
-  it('gestor: Pronto travado ("só o Renan") e situação travada no drawer do projeto', async () => {
-    render(<ProjectsView host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('radio', { name: 'Gestor' }))
-    const p = await abrir('PRJ-1', false)
-    expect((within(p).getByRole('button', { name: 'Marcar como Pronto (só o Renan)' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(within(p).getByRole('button', { name: 'Editar projeto' }))
-    const drawer = await screen.findByRole('dialog', { name: /^PRJ-1 ·/ })
-    expect((within(drawer).getByRole('combobox', { name: /^Situação/ }) as HTMLButtonElement).disabled).toBe(true)
+  it('salvar só o título não regrava descrição nem checklist', async () => {
+    const updateProjeto = vi.fn(async () => undefined)
+    stubSource(() => ({ updateProjeto }))
+    const p = await abrir('PRJ-2')
+    fireEvent.change(within(p).getByRole('textbox', { name: /^Título/ }), { target: { value: 'Documentos da frota' } })
+    fireEvent.click(within(p).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_name: 'Documentos da frota' }))
   })
 
-  it('transcrição aparece na linha do tempo; áudio do briefing sem transcrição mostra "Transcrição pendente"', async () => {
+  it('título vazio não salva', async () => {
+    const updateProjeto = vi.fn(async () => undefined)
+    stubSource(() => ({ updateProjeto }))
+    const p = await abrir('PRJ-3')
+    fireEvent.change(within(p).getByRole('textbox', { name: /^Título/ }), { target: { value: '  ' } })
+    fireEvent.click(within(p).getByRole('button', { name: 'Salvar' }))
+    expect(await within(p).findByText('Dê um título para o projeto.')).toBeTruthy()
+    expect(updateProjeto).not.toHaveBeenCalled()
+  })
+
+  it('anexos ficam numa grade; áudio mostra a transcrição ou "Transcrição pendente"', async () => {
     const p = await abrir('PRJ-1')
-    expect(within(p).getByText(/Só falta o filtro por cliente/)).toBeTruthy()
+    expect(within(p).getByRole('button', { name: /Abrir anexo relatorio-atual.svg/ })).toBeTruthy()
     expect(within(p).getByRole('button', { name: /Ouvir áudio audio-conferencia.wav/ })).toBeTruthy()
+    expect(within(p).getByText(/Só falta o filtro por cliente/)).toBeTruthy()
     const p4 = await abrir('PRJ-4', false)
-    const brief = within(p4).getByRole('group', { name: 'Briefing do gestor' })
-    expect(within(brief).getByText('Transcrição pendente')).toBeTruthy()
+    expect(within(p4).getByText('Transcrição pendente')).toBeTruthy()
   })
 
-  it('"Como usar" aparece no painel quando o projeto tem instruções', async () => {
-    const p = await abrir('PRJ-1')
-    fireEvent.click(within(p).getByText('Como usar'))
-    expect(within(p).getByText(/Escolha o período no topo da tela/)).toBeTruthy()
+  it('anexar arquivo envia na hora como anexo do projeto, com o autor do perfil', async () => {
+    const add = vi.fn()
+    stubSource((r) => ({ addAtualizacao: async (n, f) => { add(n, f); return r.addAtualizacao(n, f) } }))
+    const p = await abrir('PRJ-3')
+    fireEvent.change(within(p).getByLabelText('Escolher anexos'), { target: { files: [new File(['x'], 'tela.png', { type: 'image/png' })] } })
+    expect(await within(p).findByRole('button', { name: /Abrir anexo tela.png/ })).toBeTruthy()
+    const [nova, arquivos] = add.mock.calls[0] as [sourceModule.NovaAtualizacao, File[]]
+    expect(nova).toMatchObject({ etapaId: null, texto: '', prova: false })
+    expect(arquivos[0].name).toBe('tela.png')
   })
 
-  it('Gravar áudio no painel grava (MediaRecorder simulado), pré-escuta e registra no briefing com o autor do perfil', async () => {
+  it('gravar áudio (MediaRecorder simulado) envia o áudio como anexo', async () => {
     microfone()
     const add = vi.fn()
     stubSource((r) => ({ addAtualizacao: async (n, f) => { add(n, f); return r.addAtualizacao(n, f) } }))
-    const p = await abrir('PRJ-4')
+    const p = await abrir('PRJ-5')
     fireEvent.click(within(p).getByRole('button', { name: 'Gravar áudio' }))
     expect(await within(p).findByText(/Gravando/)).toBeTruthy()
-    fireEvent.click(within(p).getByRole('button', { name: 'Parar' }))
-    expect(await within(p).findByLabelText('Pré-escuta da gravação')).toBeTruthy()
-    fireEvent.click(within(p).getByRole('button', { name: 'Registrar atualização' }))
+    fireEvent.click(within(p).getByRole('button', { name: 'Parar gravação' }))
     await waitFor(() => expect(add).toHaveBeenCalled())
-    const [nova, arquivos] = add.mock.calls[0] as [sourceModule.NovaAtualizacao, File[]]
-    expect(nova).toMatchObject({ etapaId: null, autor: 100000000, prova: false })
-    expect(arquivos[0].type).toBe('audio/webm')
-    const brief = within(p).getByRole('group', { name: 'Briefing do gestor' })
-    await waitFor(() => expect(within(brief).getAllByText('Transcrição pendente')).toHaveLength(2))
+    expect((add.mock.calls[0][1] as File[])[0].type).toBe('audio/webm')
+    expect(await within(p).findByText('Transcrição pendente')).toBeTruthy()
   })
 
-  it('microfone negado mostra o aviso e deixa anexar arquivo', async () => {
+  it('microfone negado mostra o aviso', async () => {
     microfone('NotAllowedError')
     const p = await abrir('PRJ-4')
     fireEvent.click(within(p).getByRole('button', { name: 'Gravar áudio' }))
     expect(await within(p).findByText(/não liberou o microfone/)).toBeTruthy()
-    expect(within(p).getByRole('button', { name: 'Anexar arquivos' })).toBeTruthy()
   })
 
   it('arquivo acima de 5 MB é recusado com a mensagem do limite', async () => {
+    const add = vi.fn()
+    stubSource(() => ({ addAtualizacao: async () => { add(); throw new Error('não devia') } }))
     const p = await abrir('PRJ-2')
-    fireEvent.click(within(p).getByRole('button', { name: 'Anexar ao briefing' }))
     const grande = new File(['x'], 'video.mp4', { type: 'video/mp4' })
     Object.defineProperty(grande, 'size', { value: 6 * 1024 * 1024 })
     fireEvent.change(within(p).getByLabelText('Escolher anexos'), { target: { files: [grande] } })
     expect(await within(p).findByText(/passa do limite de 5 MB/)).toBeTruthy()
+    expect(add).not.toHaveBeenCalled()
   })
 
-  it('alteração não registrada no detalhe ou no formulário pede para descartar', async () => {
+  it('alteração não salva pede para descartar', async () => {
     const p = await abrir('PRJ-2')
-    fireEvent.click(within(p).getByRole('button', { name: 'Nova atualização' }))
-    fireEvent.change(within(p).getByRole('textbox', { name: /^Texto/ }), { target: { value: 'Rascunho' } })
+    fireEvent.change(within(p).getByRole('textbox', { name: /^Título/ }), { target: { value: 'Rascunho' } })
     fireEvent.click(within(p).getByRole('button', { name: 'Fechar painel' }))
-    const confirmar = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
-    fireEvent.click(within(confirmar).getByRole('button', { name: 'Continuar editando' }))
-    expect(within(await painel('PRJ-2')).getByRole('heading', { name: 'Cadastro de documentos' })).toBeTruthy()
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Continuar editando' }))
+    expect((within(await painel('PRJ-2')).getByRole('textbox', { name: /^Título/ }) as HTMLInputElement).value).toBe('Rascunho')
     fireEvent.click(within(await painel('PRJ-2')).getByRole('button', { name: 'Fechar painel' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /^PRJ-2 ·/ })).toBeNull())
-
-    const p1 = await abrir('PRJ-1', false)
-    fireEvent.click(within(p1).getByRole('button', { name: 'Editar projeto' }))
-    const drawer = await screen.findByRole('dialog', { name: /^PRJ-1 ·/ })
-    fireEvent.change(within(drawer).getByRole('textbox', { name: /^Nome/ }), { target: { value: 'Outro nome' } })
-    fireEvent.click(within(drawer).getByRole('button', { name: 'Cancelar' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
-    // Fechar o formulário volta ao detalhe do mesmo projeto.
-    expect(await within(await painel('PRJ-1')).findByRole('heading', { name: 'Painel de indicadores' })).toBeTruthy()
   })
 
-
-  it('editar o projeto grava projeto e etapa 1 (o que falta e situação)', async () => {
-    const updateProjeto = vi.fn(async () => undefined)
+  it('arrastar o cartão muda a coluna, inclusive para Pronto sem prova; sem botões de mover', async () => {
     const updateEtapa = vi.fn(async () => undefined)
-    stubSource(() => ({ updateProjeto, updateEtapa }))
-    const p = await abrir('PRJ-2')
-    fireEvent.click(within(p).getByRole('button', { name: 'Editar projeto' }))
-    const drawer = await screen.findByRole('dialog', { name: /^PRJ-2 ·/ })
-    fireEvent.change(within(drawer).getByRole('textbox', { name: /^O que falta/ }), { target: { value: 'Testar o alerta' } })
-    fireEvent.change(within(drawer).getByRole('textbox', { name: /^Como usar/ }), { target: { value: 'Abra Cadastros > Documentos.' } })
-    fireEvent.click(within(drawer).getByRole('button', { name: 'Salvar alterações' }))
-    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_instrucoes: 'Abra Cadastros > Documentos.' }))
-    expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_name: 'Testar o alerta' })
+    stubSource(() => ({ updateEtapa }))
+    render(<ProjectsView host={{ mode: 'mock' }} />)
+    const cartao = (await screen.findByRole('button', { name: nomeDe('PRJ-1') })).closest('article')!
+    expect(within(cartao).queryByRole('button', { name: /Mover|Voltar/ })).toBeNull()
+    const dataTransfer = { setData: () => undefined, effectAllowed: '' }
+    fireEvent.dragStart(cartao, { dataTransfer })
+    const pronto = screen.getByRole('region', { name: 'Pronto' })
+    fireEvent.dragOver(pronto, { dataTransfer })
+    fireEvent.drop(pronto, { dataTransfer })
+    await waitFor(() => expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_status: 100000003 }))
+    expect(screen.queryByRole('radio', { name: 'Gestor' })).toBeNull()
   })
 })

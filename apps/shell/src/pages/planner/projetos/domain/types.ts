@@ -1,3 +1,5 @@
+import type { ChecklistItem } from './checklist'
+
 /** Arquivo anexado (annotation) a uma atualização. */
 export type Anexo = { id: string; nome: string; tipo: string; tamanho: number | null }
 
@@ -20,15 +22,14 @@ export type Projeto = {
   id: string
   /** `PRJ-n`, autonumber do Dataverse. */
   codigo: string
+  /** Título. */
   nome: string
-  area: string
-  responsavel: string
-  /** Pedido do gestor em texto. */
+  /** Descrição (coluna `cr40f_briefing`). */
   briefing: string
-  instrucoes: string
+  checklist: ChecklistItem[]
 }
 
-/** Etapa única e escondida do projeto (número 1): guarda a situação, o "o que falta", o prazo, o PR e a publicação no PROD. */
+/** Etapa escondida do projeto (número 1): guarda a coluna do quadro (status); os outros campos são dos agentes e a tela não mostra. */
 export type Etapa = {
   id: string
   projetoId: string
@@ -46,5 +47,5 @@ export type Etapa = {
   publicadoProd: string | null
 }
 
-/** Quem está usando a tela: só o Renan muda a situação do projeto. */
+/** Quem está usando a tela: define o autor gravado nos anexos. */
 export type Perfil = 'renan' | 'gestor'
