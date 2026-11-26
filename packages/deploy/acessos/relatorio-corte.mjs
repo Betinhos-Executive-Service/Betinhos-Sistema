@@ -35,8 +35,9 @@ export async function avaliar(dv, { manter, hoje = new Date() }) {
   const mapa = JSON.parse(readFileSync(CAMINHO_MAPA, 'utf8'))
   const fora = new Set(mapa.foraDosPerfis.map((f) => f.tabela))
   const soLeitura = new Set(mapa.travaSoLeitura.map((f) => f.tabela))
+  const aceitas = new Set(mapa.perdaAceita.map((f) => f.tabela))
   const soAdmin = new Set(mapa.colunasSoAdmin.map((f) => `${f.tabela}|${f.coluna}`))
-  return { estado, relatorio: montarRelatorio({ estado, manter, uso, incertas, flows, referencias, fora, soLeitura, soAdmin }) }
+  return { estado, relatorio: montarRelatorio({ estado, manter, uso, incertas, flows, referencias, fora, soLeitura, soAdmin, aceitas }) }
 }
 
 export function detalhe(relatorio, estado) {

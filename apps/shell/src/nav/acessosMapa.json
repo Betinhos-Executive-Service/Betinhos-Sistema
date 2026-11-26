@@ -59,6 +59,9 @@
     {"tabela": "new_viageminfleet", "motivo": "sincronizado da Infleet pela automacao"},
     {"tabela": "cr40f_visaodetabela", "motivo": "visoes de outra pessoa: perda da escrita aceita pelo Renan (26/11/2026)"}
   ],
+  "perdaAceita": [
+    {"tabela": "cr40f_acessohistorico", "motivo": "historico de acessos: so o Administrador de acessos e o admin leem (Renan, 26/11/2026)"}
+  ],
   "colunasSoAdmin": [
     {"tabela": "cr40f_funcionarios", "coluna": "cr40f_loginsesenhas", "motivo": "logins e senhas: so o administrador do sistema"},
     {"tabela": "cr40f_validadorcliente", "coluna": "cr40f_senhahash", "motivo": "hash da senha do portal: so o Worker do portal le"}

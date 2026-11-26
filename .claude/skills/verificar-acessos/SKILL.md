@@ -75,6 +75,7 @@ description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabel
 9. Nunca rodar `relatorio-corte.mjs` nem `corte.mjs` contra o PROD à mão (o `dv.mjs` recusa token local no PROD); o PROD só pelo job `acessos` da Produção.
 
 ## Casos de borda
+- Trava de administrativos do corte (`corte.mjs --etapa avaliar`): `travaSoLeitura` só exige a leitura; `perdaAceita` (hoje `cr40f_acessohistorico`) e as tabelas padrão não travam e vão ao informativo. Perda aceita nova só com decisão do Renan e motivo no mapa (o teste do mapa reprova sem motivo).
 - Papel novo demora alguns segundos para valer: a prova repete cada cenário até 5 vezes; falha só depois disso.
 - Usuário de teste com papel herdado de equipe: a prova para com saída 2 e lista os papéis (sem pessoas).
 - Tabela nova usada por uma tela: entra em `acessosMapa.json` (o teste do mapa reprova a rota que não alcança a tabela).

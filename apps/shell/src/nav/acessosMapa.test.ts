@@ -11,7 +11,7 @@ type Modulo = Partial<Record<Classe, string[]>>
 type Rota = { perfis?: string[]; pastas: string[]; ignorar?: { tabela: string; motivo: string; perfis?: string[] }[] }
 type Base = { leitura: string[]; proprio: string[]; cria: string[]; donas: string[]; sistema: Record<string, Record<string, string>> }
 type Mapa = { base: Base; modulos: Record<string, Modulo>; foraDosPerfis: { tabela: string; motivo: string }[]
-  travaSoLeitura: { tabela: string; motivo: string }[]; colunasSoAdmin: { tabela: string; coluna: string; motivo: string }[]; rotas: Record<string, Rota> }
+  travaSoLeitura: { tabela: string; motivo: string }[]; perdaAceita: { tabela: string; motivo: string }[]; colunasSoAdmin: { tabela: string; coluna: string; motivo: string }[]; rotas: Record<string, Rota> }
 
 const mapa = mapaJson as unknown as Mapa
 const RAIZ = fileURLToPath(new URL('../../../../', import.meta.url))
@@ -139,6 +139,8 @@ describe('mapa de acessos', () => {
   it('exceções da trava do corte têm motivo e tabela com perfil', () => {
     const excecoes = [...mapa.travaSoLeitura, ...mapa.colunasSoAdmin]
     expect(excecoes.filter((f) => !cobertas.has(f.tabela) || !f.motivo?.trim()).map((f) => f.tabela)).toEqual([])
+    // perda aceita pode ser tabela só do Administrador de acessos (fora das áreas); basta o motivo.
+    expect(mapa.perdaAceita.filter((f) => !f.motivo?.trim()).map((f) => f.tabela)).toEqual([])
   })
 
   it('exceção por perfil só cita perfis da rota', () => {

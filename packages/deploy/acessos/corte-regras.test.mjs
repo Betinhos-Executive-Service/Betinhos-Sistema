@@ -116,6 +116,13 @@ test('tabela padrão não trava a administrativa que perde o admin: a perda vai 
   assert.equal(bia.secundarios.includes('contact'), true)
 })
 
+test('perda aceita não trava a administrativa: vai para o informativo', () => {
+  const plano = planoDoCorte(estado(), { manter: MANTER })
+  const bia = perdasPorPessoa(estado(), plano, { aceitas: new Set(['cr40f_financeiro']) }).find((p) => p.id === BIA)
+  assert.equal(bia.essenciais.includes('cr40f_financeiro'), false)
+  assert.equal(bia.secundarios.includes('cr40f_financeiro'), true)
+})
+
 test('admins a manter: vazio, inexistente e sem admin direto travam', () => {
   assert.equal(conferirManter(estado(), new Set()).length, 1)
   assert.deepEqual(conferirManter(estado(), MANTER), [])
