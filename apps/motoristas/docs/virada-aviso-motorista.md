@@ -21,12 +21,14 @@ Regras:
 - **Visualização:** o motorista mudou, em qualquer status e por qualquer caminho (inclusive limpar o campo): zera na mesma gravação. Regravar o mesmo motorista não zera.
 - **Foi Programado:** na troca de motorista vira "status final é Programado", exceto em serviço com `cr40f_ot`, em que quem projeta é o ciclo da troca de carro. Mudança só de status não passa por esta regra (o step filtra `cr40f_motorista`).
 - **Novo:** status final Programado, com motorista, e (motorista mudou, ou status passou a Programado, ou Create).
-- **Retirado:** motorista mudou, havia motorista antigo e o status anterior era Programado.
+- **Retirado:** motorista mudou, havia motorista antigo e o status anterior era Programado (e não é caso de Cancelado).
+- **Cancelado** (26/11/2026, `docs/features/aviso-cancelamento-motorista/spec.md`): status anterior Programado, havia motorista antigo e (status final Cancelado 202410002, ou motorista mudou para o funcionário "Cancelado"), em qualquer ordem ou na mesma gravação. Vai para o motorista antigo no lugar do Retirado. Cancelado com ressalvas (202410010) não avisa. Push "Serviço cancelado" / "Cancelado pelo gestor. Toque para ver a agenda atualizada.", abre a agenda e entrega como o Retirado.
+- **Funcionário "Cancelado":** `cr40f_funcionarios` com `cr40f_nomecompleto` igual a "Cancelado" (depois do Trim), que a operação põe como motorista para cancelar. Reconhecido pelo nome (existe no PROD, não no DEV); nunca recebe aviso de nenhum tipo.
 - **Sem app:** motorista sem `cr40f_emailmicrosoft`. Não dispara o Enviar; a Vigia alerta a operação.
-- **Prazo do Novo:** agora + 30 min; saída em menos de 2 h (ou já passada): agora.
+- **Prazo do Novo:** agora + 30 min; saída em menos de 2 h (ou já passada): agora. Retirado e Cancelado não têm prazo.
 - **Falha ao criar o aviso derruba a gravação** (`[DRIVER_NOTICE_FAILED]`). Decisão aceita: serviço programado sem aviso é o defeito que a tabela elimina.
 
-Situações do aviso (`new_situacao`): Pendente 100000000, Enviado 100000001, Falhou 100000002, Sem app 100000003, Visto 100000004, Cancelado 100000005. Tipo (`new_tipo`): Novo 100000000, Retirado 100000001.
+Situações do aviso (`new_situacao`): Pendente 100000000, Enviado 100000001, Falhou 100000002, Sem app 100000003, Visto 100000004, Cancelado 100000005. Tipo (`new_tipo`): Novo 100000000, Retirado 100000001, Cancelado 100000002.
 
 O reenvio da Vigia volta o aviso para Pendente com `new_alertadoem` preenchido: o Enviar dispara de novo e o texto do push fica num lugar só. Pendente parado há mais de 5 min também é regravado como Pendente ao alertar, o que dá uma nova tentativa de entrega. Se o reenvio virar Falhou, não há segundo alerta: `new_alertadoem` já está preenchido.
 

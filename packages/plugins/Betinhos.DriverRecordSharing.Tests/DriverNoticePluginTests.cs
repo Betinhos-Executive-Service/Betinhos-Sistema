@@ -20,8 +20,12 @@ namespace Betinhos.DriverRecordSharing.Tests
         private const string Exchange = "cr40f_ot";
         private const int Programado = 202410005;
         private const int Confirmado = 202410001;
+        private const int Solicitado = 202410004;
+        private const int StatusCancelado = 202410002;
+        private const int CanceladoComRessalvas = 202410010;
         private const int Novo = 100000000;
         private const int Retirado = 100000001;
+        private const int TipoCancelado = 100000002;
         private const int Pendente = 100000000;
         private const int Enviado = 100000001;
         private const int Falhou = 100000002;
@@ -35,12 +39,15 @@ namespace Betinhos.DriverRecordSharing.Tests
         private readonly Guid driverA;
         private readonly Guid driverB;
         private readonly Guid driverSemEmail;
+        private readonly Guid funcionarioCancelado;
 
         public DriverNoticePluginTests()
         {
             driverA = system.Add(Employee, "cr40f_emailmicrosoft", "a@betinhos.test");
             driverB = system.Add(Employee, "cr40f_emailmicrosoft", "b@betinhos.test");
             driverSemEmail = system.Add(Employee);
+            // Espaços em volta: a regra compara o nome depois do Trim.
+            funcionarioCancelado = system.Add(Employee, "cr40f_nomecompleto", " CANCELADO ");
         }
 
         // ---------- Pré-operação: a regra do Renan ----------
@@ -185,6 +192,95 @@ namespace Betinhos.DriverRecordSharing.Tests
             RunPost(Target(Driver, Ref(driverB), Status, new OptionSetValue(Confirmado)), Pre(driverA, Programado));
 
             AssertOnly(Retirado, driverA);
+        }
+
+        // ---------- Cancelamento (docs/features/aviso-cancelamento-motorista/spec.md) ----------
+
+        [Fact]
+        public void ProgramadoParaCanceladoComOMesmoMotoristaGeraCancelado()
+        {
+            RunPost(Target(Status, new OptionSetValue(StatusCancelado)), Pre(driverA, Programado, DateTime.UtcNow.AddHours(1)));
+
+            AssertOnly(TipoCancelado, driverA);
+            var aviso = Single(TipoCancelado);
+            Assert.Equal(Pendente, Option(aviso, "new_situacao"));
+            Assert.False(aviso.Contains("new_prazovisualizacao"));
+            Assert.Equal($"{correlationId:N}:{serviceId:N}:{driverA:N}:Cancelado", aviso.GetAttributeValue<string>("new_chaveidempotencia"));
+        }
+
+        [Fact]
+        public void TrocaParaOFuncionarioCanceladoGeraSoCanceladoEDepoisOStatusNaoGeraNada()
+        {
+            RunPost(Target(Driver, Ref(funcionarioCancelado)), Pre(driverA, Programado));
+
+            AssertOnly(TipoCancelado, driverA);
+
+            RunPost(Target(Status, new OptionSetValue(StatusCancelado)), Pre(funcionarioCancelado, Programado));
+
+            AssertOnly(TipoCancelado, driverA);
+        }
+
+        [Fact]
+        public void FuncionarioCanceladoEStatusCanceladoNaMesmaGravacaoGeraUmCancelado()
+        {
+            RunPost(Target(Driver, Ref(funcionarioCancelado), Status, new OptionSetValue(StatusCancelado)), Pre(driverA, Programado));
+
+            AssertOnly(TipoCancelado, driverA);
+        }
+
+        [Fact]
+        public void CanceladoComRessalvasNaoGeraAviso()
+        {
+            RunPost(Target(Status, new OptionSetValue(CanceladoComRessalvas)), Pre(driverA, Programado));
+
+            Assert.Empty(Notices());
+        }
+
+        [Theory]
+        [InlineData(Confirmado)]
+        [InlineData(Solicitado)]
+        public void CancelarServicoQueNaoEstavaProgramadoNaoGeraAviso(int statusAnterior)
+        {
+            RunPost(Target(Status, new OptionSetValue(StatusCancelado)), Pre(driverA, statusAnterior));
+            RunPost(Target(Driver, Ref(funcionarioCancelado)), Pre(driverA, statusAnterior));
+
+            Assert.Empty(Notices());
+        }
+
+        [Fact]
+        public void TrocaEStatusCanceladoNaMesmaGravacaoGeraSoCanceladoParaOAnterior()
+        {
+            RunPost(Target(Driver, Ref(driverB), Status, new OptionSetValue(StatusCancelado)), Pre(driverA, Programado));
+
+            AssertOnly(TipoCancelado, driverA);
+        }
+
+        [Fact]
+        public void FuncionarioCanceladoNuncaRecebeNovo()
+        {
+            RunPost(Target(Status, new OptionSetValue(Programado)), Pre(funcionarioCancelado, Confirmado));
+            RunPost(Target(Driver, Ref(funcionarioCancelado), Status, new OptionSetValue(Programado)), Pre(driverA, Confirmado));
+            Execute(40, "Create", Target(Driver, Ref(funcionarioCancelado), Status, new OptionSetValue(Programado)), null);
+
+            Assert.Empty(Notices());
+        }
+
+        [Fact]
+        public void SairDoFuncionarioCanceladoGeraSoNovoParaONovoMotorista()
+        {
+            RunPost(Target(Driver, Ref(driverB)), Pre(funcionarioCancelado, Programado));
+
+            AssertOnly(Novo, driverB);
+        }
+
+        [Fact]
+        public void MudancaSemAvisoPossivelNaoConsultaOFuncionario()
+        {
+            // Programado(A) -> Confirmado com o mesmo motorista passa pelas condições, mas não gera aviso.
+            RunPost(Target(Status, new OptionSetValue(Confirmado)), Pre(driverA, Programado));
+
+            Assert.Empty(Notices());
+            Assert.Equal(0, system.Retrieves);
         }
 
         [Fact]
@@ -398,7 +494,13 @@ namespace Betinhos.DriverRecordSharing.Tests
 
             public Entity Get(string table, Guid id) => Rows.Single(row => row.LogicalName == table && row.Id == id);
 
-            public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => Get(entityName, id);
+            public int Retrieves;
+
+            public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet)
+            {
+                Retrieves++;
+                return Get(entityName, id);
+            }
 
             public Guid Create(Entity entity)
             {

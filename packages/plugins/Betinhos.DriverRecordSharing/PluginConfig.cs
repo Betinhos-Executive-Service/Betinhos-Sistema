@@ -121,6 +121,8 @@ namespace Betinhos.DriverRecordSharing
         public const string EmployeePrimaryId = "cr40f_funcionariosid";
         public const string EmployeeName = "cr40f_nomecompleto";
         public const string EmployeeMicrosoftEmail = "cr40f_emailmicrosoft";
+        /// <summary>Funcionário que a operação põe como motorista para cancelar o serviço; nunca recebe aviso.</summary>
+        public const string EmployeeCanceledName = "Cancelado";
         public const string EmployeeDismissalDate = "cr40f_datadedemissao";
 
         public const string UserTable = "systemuser";

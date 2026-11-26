@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace Betinhos.DriverRecordSharing
 {
@@ -34,8 +36,20 @@ namespace Betinhos.DriverRecordSharing
                     return;
                 }
 
-                var writer = new DriverNoticeWriter(factory.CreateOrganizationService(null), tracing);
-                foreach (var notice in DriverNoticeRules.Plan(target, pre))
+                var system = factory.CreateOrganizationService(null);
+                var writer = new DriverNoticeWriter(system, tracing);
+                var canceledByDriver = new Dictionary<Guid, bool>();
+                Func<EntityReference, bool> isCanceledEmployee = driver =>
+                {
+                    if (!canceledByDriver.TryGetValue(driver.Id, out var canceled))
+                    {
+                        var employee = system.Retrieve(PluginConfig.EmployeeTable, driver.Id, new ColumnSet(PluginConfig.EmployeeFullName));
+                        canceled = DriverNoticeRules.IsCanceledEmployeeName(employee.GetAttributeValue<string>(PluginConfig.EmployeeFullName));
+                        canceledByDriver[driver.Id] = canceled;
+                    }
+                    return canceled;
+                };
+                foreach (var notice in DriverNoticeRules.Plan(target, pre, isCanceledEmployee))
                 {
                     writer.Write(notice, context.CorrelationId, context.PrimaryEntityId, target, pre);
                 }
