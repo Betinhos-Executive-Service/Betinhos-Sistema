@@ -1,4 +1,4 @@
 {
-  "dev": "preparar",
+  "dev": "cortar",
   "prod": "esperar"
 }
