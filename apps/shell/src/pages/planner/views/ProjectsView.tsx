@@ -1,16 +1,17 @@
-// Projetos no Planner: quadro dos projetos do módulo #/projetos (cr40f_projeto), por situação.
+// Projetos no Planner: quadro dos projetos (cr40f_projeto) por situação; clique no cartão abre o detalhe.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, ToastProvider, useToast } from "@betinhos/ui";
-import { ArrowRight, ChevronLeft, CircleCheck, ExternalLink, Film, Image as ImageIcon, Lightbulb, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
+import { Alert, Button, SegmentedControl, StatusBadge, ToastProvider, useToast } from "@betinhos/ui";
+import { ArrowRight, ChevronLeft, CircleCheck, Film, Image as ImageIcon, Lightbulb, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
 import PageHeader from '../components/PageHeader';
 import { NewProjectDrawer, type CreatedProject } from '../components/NewProjectDrawer';
+import { ProjectDetailDrawer } from '../components/ProjectDetailDrawer';
 import type { Host } from '../../../host';
-import { hrefFor } from '../../../nav/useHashRoute';
-import { createSource, reasonText } from '../../projetos/data/source';
-import { useProjetos } from '../../projetos/useProjetos';
-import { STATUS } from '../../projetos/domain/choices';
-import { codigoEtapa1 } from '../../projetos/domain/regras';
-import type { Perfil } from '../../projetos/domain/types';
+import { useQueryId } from '../../../nav/queryState';
+import { createSource, reasonText } from '../projetos/data/source';
+import { useProjetos } from '../projetos/useProjetos';
+import { STATUS } from '../projetos/domain/choices';
+import { codigoEtapa1 } from '../projetos/domain/regras';
+import type { Perfil } from '../projetos/domain/types';
 import { BOARD_COLUMNS, attachmentKind, cardsByStatus, moveError, projectCards, type ProjectCard } from '../domain/projectsBoard';
 
 const COLUMN_STYLE: Record<number, { key: string; icon: any; hint: string }> = {
@@ -78,6 +79,7 @@ function Board({ host }: { host?: Host }) {
   const toast = useToast();
   const [perfil, setPerfil] = useState<Perfil>("gestor");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openId, setOpenId] = useQueryId("projeto");
   const [dragId, setDragId] = useState("");
   const [dropStatus, setDropStatus] = useState<number | null>(null);
   const [movingId, setMovingId] = useState("");
@@ -158,6 +160,12 @@ function Board({ host }: { host?: Host }) {
           Não foi possível carregar os projetos. {data.error} Se o erro falar de permissão, peça o papel Projetos.
         </Alert>
       )}
+      {source.mock && (
+        <div className="projects-mock">
+          <StatusBadge tone="info">Dados de exemplo</StatusBadge>
+          <SegmentedControl size="compact" aria-label="Perfil (exemplo)" value={perfil} onChange={(v) => setPerfil(v as Perfil)} options={[{ value: "renan", label: "Renan" }, { value: "gestor", label: "Gestor" }]} />
+        </div>
+      )}
       {!canMove && data.loaded && (
         <p className="projects-footnote">Só o Renan muda a situação dos projetos. Você pode registrar novas ideias.</p>
       )}
@@ -207,7 +215,7 @@ function Board({ host }: { host?: Host }) {
                       onDragEnd={() => { setDragId(""); setDropStatus(null); }}
                     >
                       <span className="projects-card-code">{card.projeto.codigo || "Novo"}</span>
-                      <h3>{card.projeto.nome}</h3>
+                      <h3><button type="button" className="projects-card-open" onClick={() => setOpenId(id)}>{card.projeto.nome}</button></h3>
                       {card.projeto.briefing && <p>{card.projeto.briefing}</p>}
                       {card.etapa?.nome && <p className="projects-card-next"><strong>Falta:</strong> {card.etapa.nome}</p>}
                       {flowIndex >= 0 && (
@@ -218,7 +226,6 @@ function Board({ host }: { host?: Host }) {
                       <footer className="projects-card-foot">
                         <AttachmentCounts card={card} />
                         <span className="projects-card-actions">
-                          <a className="projects-icon-button" href={hrefFor("projetos", { projeto: id })} aria-label={`Abrir ${card.projeto.nome} em Projetos`} title="Abrir no módulo Projetos"><ExternalLink size={15} /></a>
                           {canMove && previous != null && (
                             <button className="projects-icon-button" type="button" disabled={Boolean(movingId)} onClick={() => void move(card, previous)} aria-label={`Voltar ${card.projeto.nome} para ${labelOf(previous)}`} title={`Voltar para ${labelOf(previous)}`}><ChevronLeft size={15} /></button>
                           )}
@@ -238,6 +245,10 @@ function Board({ host }: { host?: Host }) {
         })}
       </div>
 
+      {data.loaded && (
+        <ProjectDetailDrawer projeto={data.projetos.find((p) => p.id === openId) ?? null} projetos={data.projetos} etapas={data.etapas} atualizacoes={data.atualizacoes}
+          perfil={perfil} source={source} onClose={() => setOpenId(null)} onSaved={data.upsert} onEtapaSalva={data.upsertEtapa} onAtualizacao={data.addAtualizacao} />
+      )}
       <NewProjectDrawer open={drawerOpen} source={source} perfil={perfil} onClose={() => setDrawerOpen(false)} onCreated={onCreated} />
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>

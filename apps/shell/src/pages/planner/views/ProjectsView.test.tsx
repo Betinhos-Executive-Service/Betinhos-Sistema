@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import * as sourceModule from './data/source'
-import { ProjetosPage } from './ProjetosPage'
+import * as sourceModule from '../projetos/data/source'
+import { createMockProjetos } from '../projetos/data/mock'
+import ProjectsView from './ProjectsView'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
 
 beforeEach(() => {
-  window.location.hash = '#/projetos'
+  window.location.hash = '#/planner?view=projects'
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined }))
 })
@@ -43,66 +44,29 @@ function microfone(falha?: string) {
   return getUserMedia
 }
 
-const painel = () => screen.findByRole('complementary', { name: 'Detalhe' })
+const nomeDe = (codigo: string) => createMockProjetos().find((p) => p.codigo === codigo)!.nome
+const painel = (codigo: string) => screen.findByRole('dialog', { name: new RegExp(`^${codigo} ·`) })
 
-/** Abre a tela e clica na linha do projeto pelo código (`PRJ-n`); devolve o painel lateral. */
+/** Abre o quadro e clica no cartão do projeto (`PRJ-n`); devolve o drawer do detalhe. */
 async function abrir(codigo: string, render0 = true) {
-  if (render0) render(<ProjetosPage host={{ mode: 'mock' }} />)
-  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${codigo} `) }))
-  const p = await painel()
-  await within(p).findByText(new RegExp(`^${codigo}`))
-  return p
+  if (render0) render(<ProjectsView host={{ mode: 'mock' }} />)
+  fireEvent.click(await screen.findByRole('button', { name: nomeDe(codigo) }))
+  return painel(codigo)
 }
 
-describe('Projetos', () => {
-  it('lista com uma linha por projeto (nome, situação, o que falta), chips com contagem e selo de exemplo', async () => {
-    render(<ProjetosPage host={{ mode: 'mock' }} />)
-    expect(await screen.findByRole('button', { name: /^PRJ-1 Painel de indicadores\. Conferir\. O que falta: Conferir os valores com o relatório de outubro\./ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^PRJ-4 .*Ideia\. O que falta: Montar o brief\./ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^PRJ-5 .*Pausado/ })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /^PRJ-\d / })).toHaveLength(5)
-    expect(screen.queryByRole('radio', { name: 'Provas' })).toBeNull()
-    expect(screen.queryByRole('radio', { name: 'Instruções' })).toBeNull()
-    expect(screen.getByText('Dados de exemplo')).toBeTruthy()
-    const chips = screen.getByRole('group', { name: 'Filtros rápidos' })
-    expect(within(chips).getByRole('button', { name: /^Precisa de mim · \d/ })).toBeTruthy()
-    fireEvent.click(within(chips).getByRole('button', { name: 'Conferir · 1' }))
-    await waitFor(() => expect(screen.queryByRole('button', { name: /^PRJ-2 / })).toBeNull())
-    expect(screen.getByRole('button', { name: /^PRJ-1 / })).toBeTruthy()
-    fireEvent.click(within(chips).getByRole('button', { name: /^Prontos com prova/ }))
-    expect(await screen.findByRole('button', { name: /^PRJ-3 / })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /^PRJ-1 / })).toBeNull()
-    // Gestor não tem o chip "Precisa de mim" (a regra é do Renan).
-    fireEvent.click(screen.getByRole('radio', { name: 'Gestor' }))
-    await waitFor(() => expect(within(chips).queryByRole('button', { name: /^Precisa de mim/ })).toBeNull())
+describe('Projetos no Planner: detalhe do cartão', () => {
+  it('cartão abre o detalhe e grava ?projeto= no endereço; sem link para o módulo antigo', async () => {
+    const p = await abrir('PRJ-1')
+    expect(within(p).getByRole('heading', { name: 'Painel de indicadores' })).toBeTruthy()
+    expect(window.location.hash).toMatch(/projeto=/)
+    expect(document.querySelector('a[href*="#/projetos"]')).toBeNull()
   })
 
-  it('anda entre as linhas pelo teclado', async () => {
-    render(<ProjetosPage host={{ mode: 'mock' }} />)
-    const p1 = await screen.findByRole('button', { name: /^PRJ-1 / })
-    p1.focus()
-    fireEvent.keyDown(p1, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^PRJ-2 / }))
-  })
 
-  it('gestor cria o projeto (PRJ-6) e a etapa 1 nasce PRJ-6.1 em Ideia, com o que falta', async () => {
-    const createEtapa = vi.fn()
-    stubSource((r) => ({ createEtapa: async (c, n) => { createEtapa(c, n); return r.createEtapa(c, n) } }))
-    render(<ProjetosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('radio', { name: 'Gestor' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Novo' }))
-    const novo = await screen.findByRole('dialog', { name: 'Novo projeto' })
-    expect(within(novo).queryByRole('combobox', { name: /^Situação/ })).toBeNull()
-    fireEvent.change(within(novo).getByRole('textbox', { name: /^Nome/ }), { target: { value: 'Agenda de manutenção' } })
-    fireEvent.change(within(novo).getByRole('textbox', { name: /^O que falta/ }), { target: { value: 'Listar as revisões' } })
-    fireEvent.change(within(novo).getByRole('textbox', { name: /^O que precisa/ }), { target: { value: 'Quero ver as revisões da semana.' } })
-    fireEvent.click(within(novo).getByRole('button', { name: 'Cadastrar projeto' }))
-    const p = await painel()
-    expect(await within(p).findByRole('heading', { name: 'Agenda de manutenção' })).toBeTruthy()
-    expect(within(p).getByText('Quero ver as revisões da semana.')).toBeTruthy()
-    await waitFor(() => expect(createEtapa).toHaveBeenCalledWith(expect.objectContaining({ cr40f_name: 'Listar as revisões', cr40f_status: 100000000 }), expect.objectContaining({ numero: 1, codigo: 'PRJ-6.1' })))
-    expect(await screen.findByRole('button', { name: /^PRJ-6 Agenda de manutenção\. Ideia\. O que falta: Listar as revisões\./ })).toBeTruthy()
-  })
+
+
+
+
 
   it('Marcar como Pronto fica travado sem prova; com prova registrada, grava', async () => {
     const updateEtapa = vi.fn(async () => undefined)
@@ -123,7 +87,7 @@ describe('Projetos', () => {
   })
 
   it('gestor: Pronto travado ("só o Renan") e situação travada no drawer do projeto', async () => {
-    render(<ProjetosPage host={{ mode: 'mock' }} />)
+    render(<ProjectsView host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('radio', { name: 'Gestor' }))
     const p = await abrir('PRJ-1', false)
     expect((within(p).getByRole('button', { name: 'Marcar como Pronto (só o Renan)' }) as HTMLButtonElement).disabled).toBe(true)
@@ -182,25 +146,28 @@ describe('Projetos', () => {
     expect(await within(p).findByText(/passa do limite de 5 MB/)).toBeTruthy()
   })
 
-  it('alteração não registrada no painel ou no drawer pede para descartar', async () => {
+  it('alteração não registrada no detalhe ou no formulário pede para descartar', async () => {
     const p = await abrir('PRJ-2')
     fireEvent.click(within(p).getByRole('button', { name: 'Nova atualização' }))
     fireEvent.change(within(p).getByRole('textbox', { name: /^Texto/ }), { target: { value: 'Rascunho' } })
-    fireEvent.click(screen.getByRole('button', { name: /^PRJ-1 / }))
+    fireEvent.click(within(p).getByRole('button', { name: 'Fechar painel' }))
     const confirmar = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
     fireEvent.click(within(confirmar).getByRole('button', { name: 'Continuar editando' }))
-    expect(within(await painel()).getByRole('heading', { name: 'Cadastro de documentos' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /^PRJ-1 / }))
+    expect(within(await painel('PRJ-2')).getByRole('heading', { name: 'Cadastro de documentos' })).toBeTruthy()
+    fireEvent.click(within(await painel('PRJ-2')).getByRole('button', { name: 'Fechar painel' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
-    expect(await within(await painel()).findByRole('heading', { name: 'Painel de indicadores' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^PRJ-2 ·/ })).toBeNull())
 
-    fireEvent.click(within(await painel()).getByRole('button', { name: 'Editar projeto' }))
+    const p1 = await abrir('PRJ-1', false)
+    fireEvent.click(within(p1).getByRole('button', { name: 'Editar projeto' }))
     const drawer = await screen.findByRole('dialog', { name: /^PRJ-1 ·/ })
     fireEvent.change(within(drawer).getByRole('textbox', { name: /^Nome/ }), { target: { value: 'Outro nome' } })
     fireEvent.click(within(drawer).getByRole('button', { name: 'Cancelar' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^PRJ-1 ·/ })).toBeNull())
+    // Fechar o formulário volta ao detalhe do mesmo projeto.
+    expect(await within(await painel('PRJ-1')).findByRole('heading', { name: 'Painel de indicadores' })).toBeTruthy()
   })
+
 
   it('editar o projeto grava projeto e etapa 1 (o que falta e situação)', async () => {
     const updateProjeto = vi.fn(async () => undefined)

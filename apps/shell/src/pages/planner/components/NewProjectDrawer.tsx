@@ -2,11 +2,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Dialog, Drawer, Field, Input, Textarea } from "@betinhos/ui";
 import { FileText, ImagePlus, Paperclip, Plus, Trash2, UploadCloud } from "lucide-react";
-import { reasonText, type Source } from "../../projetos/data/source";
-import { STATUS, autorDoPerfil } from "../../projetos/domain/choices";
-import { MAX_ANEXOS } from "../../projetos/domain/anexos";
-import { codigoEtapa1 } from "../../projetos/domain/regras";
-import type { Atualizacao, Etapa, Perfil, Projeto } from "../../projetos/domain/types";
+import { reasonText, type Source } from "../projetos/data/source";
+import { STATUS, autorDoPerfil } from "../projetos/domain/choices";
+import { MAX_ANEXOS } from "../projetos/domain/anexos";
+import { codigoEtapa1 } from "../projetos/domain/regras";
+import type { Atualizacao, Etapa, Perfil, Projeto } from "../projetos/domain/types";
 import { acceptFiles, attachmentKind, namePastedFile } from "../domain/projectsBoard";
 import { AudioRecorder } from "./AudioRecorder";
 

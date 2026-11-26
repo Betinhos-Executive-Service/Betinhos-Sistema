@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { STATUS } from '../../projetos/domain/choices'
-import { MAX_ANEXOS } from '../../projetos/domain/anexos'
-import { AVISO_SEM_PROVA, AVISO_SO_RENAN } from '../../projetos/domain/regras'
-import { createMockAtualizacoes, createMockEtapas, createMockProjetos } from '../../projetos/data/mock'
+import { STATUS } from '../projetos/domain/choices'
+import { MAX_ANEXOS } from '../projetos/domain/anexos'
+import { AVISO_SEM_PROVA, AVISO_SO_RENAN } from '../projetos/domain/regras'
+import { createMockAtualizacoes, createMockEtapas, createMockProjetos } from '../projetos/data/mock'
 import { acceptFiles, attachmentKind, cardsByStatus, moveError, namePastedFile, projectCards } from './projectsBoard'
 
 const file = (name: string, type: string, size = 10) => new File([new Uint8Array(size)], name, { type })

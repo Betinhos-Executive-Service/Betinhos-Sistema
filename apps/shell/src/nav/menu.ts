@@ -11,7 +11,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'projetos' | 'app-motoristas' | 'acessos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba; /** Rota válida (com guarda e título), mas sem link no menu: aberta por botão de outra tela. */ foraDoMenu?: true }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'app-motoristas' | 'acessos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba; /** Rota válida (com guarda e título), mas sem link no menu: aberta por botão de outra tela. */ foraDoMenu?: true }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -95,7 +95,6 @@ export const MENU: MenuGroup[] = [
       // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
       wr('Dashboard antigo (TV)', 'new_dashboard'),
       { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
-      { kind: 'page', id: 'projetos', label: 'Projetos', page: 'projetos' },
       { kind: 'page', id: 'rh-descontos', label: 'Descontos em folha', page: 'rh-descontos' },
       wr('Composição de Preço (antiga)', 'new_TelaComposicaoPreco.html'),
       table('cr40f_categoriadespesaoperacional'),

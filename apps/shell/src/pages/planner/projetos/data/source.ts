@@ -1,6 +1,6 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
-import type { Host } from '../../../host'
-import { latenciaMock } from '../../../app/latenciaMock'
+import type { Host } from '../../../../host'
+import { latenciaMock } from '../../../../app/latenciaMock'
 import { STATUS } from '../domain/choices'
 import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from '../domain/types'
 import { createMockArquivos, createMockAtualizacoes, createMockEtapas, createMockProjetos } from './mock'

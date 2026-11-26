@@ -4,7 +4,7 @@ import { atualizacaoPayload, atualizacoesPath, etapaPayload, mapAtualizacao, map
 import { MAX_ANEXO_BYTES, erroDoAnexo } from './domain/anexos'
 import { AUTOR, STATUS, autorDoPerfil, statusLabel } from './domain/choices'
 import { applyEtapa, applyProjeto, diffEtapa, diffProjeto, emptyProjetoForm, toProjetoForm, validateProjeto } from './domain/form'
-import { acaoPendente, contagens, fase, linhas, motivoSemConcluir, oQueFalta, parada, precisaDeMim, siglaAutor, situacao, trilha } from './domain/painel'
+import { fase, motivoSemConcluir, siglaAutor, trilha } from './domain/painel'
 import { AVISO_SEM_PROVA, AVISO_SO_RENAN, atrasada, codigoEtapa1, doProjeto, erroDeStatus, etapaDoProjeto, ordemDoCodigo, podeConcluir, provas } from './domain/regras'
 import type { Atualizacao, Etapa } from './domain/types'
 
@@ -58,14 +58,7 @@ describe('etapa única do projeto', () => {
   it('ordem do código é numérica (PRJ-10 depois de PRJ-9)', () => {
     expect(ordemDoCodigo('PRJ-10')).toBeGreaterThan(ordemDoCodigo('PRJ-9') ?? 0)
   })
-  it('situação: rótulos curtos, "Pronto · N provas" e "No PROD"', () => {
-    expect(statusLabel(null)).toBe('Ideia')
-    expect(situacao(null, [])).toMatchObject({ rotulo: 'Ideia' })
-    expect(situacao(et({ status: STATUS.validacao }), []).rotulo).toBe('Conferir')
-    expect(situacao(et({ status: STATUS.andamento, publicadoProd: '2026-11-20T18:00:00Z' }), []).rotulo).toBe('No PROD')
-    expect(situacao(et({ status: STATUS.concluida }), [at({ prova: true, anexos: [anexo, anexo] })]).rotulo).toBe('Pronto · 2 provas')
-    expect(situacao(et({ status: STATUS.concluida }), [at({ prova: true, anexos: [anexo] })]).rotulo).toBe('Pronto · 1 prova')
-  })
+
 })
 
 describe('formulário do projeto', () => {
@@ -139,7 +132,7 @@ describe('lista e dados', () => {
   })
 })
 
-describe('painel: trilha, filtros e linhas', () => {
+describe('painel: trilha e Pronto', () => {
   const pj = (over: Partial<{ id: string; codigo: string; nome: string; briefing: string }> = {}) => ({ id: 'p', codigo: 'PRJ-1', nome: 'P', area: '', responsavel: '', briefing: '', instrucoes: '', ...over })
   it('fase: Ideia 1, Fazendo 2, Conferir 3, publicado e aberto 4, Pronto 5, Pausado sem destaque', () => {
     expect(fase(et({ status: STATUS.ideia }))).toBe(1)
@@ -157,57 +150,11 @@ describe('painel: trilha, filtros e linhas', () => {
     expect(vencida.descricao).toContain('prazo vencido')
     expect(trilha(et({ status: STATUS.pausada }), [], HOJE)).toMatchObject({ fase: null })
   })
-  it('ação pendente: Conferir, Anexar prova e Concluir', () => {
-    const prova = at({ prova: true, anexos: [anexo] })
-    expect(acaoPendente(et({ status: STATUS.validacao }), [])).toBe('Conferir')
-    expect(acaoPendente(et({ status: STATUS.andamento, publicadoProd: '2026-11-20T18:00:00Z' }), [])).toBe('Anexar prova')
-    expect(acaoPendente(et({ status: STATUS.andamento, publicadoProd: '2026-11-20T18:00:00Z' }), [prova])).toBe('Concluir')
-    expect(acaoPendente(et({ status: STATUS.ideia }), [])).toBeNull()
-    expect(acaoPendente(et({ status: STATUS.concluida }), [prova])).toBeNull()
-  })
-  it('parada: aberta sem atualização há mais de 7 dias', () => {
-    const velha = at({ data: '2026-11-12T10:00:00' })
-    expect(parada(et({ status: STATUS.andamento }), [velha], HOJE)).toBe(true)
-    expect(parada(et({ status: STATUS.andamento }), [at({ data: '2026-11-20T10:00:00' })], HOJE)).toBe(false)
-    expect(parada(et({ status: STATUS.concluida }), [velha], HOJE)).toBe(false)
-    expect(parada(et({ status: STATUS.pausada }), [velha], HOJE)).toBe(false)
-    expect(parada(et({ status: STATUS.andamento }), [], HOJE)).toBe(false)
-  })
-  it('precisa de mim (Renan): conferir, publicado sem prova ou briefing sem etapa; gestor nunca', () => {
-    const prod = { status: STATUS.andamento, publicadoProd: '2026-11-20T18:00:00Z' }
-    expect(precisaDeMim('renan', pj(), et({ status: STATUS.validacao }), [])).toBe(true)
-    expect(precisaDeMim('renan', pj(), et(prod), [])).toBe(true)
-    expect(precisaDeMim('renan', pj(), et(prod), [at({ prova: true, anexos: [anexo] })])).toBe(false)
-    expect(precisaDeMim('renan', pj(), et({ status: STATUS.andamento }), [])).toBe(false)
-    expect(precisaDeMim('gestor', pj(), et({ status: STATUS.validacao }), [])).toBe(false)
-    expect(precisaDeMim('renan', pj({ briefing: 'Pedido' }), null, [])).toBe(true)
-    expect(precisaDeMim('renan', pj(), null, [])).toBe(false)
-    expect(precisaDeMim('renan', pj({ briefing: 'Pedido' }), et({}), [])).toBe(false)
-  })
-  it('"o que falta": nome da etapa, senão a ação pendente, senão o brief a montar', () => {
-    expect(oQueFalta(pj(), et({ nome: 'Definir texto' }), [])).toBe('Definir texto')
-    expect(oQueFalta(pj(), et({ nome: '', status: STATUS.validacao }), [])).toBe('Conferir')
-    expect(oQueFalta(pj({ briefing: 'x' }), null, [])).toBe('Montar o brief')
-    expect(oQueFalta(pj(), null, [])).toBe('—')
-  })
-  it('contagens e linhas (uma por projeto) batem com os filtros; a busca ignora acento', () => {
-    const projetos = [pj({ id: 'p', codigo: 'PRJ-1', nome: 'Gestão' }), pj({ id: 'q', codigo: 'PRJ-2', nome: 'Novo', briefing: 'Pedido do gestor' }), pj({ id: 'r', codigo: 'PRJ-3', nome: 'Pronto' })]
-    const etapas = [
-      et({ id: 'e1', projetoId: 'p', status: STATUS.validacao, nome: 'Conferir tela' }),
-      et({ id: 'e2', projetoId: 'p', numero: 2, status: STATUS.andamento, nome: 'ignorada' }),
-      et({ id: 'e3', projetoId: 'r', status: STATUS.concluida }),
-    ]
-    const atualizacoes = [at({ etapaId: 'e1', projetoId: 'p', data: '2026-11-10T10:00:00' }), at({ id: 'b', etapaId: 'e3', projetoId: 'r', prova: true, anexos: [anexo] })]
-    const ctx = { projetos, etapas, atualizacoes, perfil: 'renan' as const, hoje: HOJE }
-    expect(contagens(ctx)).toEqual({ todos: 3, mim: 2, validacao: 1, parados: 1, provas: 1 })
-    expect(linhas({ ...ctx, filtro: 'todos', busca: '' }).map((l) => l.projeto.codigo)).toEqual(['PRJ-1', 'PRJ-2', 'PRJ-3'])
-    expect(linhas({ ...ctx, filtro: 'validacao', busca: '' }).map((l) => [l.projeto.codigo, l.falta, l.situacao.rotulo])).toEqual([['PRJ-1', 'Conferir tela', 'Conferir']])
-    expect(linhas({ ...ctx, filtro: 'mim', busca: '' }).map((l) => l.projeto.codigo)).toEqual(['PRJ-1', 'PRJ-2'])
-    expect(linhas({ ...ctx, filtro: 'todos', busca: 'gestao' }).map((l) => l.projeto.codigo)).toEqual(['PRJ-1'])
-    expect(linhas({ ...ctx, filtro: 'todos', busca: 'conferir tela' }).map((l) => l.projeto.codigo)).toEqual(['PRJ-1'])
-    expect(linhas({ ...ctx, filtro: 'todos', busca: '' }).find((l) => l.projeto.codigo === 'PRJ-2')?.falta).toBe('Montar o brief')
-    expect(contagens({ ...ctx, perfil: 'gestor' }).mim).toBe(0)
-  })
+
+
+
+
+
   it('motivo de não concluir e sigla do autor', () => {
     expect(motivoSemConcluir('gestor', et({}), [])).toBe('só o Renan')
     expect(motivoSemConcluir('renan', et({}), [])).toBe('falta prova')

@@ -82,4 +82,4 @@ export const anexoPayload = (atualizacaoSet: string, atualizacaoId: string, nome
 })
 
 // Papéis do Renan (administrador do ambiente) e leitura dos papéis do usuário: `app/papeisUsuario.ts`, comum a outras telas.
-export { PAPEIS_RENAN, papeisPath } from '../../../app/papeisUsuario'
+export { PAPEIS_RENAN, papeisPath } from '../../../../app/papeisUsuario'

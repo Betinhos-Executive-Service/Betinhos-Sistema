@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { cleanId } from '@betinhos/dataverse'
 import { Alert, Button, Dialog, Drawer, useToast } from '@betinhos/ui'
-import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BotaoAuditoria } from '../../../../app/auditoria/AuditoriaProvider'
 import { reasonText, type Source } from '../data/source'
 import { applyEtapa, applyProjeto, diffEtapa, diffProjeto, emptyProjetoForm, hasChanges, projetoSujo, toProjetoForm, validateProjeto, type ProjetoErrors, type ProjetoForm as FormValues } from '../domain/form'
 import { STATUS } from '../domain/choices'

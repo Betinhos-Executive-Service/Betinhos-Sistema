@@ -1,8 +1,8 @@
-// Quadro de Projetos do Planner: os mesmos projetos do módulo #/projetos (cr40f_projeto), em colunas por situação.
-import { STATUS, STATUS_OPTIONS } from '../../projetos/domain/choices'
-import { MAX_ANEXOS, erroDoAnexo } from '../../projetos/domain/anexos'
-import { erroDeStatus, etapaDoProjeto } from '../../projetos/domain/regras'
-import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from '../../projetos/domain/types'
+// Quadro de Projetos do Planner: projetos do cr40f_projeto (pasta planner/projetos), em colunas por situação.
+import { STATUS, STATUS_OPTIONS } from '../projetos/domain/choices'
+import { MAX_ANEXOS, erroDoAnexo } from '../projetos/domain/anexos'
+import { erroDeStatus, etapaDoProjeto } from '../projetos/domain/regras'
+import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from '../projetos/domain/types'
 
 export const BOARD_COLUMNS = STATUS_OPTIONS
 

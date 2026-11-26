@@ -3174,6 +3174,13 @@
 :where(.planner-page, .planner-portal) .projects-card:active { cursor: grabbing; }
 :where(.planner-page, .planner-portal) .projects-card.is-dragging { opacity: .45; border-color: var(--bt-color-action); }
 :where(.planner-page, .planner-portal) .projects-card h3 { margin: 0; color: var(--ink); font-size: 13px; font-weight: 800; line-height: 18px; overflow-wrap: anywhere; }
+:where(.planner-page, .planner-portal) .projects-card { position: relative; }
+:where(.planner-page, .planner-portal) .projects-card-open { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+:where(.planner-page, .planner-portal) .projects-card-open::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+:where(.planner-page, .planner-portal) .projects-card-open:focus-visible { outline: 0; }
+:where(.planner-page, .planner-portal) .projects-card:has(.projects-card-open:focus-visible) { box-shadow: 0 0 0 2px var(--bt-focus-border, #2563eb); }
+:where(.planner-page, .planner-portal) .projects-card-actions { position: relative; z-index: 1; }
+:where(.planner-page, .planner-portal) .projects-mock { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 :where(.planner-page, .planner-portal) .projects-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 17px; overflow-wrap: anywhere; }
 :where(.planner-page, .planner-portal) .projects-progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 :where(.planner-page, .planner-portal) .projects-progress span { position: relative; height: 4px; border-radius: 999px; background: var(--surface-soft); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }

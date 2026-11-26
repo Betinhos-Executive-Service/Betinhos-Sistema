@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Button, StatusBadge, useToast } from '@betinhos/ui'
 import { Check, ExternalLink, Mic, Paperclip, Pencil, Plus, X } from 'lucide-react'
-import { formatDay } from '../../../app/format'
+import { formatDay } from '../../../../app/format'
 import { reasonText, type Source } from '../data/source'
 import { STATUS, autorDoPerfil, statusLabel, statusTone } from '../domain/choices'
 import { ehAudio } from '../domain/anexos'

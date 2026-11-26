@@ -1,5 +1,5 @@
 import { StatusBadge } from '@betinhos/ui'
-import { formatDay } from '../../../app/format'
+import { formatDay } from '../../../../app/format'
 import type { Source } from '../data/source'
 import { autorLabel } from '../domain/choices'
 import { ehAudio } from '../domain/anexos'
