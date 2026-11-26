@@ -7,7 +7,8 @@ namespace Betinhos.DriverRecordSharing
     public enum DriverNoticeKind
     {
         Novo = 100000000,
-        Retirado = 100000001
+        Retirado = 100000001,
+        Cancelado = 100000002
     }
 
     public sealed class PlannedDriverNotice
@@ -54,27 +55,50 @@ namespace Betinhos.DriverRecordSharing
             }
         }
 
-        public static IReadOnlyList<PlannedDriverNotice> Plan(Entity target, Entity pre)
+        /// <param name="isCanceledEmployee">
+        /// Diz se o motorista é o funcionário "Cancelado" (a operação cancela trocando o motorista por ele). Só é
+        /// chamado quando a resposta decide algum aviso. Esse funcionário nunca recebe aviso.
+        /// </param>
+        public static IReadOnlyList<PlannedDriverNotice> Plan(Entity target, Entity pre, Func<EntityReference, bool> isCanceledEmployee)
         {
             var notices = new List<PlannedDriverNotice>();
             var driverChanged = DriverChanged(target, pre);
             var previousDriver = pre?.GetAttributeValue<EntityReference>(PluginConfig.ServiceDriverLookup);
             var previousStatus = pre?.GetAttributeValue<OptionSetValue>(PluginConfig.ServiceStatus)?.Value;
             var finalDriver = Final<EntityReference>(target, pre, PluginConfig.ServiceDriverLookup);
+            var finalStatus = FinalStatus(target, pre);
 
-            if (FinalStatus(target, pre) == PluginConfig.ServiceStatusProgrammed &&
+            if (finalStatus == PluginConfig.ServiceStatusProgrammed &&
                 finalDriver != null &&
-                (driverChanged || previousStatus != PluginConfig.ServiceStatusProgrammed))
+                (driverChanged || previousStatus != PluginConfig.ServiceStatusProgrammed) &&
+                !isCanceledEmployee(finalDriver))
             {
                 notices.Add(new PlannedDriverNotice(DriverNoticeKind.Novo, finalDriver));
             }
 
-            if (driverChanged && previousDriver != null && previousStatus == PluginConfig.ServiceStatusProgrammed)
+            // Serviço programado que deixa de existir para o motorista anterior: cancelado pelo status ou pela troca
+            // para o funcionário "Cancelado", em qualquer ordem. Cancelado com ressalvas fica de fora (decisão do Renan).
+            if (previousDriver != null &&
+                previousStatus == PluginConfig.ServiceStatusProgrammed &&
+                (driverChanged || finalStatus == PluginConfig.ServiceStatusCanceled) &&
+                !isCanceledEmployee(previousDriver))
             {
-                notices.Add(new PlannedDriverNotice(DriverNoticeKind.Retirado, previousDriver));
+                if (finalStatus == PluginConfig.ServiceStatusCanceled || (finalDriver != null && isCanceledEmployee(finalDriver)))
+                {
+                    notices.Add(new PlannedDriverNotice(DriverNoticeKind.Cancelado, previousDriver));
+                }
+                else
+                {
+                    notices.Add(new PlannedDriverNotice(DriverNoticeKind.Retirado, previousDriver));
+                }
             }
 
             return notices;
+        }
+
+        public static bool IsCanceledEmployeeName(string fullName)
+        {
+            return string.Equals(fullName?.Trim(), PluginConfig.EmployeeCanceledName, StringComparison.Ordinal);
         }
 
         /// <summary>Prazo para o motorista visualizar: saída em menos de 2 h (ou já passada) vence agora.</summary>
