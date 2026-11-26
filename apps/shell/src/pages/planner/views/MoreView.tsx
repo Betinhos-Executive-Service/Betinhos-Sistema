@@ -1,7 +1,7 @@
 // Porte de Tela Planner/src/App.jsx (sem mudança de comportamento).
 import PageHeader from '../components/PageHeader'
 import { canViewManagement } from '../domain/management'
-import { ChevronRight, Lightbulb, Settings, Target, Users } from 'lucide-react'
+import { ChevronRight, FolderKanban, Lightbulb, Settings, Target } from 'lucide-react'
 
 
 export function MoreView({ onNavigate, canViewManagement = false }: any) {
@@ -44,20 +44,6 @@ export function MoreView({ onNavigate, canViewManagement = false }: any) {
         <button
           className="panel more-action"
           type="button"
-          onClick={() => onNavigate("contacts")}
-        >
-          <span className="more-action-icon more-action-icon-contact">
-            <Users size={19} />
-          </span>
-          <span>
-            <strong>Contatos</strong>
-            <small>Casos recebidos e responsáveis</small>
-          </span>
-          <ChevronRight size={17} />
-        </button>
-        <button
-          className="panel more-action"
-          type="button"
           onClick={() => onNavigate("settings")}
         >
           <span className="more-action-icon">
@@ -66,6 +52,20 @@ export function MoreView({ onNavigate, canViewManagement = false }: any) {
           <span>
             <strong>Configurações</strong>
             <small>Dados, recarregamento e versão</small>
+          </span>
+          <ChevronRight size={17} />
+        </button>
+        <button
+          className="panel more-action"
+          type="button"
+          onClick={() => onNavigate("projects")}
+        >
+          <span className="more-action-icon more-action-icon-projects">
+            <FolderKanban size={19} />
+          </span>
+          <span>
+            <strong>Projetos</strong>
+            <small>Ideias de software, do rascunho ao ar</small>
           </span>
           <ChevronRight size={17} />
         </button>
