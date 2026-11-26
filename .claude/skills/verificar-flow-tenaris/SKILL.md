@@ -1,6 +1,6 @@
 ---
 name: verificar-flow-tenaris
-description: "Verifica os patches do 'Flow Novo Sistema Tenaris -> Dataverse': contatos do passageiro sem apagar (patch-flow-tenaris-contatos.ps1) e lote com pessoas do script, falha por serviço, vínculos por diferença e status por envio (patch-flow-tenaris-lote.mjs, par SyncTenaris v3.9 + MarcarStatusSync v5.6). Use após mudar um deles, os scripts do Excel, ou antes de levar ao PROD."
+description: "Verifica os patches do 'Flow Novo Sistema Tenaris -> Dataverse': contatos do passageiro sem apagar (patch-flow-tenaris-contatos.ps1) e lote com pessoas do script, falha por serviço, vínculos por diferença e status por envio (patch-flow-tenaris-lote.mjs, par SyncTenaris v3.9 + MarcarStatusSync v5.6) e Cancelado que passa pela proteção do status (patch-flow-tenaris-cancelado.mjs). Use após mudar um deles, os scripts do Excel, ou antes de levar ao PROD."
 ---
 # Verificar flow Tenaris (contatos do passageiro e lote)
 
@@ -63,3 +63,10 @@ description: "Verifica os patches do 'Flow Novo Sistema Tenaris -> Dataverse': c
 2. `SyncTenaris_v3.9` no Excel, mantendo o `URL_FLOW` do v3.6: o flow atual ignora `pessoas`/`versao` (gatilho sem validação de schema) e segue montando as pessoas.
 3. Patch do flow: `node packages/deploy/patch-flow-tenaris-lote.mjs --ambiente PROD --apply --confirmar-prod` (só com autorização explícita). Daqui em diante um v3.6 que sobrar recebe "SyncTenaris antigo" no painel e nada é gravado.
 - Prova: no próximo sync, linha do `_historico_sync` fechada pelo `executadoEm` (diag do `Run_script` começa com `v5.6`), `pessoas` no corpo do gatilho, nenhum `Delete_a_row` em serviço sem troca de passageiro. Com falha num serviço: e-mail de aviso, painel "Concluído" com a contagem e o ID na aba oculta `_pendentes_sync`; o próximo sync o reenvia ("só por pendência" no log).
+
+## Cancelado passa pela proteção (`patch-flow-tenaris-cancelado.mjs`, 26/11/2026)
+- O que faz: troca só `item/cr40f_status` do `Upsert_Geral`. Com `cr40f_status` em `new_camposprotegidos`, o Cancelado (202410002) vai mesmo assim; os outros status regravam o atual. Quem decide é o `Cr40f.Protecao.Plugin`: aberto vira Requer Análise (100000001), fechado (Concluído, Requer Análise, Cancelado, Cancelado com ressalvas) continua barrado. Spec: `docs/features/tenaris-cancelado-requer-analise/spec.md`.
+- Testes: `node --test packages/deploy/patch-flow-tenaris-cancelado.test.mjs` (usa a fixture do lote com a expressão real injetada; formatos antigo e pós-lote).
+- Simulação: `node packages/deploy/patch-flow-tenaris-cancelado.mjs --ambiente DEV` → `status do Upsert_Geral: original` e `DRY RUN`, ou `Já aplicado`. Expressão fora do formato → recusa sem gravar (o flow mudou à mão: compare antes de forçar).
+- Aplicar: `--apply` (backup em `packages/deploy/flows/backup/`, mantém o statecode); voltar: `--apply --restaurar <backup.json>`. Aplicado no DEV em 26/11/2026 15:02; o PROD recebe pelas soluções (BetinhosAutomacao), sem rodar o script lá.
+- Prova ponta a ponta sem rodar o flow (o `Run_script` grava na planilha real): numa OS de teste Programada com `new_camposprotegidos` contendo `cr40f_status` e um motorista, PATCH com `cr40f_status = 202410002` e `new_snapshotsharepoint` igual ao atual → status Requer Análise, aviso Cancelado ao motorista (`verificar-push-motorista`, item 6e) e o "Flow Notificação Novo 'Requer Análise' | Interno" acionado (rascunho no DEV: confira só que o gatilho bate).
