@@ -182,4 +182,70 @@ describe('Projetos no Planner: detalhe do cartão', () => {
     await waitFor(() => expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_status: 100000003 }))
     expect(screen.queryByRole('radio', { name: 'Gestor' })).toBeNull()
   })
+
+  it('soltar em Pausado pede o motivo (opcional), grava junto e mostra no cartão', async () => {
+    const updateEtapa = vi.fn(async () => undefined)
+    stubSource(() => ({ updateEtapa }))
+    render(<ProjectsView host={{ mode: 'mock' }} />)
+    const cartao = (await screen.findByRole('button', { name: nomeDe('PRJ-1') })).closest('article')!
+    const dataTransfer = { setData: () => undefined, effectAllowed: '' }
+    const pausado = screen.getByRole('region', { name: 'Pausado' })
+    fireEvent.dragStart(cartao, { dataTransfer }); fireEvent.dragOver(pausado, { dataTransfer }); fireEvent.drop(pausado, { dataTransfer })
+    let dialogo = await screen.findByRole('dialog', { name: `Pausar “${nomeDe('PRJ-1')}”` })
+    fireEvent(dialogo, new Event('cancel', { cancelable: true }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^Pausar/ })).toBeNull())
+    expect(updateEtapa).not.toHaveBeenCalled()
+    fireEvent.dragStart(cartao, { dataTransfer }); fireEvent.dragOver(pausado, { dataTransfer }); fireEvent.drop(pausado, { dataTransfer })
+    dialogo = await screen.findByRole('dialog', { name: /^Pausar/ })
+    fireEvent.change(within(dialogo).getByRole('textbox'), { target: { value: ' Esperando o cliente ' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Pausar' }))
+    await waitFor(() => expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_status: 100000004, cr40f_motivopausa: 'Esperando o cliente' }))
+    expect(await within(screen.getByRole('region', { name: 'Pausado' })).findByText('Esperando o cliente')).toBeTruthy()
+  })
+
+  it('sair de Pausado limpa o motivo', async () => {
+    const updateEtapa = vi.fn(async () => undefined)
+    stubSource(() => ({ updateEtapa }))
+    render(<ProjectsView host={{ mode: 'mock' }} />)
+    const cartao = (await screen.findByRole('button', { name: nomeDe('PRJ-5') })).closest('article')!
+    expect(within(cartao).getByText(/Esperando o financeiro/)).toBeTruthy()
+    const dataTransfer = { setData: () => undefined, effectAllowed: '' }
+    const ideia = screen.getByRole('region', { name: 'Ideia' })
+    fireEvent.dragStart(cartao, { dataTransfer }); fireEvent.dragOver(ideia, { dataTransfer }); fireEvent.drop(ideia, { dataTransfer })
+    await waitFor(() => expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_status: 100000000, cr40f_motivopausa: null }))
+  })
+
+  it('filtro por tag mostra só os cartões da tag', async () => {
+    render(<ProjectsView host={{ mode: 'mock' }} />)
+    await screen.findByRole('button', { name: nomeDe('PRJ-1') })
+    fireEvent.click(within(screen.getByRole('group', { name: 'Filtrar por tag' })).getByRole('button', { name: 'Frota' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: nomeDe('PRJ-1') })).toBeNull())
+    expect(screen.getByRole('button', { name: nomeDe('PRJ-2') })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Todas' }))
+    expect(await screen.findByRole('button', { name: nomeDe('PRJ-1') })).toBeTruthy()
+  })
+
+  it('detalhe grava prazo (semana) e tags só com as colunas mudadas', async () => {
+    const updateProjeto = vi.fn(async () => undefined)
+    stubSource(() => ({ updateProjeto }))
+    const p = await abrir('PRJ-4')
+    fireEvent.click(within(p).getByRole('tab', { name: 'Semana' }))
+    fireEvent.click(within(p).getByRole('button', { name: /Semana 3/ }))
+    const tag = within(p).getByRole('textbox', { name: 'Nova tag' })
+    fireEvent.change(tag, { target: { value: 'Relatórios' } }); fireEvent.keyDown(tag, { key: 'Enter' })
+    fireEvent.focus(tag); fireEvent.click(within(within(p).getByRole('group', { name: 'Tags já usadas' })).getByRole('button', { name: '+ Frota' }))
+    fireEvent.click(within(p).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_tags: 'Relatórios, Frota', cr40f_prazo: '2026-12-20', cr40f_prazotipo: 100000001 }))
+  })
+
+  it('tag digitada sem Enter pede descartar ao fechar e entra no Salvar', async () => {
+    const updateProjeto = vi.fn(async () => undefined)
+    stubSource(() => ({ updateProjeto }))
+    const p = await abrir('PRJ-4')
+    fireEvent.change(within(p).getByRole('textbox', { name: 'Nova tag' }), { target: { value: 'Urgente' } })
+    fireEvent.click(within(p).getByRole('button', { name: 'Fechar painel' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Continuar editando' }))
+    fireEvent.click(within(await painel('PRJ-4')).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_tags: 'Urgente' }))
+  })
 })

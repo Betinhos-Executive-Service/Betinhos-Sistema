@@ -9,16 +9,16 @@ const xid = (n: number) => `dddddddd-0000-4000-8000-${String(n).padStart(12, '0'
 /** Projetos de exemplo, genéricos e fictícios. */
 export function createMockProjetos(): Projeto[] {
   return [
-    { id: pid(1), codigo: 'PRJ-1', nome: 'Painel de indicadores', briefing: 'Quero ver num lugar só os números do mês: serviços feitos, cancelados e o faturamento por cliente.', checklist: [{ texto: 'Serviços feitos e cancelados', feito: true }, { texto: 'Faturamento por cliente', feito: true }, { texto: 'Filtro por período', feito: false }] },
-    { id: pid(2), codigo: 'PRJ-2', nome: 'Cadastro de documentos', briefing: 'Guardar os documentos de cada veículo com a data de vencimento.', checklist: [{ texto: 'Tela de cadastro', feito: true }, { texto: 'Alerta de vencimento', feito: false }] },
-    { id: pid(3), codigo: 'PRJ-3', nome: 'Aviso de vencimento', briefing: 'O aviso chega por e-mail 30 dias antes do vencimento.', checklist: [] },
-    { id: pid(4), codigo: 'PRJ-4', nome: 'Relatório mensal automático', briefing: 'Gravei um áudio explicando o relatório que preciso.', checklist: [] },
-    { id: pid(5), codigo: 'PRJ-5', nome: 'Revisão do fluxo de aprovação', briefing: '', checklist: [{ texto: 'Definir quem aprova cada valor', feito: false }] },
+    { id: pid(1), codigo: 'PRJ-1', nome: 'Painel de indicadores', briefing: 'Quero ver num lugar só os números do mês: serviços feitos, cancelados e o faturamento por cliente.', checklist: [{ texto: 'Serviços feitos e cancelados', feito: true }, { texto: 'Faturamento por cliente', feito: true }, { texto: 'Filtro por período', feito: false }], tags: ['Financeiro', 'Dashboard'], prazo: { tipo: 'semana', fim: '2026-12-06' } },
+    { id: pid(2), codigo: 'PRJ-2', nome: 'Cadastro de documentos', briefing: 'Guardar os documentos de cada veículo com a data de vencimento.', checklist: [{ texto: 'Tela de cadastro', feito: true }, { texto: 'Alerta de vencimento', feito: false }], tags: ['Frota'], prazo: { tipo: 'dia', fim: '2026-11-27' } },
+    { id: pid(3), codigo: 'PRJ-3', nome: 'Aviso de vencimento', briefing: 'O aviso chega por e-mail 30 dias antes do vencimento.', checklist: [], tags: ['Frota', 'E-mail'], prazo: { tipo: 'mes', fim: '2026-11-30' } },
+    { id: pid(4), codigo: 'PRJ-4', nome: 'Relatório mensal automático', briefing: 'Gravei um áudio explicando o relatório que preciso.', checklist: [], tags: [], prazo: { tipo: 'mes', fim: '2026-12-31' } },
+    { id: pid(5), codigo: 'PRJ-5', nome: 'Revisão do fluxo de aprovação', briefing: '', checklist: [{ texto: 'Definir quem aprova cada valor', feito: false }], tags: ['Financeiro'], prazo: { tipo: 'dia', fim: '2026-11-20' } },
   ]
 }
 
 const etapa = (projeto: number, nome: string, status: number, over: Partial<Etapa> = {}): Etapa => ({
-  id: eid(projeto), projetoId: pid(projeto), numero: 1, codigo: `PRJ-${projeto}.1`, nome, status, prazo: null, andamento: 0, linkPr: '', publicadoProd: null, ...over,
+  id: eid(projeto), projetoId: pid(projeto), numero: 1, codigo: `PRJ-${projeto}.1`, nome, status, prazo: null, andamento: 0, linkPr: '', publicadoProd: null, motivoPausa: '', ...over,
 })
 
 /** Etapa única (`PRJ-n.1`) de cada projeto de exemplo; o PRJ-4 fica sem etapa (só o briefing). */
@@ -27,7 +27,7 @@ export function createMockEtapas(): Etapa[] {
     etapa(1, 'Conferir os valores com o relatório de outubro', STATUS.validacao, { prazo: '2026-12-10', andamento: 90, linkPr: 'https://github.com/exemplo/sistema/pull/101' }),
     etapa(2, 'Tela de cadastro e alerta de vencimento', STATUS.andamento, { prazo: '2026-12-20', andamento: 55, linkPr: 'https://github.com/exemplo/sistema/pull/102' }),
     etapa(3, '', STATUS.concluida, { prazo: '2026-11-15', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/99', publicadoProd: '2026-11-16T09:10:00' }),
-    etapa(5, 'Definir quem aprova cada valor', STATUS.pausada, { prazo: '2026-10-30', andamento: 30 }),
+    etapa(5, 'Definir quem aprova cada valor', STATUS.pausada, { prazo: '2026-10-30', andamento: 30, motivoPausa: 'Esperando o financeiro definir os limites de aprovação.' }),
   ]
 }
 

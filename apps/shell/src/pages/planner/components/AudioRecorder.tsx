@@ -1,4 +1,4 @@
-// Gravador de áudio da Nova ideia: um toque grava, outro para; cada gravação vira um anexo.
+// Gravador de áudio (Nova ideia e detalhe do projeto): um toque grava, outro para; cada gravação vira um anexo.
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square } from "lucide-react";
 
@@ -20,9 +20,10 @@ function errorMessage(reason: unknown): string {
   return "Não foi possível gravar. Anexe um arquivo de áudio.";
 }
 
-type Props = { onRecorded: (file: File) => void; onError: (message: string) => void; disabled?: boolean };
+/** `compact`: só um botão (Gravar áudio / Gravando 00:18 de 03:00), para caber no título da seção. */
+type Props = { onRecorded: (file: File) => void; onError: (message: string) => void; disabled?: boolean; compact?: boolean };
 
-export function AudioRecorder({ onRecorded, onError, disabled }: Props) {
+export function AudioRecorder({ onRecorded, onError, disabled, compact }: Props) {
   const [phase, setPhase] = useState<"idle" | "asking" | "recording">("idle");
   const [seconds, setSeconds] = useState(0);
   const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0));
@@ -112,6 +113,15 @@ export function AudioRecorder({ onRecorded, onError, disabled }: Props) {
   }
 
   const recording = phase === "recording";
+  if (compact) {
+    return (
+      <button type="button" className={`pj-acao${recording ? " is-gravando" : ""}`} onClick={recording ? stop : () => void start()}
+        disabled={disabled || phase === "asking"} aria-label={recording ? "Parar gravação" : "Gravar áudio"} aria-pressed={recording}>
+        {recording ? <Square size={14} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
+        <span aria-live="polite">{recording ? `Gravando ${mmss(seconds)} de ${mmss(MAX_RECORDING_SECONDS)}` : phase === "asking" ? "Liberando o microfone..." : "Gravar áudio"}</span>
+      </button>
+    );
+  }
   return (
     <div className={`projects-recorder${recording ? " is-recording" : ""}`}>
       <button

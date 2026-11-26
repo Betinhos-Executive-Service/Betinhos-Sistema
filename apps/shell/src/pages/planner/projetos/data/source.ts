@@ -3,6 +3,8 @@ import type { Host } from '../../../../host'
 import { latenciaMock } from '../../../../app/latenciaMock'
 import { STATUS } from '../domain/choices'
 import { lerChecklist } from '../domain/checklist'
+import { lerPrazo } from '../domain/prazo'
+import { lerTags } from '../domain/tags'
 import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from '../domain/types'
 import { createMockArquivos, createMockAtualizacoes, createMockEtapas, createMockProjetos } from './mock'
 import {
@@ -74,7 +76,8 @@ function createMockSource(): Source {
     },
     async createProjeto(c) {
       await wait(400)
-      const p: Projeto = { id: next('bbbbbbbb'), codigo: `PRJ-${++codigo}`, nome: s(c.cr40f_name), briefing: s(c.cr40f_briefing), checklist: lerChecklist(c.cr40f_checklist) }
+      const p: Projeto = { id: next('bbbbbbbb'), codigo: `PRJ-${++codigo}`, nome: s(c.cr40f_name), briefing: s(c.cr40f_briefing), checklist: lerChecklist(c.cr40f_checklist),
+        tags: lerTags(c.cr40f_tags), prazo: lerPrazo(c.cr40f_prazo, c.cr40f_prazotipo) }
       projetos = [...projetos, p]
       return { id: p.id, codigo: p.codigo }
     },
@@ -86,7 +89,7 @@ function createMockSource(): Source {
       const e: Etapa = {
         id: next('eeeeeeee'), projetoId: cleanId(nova.projetoId), numero: nova.numero, codigo: nova.codigo, nome: s(c.cr40f_name),
         status: Number(c.cr40f_status ?? STATUS.ideia), prazo: s(c.cr40f_prazo) || null,
-        andamento: Number(c.cr40f_andamento ?? 0), linkPr: s(c.cr40f_linkpr), publicadoProd: null,
+        andamento: Number(c.cr40f_andamento ?? 0), linkPr: s(c.cr40f_linkpr), publicadoProd: null, motivoPausa: s(c.cr40f_motivopausa),
       }
       etapas = [...etapas, e]
       return e.id
