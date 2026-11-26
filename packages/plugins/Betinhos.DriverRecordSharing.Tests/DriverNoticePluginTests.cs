@@ -47,7 +47,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             driverB = system.Add(Employee, "cr40f_emailmicrosoft", "b@betinhos.test");
             driverSemEmail = system.Add(Employee);
             // Espaços em volta: a regra compara o nome depois do Trim.
-            funcionarioCancelado = system.Add(Employee, "cr40f_nomecompleto", " Cancelado ");
+            funcionarioCancelado = system.Add(Employee, "cr40f_nomecompleto", " CANCELADO ");
         }
 
         // ---------- Pré-operação: a regra do Renan ----------
@@ -276,8 +276,10 @@ namespace Betinhos.DriverRecordSharing.Tests
         [Fact]
         public void MudancaSemAvisoPossivelNaoConsultaOFuncionario()
         {
-            RunPost(Target(Status, new OptionSetValue(Confirmado)), Pre(driverA, Solicitado));
+            // Programado(A) -> Confirmado com o mesmo motorista passa pelas condições, mas não gera aviso.
+            RunPost(Target(Status, new OptionSetValue(Confirmado)), Pre(driverA, Programado));
 
+            Assert.Empty(Notices());
             Assert.Equal(0, system.Retrieves);
         }
 

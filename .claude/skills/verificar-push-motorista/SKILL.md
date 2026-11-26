@@ -1,6 +1,6 @@
 ---
 name: verificar-push-motorista
-description: "Verifica os avisos push ao motorista (Web Push primeiro, Power Apps Notification V2 só de reserva) nos flows Push Checklist, Push Comunicados, Termo de multa, Push Treinamentos e Aviso Motorista | Enviar. Use após mudar flows/checklist-push.json, comunicados-push.json, termo-multa-push.json, treinamentos-push.json, provision-flow-aviso-motorista.ps1, flows/sincronizar-flow.ps1 ou o Worker web-push."
+description: "Verifica os avisos push ao motorista (Web Push primeiro, Power Apps Notification V2 só de reserva) nos flows Push Checklist, Push Comunicados, Termo de multa, Push Treinamentos e Aviso Motorista | Enviar. Use após mudar flows/checklist-push.json, comunicados-push.json, termo-multa-push.json, treinamentos-push.json, provision-flow-aviso-motorista.ps1, DriverNoticeRules.cs/DriverNoticePlugin.cs, flows/sincronizar-flow.ps1 ou o Worker web-push."
 ---
 # Verificar push ao motorista (Web Push primeiro)
 
@@ -19,7 +19,8 @@ description: "Verifica os avisos push ao motorista (Web Push primeiro, Power App
 3. Motorista SEM inscrição: `Web_Push_Send_push` Succeeded sem Worker, `Fallback_V2` roda `Send_push` (V2), registro em Enviado, push abre o model-driven.
 4. Inscrição inválida (endpoint 404/410): inscrição apagada pelo escopo e V2 roda de reserva.
 5. Falha do V2 depois de web push não entregue: registro em Falhou com a mensagem do erro.
-6. Conferir que o estado ligado/desligado dos flows ficou como antes.
+6. Aviso Motorista, tipos (`new_tipo`: Novo 100000000, Retirado 100000001, Cancelado 100000002): numa OS de teste Programada, (a) mudar só o status para Cancelado gera um aviso Cancelado ("Serviço cancelado", abre `?agenda=1`); (b) trocar o motorista para o funcionário "Cancelado" (nome, sem diferenciar maiúsculas; só existe no PROD, no DEV crie um de teste) gera Cancelado e o status depois não gera outro; (c) trocar para outro motorista gera Retirado ao anterior e Novo ao novo; (d) Cancelado com ressalvas não gera nada. Regras em `DriverNoticeRules.Plan`, testes em `DriverNoticePluginTests` (`dotnet test packages/plugins/Betinhos.DriverRecordSharing.Tests -p:SignAssembly=false --filter FullyQualifiedName~DriverNotice`).
+7. Conferir que o estado ligado/desligado dos flows ficou como antes.
 
 ## Cuidados
 - O Worker é chamado por conector; o segredo fica na conexão, nunca no flow.

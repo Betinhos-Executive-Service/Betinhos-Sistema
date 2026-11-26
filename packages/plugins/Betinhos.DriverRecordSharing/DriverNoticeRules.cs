@@ -55,10 +55,7 @@ namespace Betinhos.DriverRecordSharing
             }
         }
 
-        /// <param name="isCanceledEmployee">
-        /// Diz se o motorista é o funcionário "Cancelado" (a operação cancela trocando o motorista por ele). Só é
-        /// chamado quando a resposta decide algum aviso. Esse funcionário nunca recebe aviso.
-        /// </param>
+        /// <param name="isCanceledEmployee">Só é chamado quando a resposta decide algum aviso (cada chamada é um Retrieve).</param>
         public static IReadOnlyList<PlannedDriverNotice> Plan(Entity target, Entity pre, Func<EntityReference, bool> isCanceledEmployee)
         {
             var notices = new List<PlannedDriverNotice>();
@@ -83,14 +80,8 @@ namespace Betinhos.DriverRecordSharing
                 (driverChanged || finalStatus == PluginConfig.ServiceStatusCanceled) &&
                 !isCanceledEmployee(previousDriver))
             {
-                if (finalStatus == PluginConfig.ServiceStatusCanceled || (finalDriver != null && isCanceledEmployee(finalDriver)))
-                {
-                    notices.Add(new PlannedDriverNotice(DriverNoticeKind.Cancelado, previousDriver));
-                }
-                else
-                {
-                    notices.Add(new PlannedDriverNotice(DriverNoticeKind.Retirado, previousDriver));
-                }
+                var canceled = finalStatus == PluginConfig.ServiceStatusCanceled || (finalDriver != null && isCanceledEmployee(finalDriver));
+                notices.Add(new PlannedDriverNotice(canceled ? DriverNoticeKind.Cancelado : DriverNoticeKind.Retirado, previousDriver));
             }
 
             return notices;
@@ -98,7 +89,7 @@ namespace Betinhos.DriverRecordSharing
 
         public static bool IsCanceledEmployeeName(string fullName)
         {
-            return string.Equals(fullName?.Trim(), PluginConfig.EmployeeCanceledName, StringComparison.Ordinal);
+            return string.Equals(fullName?.Trim(), PluginConfig.EmployeeCanceledName, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Prazo para o motorista visualizar: saída em menos de 2 h (ou já passada) vence agora.</summary>

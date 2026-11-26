@@ -1,13 +1,13 @@
 # Aviso ao motorista de serviço cancelado
 
 - Nível: 2 (schema: opção nova em choice; plugin; flow)
-- Etapa: 5 de 7 Construir
-- Próximo passo: tarefas 1–3 · sozinho
+- Etapa: 7 de 7 Entregar
+- Próximo passo: QA e merge do PR na develop; depois a tarefa 4 (prova no DEV) · com você
 - Branch e PR: t3/notificacao-cancelamento-servico-motoristas · ainda não
 - Protótipo: sem protótipo (só texto de push)
 - Go: 26/11/2026 13:24 por Renan (card)
 - PROD: ainda não
-- Atualizado: 26/11/2026 13:24
+- Atualizado: 26/11/2026 13:38
 
 ## Diagnóstico (PROD, leitura, 26/11/2026)
 - Romildo relatou que não recebe aviso de serviço cancelado.
@@ -28,13 +28,17 @@
 ## Tarefas e provas
 | # | Tarefa | Depende de | Cenário (ação → resultado) | Prova | Nível | Resultado |
 |---|---|---|---|---|---|---|
-| 1 | Migration: opção Cancelado 100000002 em new_avisomotorista.new_tipo | — | Deploy aplica no DEV → opção existe | dry-run local + metadata DEV após merge | Opus | pendente |
-| 2 | Plugin: regras e testes (DriverNoticeRules/Plugin/Writer, PluginConfig) | 1 | cenários 1–6 | dotnet test (casos novos) | Opus | pendente |
-| 3 | Flow Enviar: título/corpo/link do Cancelado + doc da virada | 1 | cenário 7 | teste do gerador do flow + DEV após merge | Opus | pendente |
+| 1 | Migration: opção Cancelado 100000002 em new_avisomotorista.new_tipo | — | Deploy aplica no DEV → opção existe | dry-run local + metadata DEV após merge | Opus | feito; metadata no DEV pendente do Deploy |
+| 2 | Plugin: regras e testes (DriverNoticeRules/Plugin/Writer, PluginConfig) | 1 | cenários 1–6 | dotnet test (casos novos) | Opus | feito: 978/978 no projeto de testes |
+| 3 | Flow Enviar: título/corpo/link do Cancelado + doc da virada | 1 | cenário 7 | teste do gerador do flow + DEV após merge | Opus | feito: node --test 26/26; DEV pendente |
 | 4 | Prova no DEV após merge | 1–3 | cenários 1, 5, 7 numa OS de teste | registros new_avisomotorista + execução do flow | — | pendente |
 
 ## Pendências e fora de escopo
--
+- Se a migration falhar no Deploy do DEV e o plugin publicar, todo cancelamento de serviço Programado falha no save (valor fora do choice). Conferir a opção no DEV logo após o Deploy.
+- Programado(P) → motorista limpo → status Cancelado gera Retirado (não Cancelado). Fora da spec; confirmar se a operação cancela limpando o motorista.
+- Funcionário "Cancelado" reconhecido pelo nome (decisão do Renan); renomear o registro no PROD desliga a regra. Alternativa futura: coluna "não é pessoa" em cr40f_funcionarios.
+- Otimização não feita: o Retrieve do nome e o do e-mail (HasApp) do mesmo funcionário poderiam ser um só.
 
 ## Retro
--
+- Revisão Opus pegou: comparação do nome sensível a maiúsculas e teste que não provava a avaliação preguiçosa; corrigidos.
+- Armadilha: diff contra origin/develop com dois pontos mostra outros PRs; use três pontos.
