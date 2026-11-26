@@ -33,7 +33,11 @@
 | 3 | Flow Enviar: título/corpo/link do Cancelado + doc da virada | 1 | cenário 7 | teste do gerador do flow + DEV após merge | Opus | feito: node --test 26/26; DEV pendente |
 | 4 | Prova no DEV após merge | 1–3 | cenários 1, 5, 7 numa OS de teste | registros new_avisomotorista + execução do flow | — | pendente |
 
+## Provas avulsas
+- 26/11/2026 14:34, DEV: aviso de teste (Retirado, OS-1733) ao Renan sem inscrição Web Push → flow Enviar foi pelo V2 (202) → chegou no Power Apps (confirmado pelo Renan). Com a inscrição antiga de 03/11, o FCM aceitou (201), o V2 foi pulado e nada apareceu.
+
 ## Pendências e fora de escopo
+- Decisão pendente do Renan ("a prioridade é o power apps"): hoje o Web Push aceito pula o V2. PROD está sem inscrições (26/11), então não afeta agora.
 - Se a migration falhar no Deploy do DEV e o plugin publicar, todo cancelamento de serviço Programado falha no save (valor fora do choice). Conferir a opção no DEV logo após o Deploy.
 - Programado(P) → motorista limpo → status Cancelado gera Retirado (não Cancelado). Fora da spec; confirmar se a operação cancela limpando o motorista.
 - Funcionário "Cancelado" reconhecido pelo nome (decisão do Renan); renomear o registro no PROD desliga a regra. Alternativa futura: coluna "não é pessoa" em cr40f_funcionarios.
