@@ -2,7 +2,7 @@
 
 - Nível: 2 (plugin de proteção, plugin do aviso, flow Tenaris e flow do aviso)
 - Etapa: 5 de 7 Construir
-- Próximo passo: tarefa 1 (ProtecaoCampos) · sozinho
+- Próximo passo: tarefa 4 (patch do flow Tenaris) · sozinho
 - Branch e PR: feat/tenaris-cancelado-requer-analise · ainda não
 - Protótipo: sem protótipo
 - Go: 26/11/2026 14:57 por Renan (card)
@@ -21,9 +21,9 @@
 ## Tarefas e provas
 | # | Tarefa | Depende de | Cenário (ação → resultado) | Prova | Nível | Resultado |
 |---|---|---|---|---|---|---|
-| 1 | `ProtecaoCampos`: Cancelado (202410002) da sincronização com status protegido aberto vira Requer Análise (100000001); fechado continua barrado | — | 1, 2, 3 | testes xUnit do `Cr40f.Protecao.Plugin` | Opus | |
-| 2 | `DriverNoticeRules`: Programado → Requer Análise com snapshot no Target gera aviso Cancelado ao motorista; sem snapshot, nada | — | 4, 5 | testes xUnit do DriverRecordSharing | Opus | |
-| 3 | Flow Aviso Enviar: corpo genérico do Cancelado | — | 6 | teste do provision + Deploy no DEV | Sonnet | |
+| 1 | `ProtecaoCampos`: Cancelado (202410002) da sincronização com status protegido aberto vira Requer Análise (100000001); fechado continua barrado | — | 1, 2, 3 | testes xUnit do `Cr40f.Protecao.Plugin` | Opus | 23 testes passando |
+| 2 | `DriverNoticeRules`: Programado → Requer Análise com snapshot no Target gera aviso Cancelado ao motorista; sem snapshot, nada | — | 4, 5 | testes xUnit do DriverRecordSharing | Opus | 981 testes passando |
+| 3 | Flow Aviso Enviar: corpo genérico do Cancelado | — | 6 | teste do provision + Deploy no DEV | Sonnet | teste do provision 26/26; Deploy pendente |
 | 4 | Flow Tenaris: `Upsert_Geral` deixa o Cancelado passar com o status protegido (`patch-flow-tenaris-cancelado.mjs`, simulação, `--apply` no DEV, backup) | 1 | 1 | teste node + simulação e aplicação no DEV (rascunho) | Sonnet | |
 | 5 | Prova no DEV: OS de teste Programada protegida + Update com snapshot e Cancelado → Requer Análise, aviso Cancelado ao motorista, e-mail da gestão | 1–4 e Deploy | 1, 4, 6 | registro, aviso Enviado, execução do flow Requer Análise | — | |
 
