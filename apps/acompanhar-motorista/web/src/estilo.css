@@ -241,7 +241,6 @@ a,button,[role=button],label,summary,input,textarea{-webkit-tap-highlight-color:
 .idioma-seg .idioma-op{min-height:30px;padding:0 11px;font-size:12px;font-weight:800;color:#c4d2ea;background:transparent}
 .idioma-seg .idioma-op[aria-pressed="true"]{background:var(--bt-color-surface);color:var(--bt-color-brand)}
 .boasvindas{margin:0 0 18px;font-size:22px;line-height:28px;font-weight:800;color:var(--bt-color-gold)}
-.reserva{margin:0 0 12px;font-size:13px;line-height:18px;font-weight:600;color:#c4d2ea}
 .titulo-linha{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .faixa h1{margin:0;font-size:28px;line-height:34px;font-weight:800;letter-spacing:-.01em;overflow-wrap:anywhere}
 .faixa .esqueleto{background:rgba(255,255,255,.18)!important;width:60%;min-height:34px}
@@ -257,9 +256,17 @@ a,button,[role=button],label,summary,input,textarea{-webkit-tap-highlight-color:
 .frase{margin:20px 0 0;font-size:15px;line-height:22px;font-weight:500;color:#dbe5f5}
 .frase:empty{display:none}
 .corpo{position:relative;z-index:1;display:flex;flex-direction:column;gap:16px;max-width:592px;margin:-36px auto 0;padding:0 16px calc(24px + env(safe-area-inset-bottom))}
-.corpo>.card,.corpo>.avaliacao{animation:entra 320ms var(--bt-ease-quint) backwards}
+/* Celular: as colunas do desktop somem e o order monta a sequência de uma coluna (topo, motorista, mapa, viagem, resto): quem vem buscar importa mais que o mapa. */
+.corpo:not(.duas)>.col{display:contents}
+.corpo:not(.duas) .col>*{order:4}
+.corpo:not(.duas) .col>:is(.avaliacao,.faixa-pax){order:0}
+.corpo:not(.duas) .c-motorista{order:1}
+.corpo:not(.duas) .c-mapa{order:2}
+.corpo:not(.duas) .c-viagem{order:3}
+.corpo:not(.duas)>.rodape{order:5}
+.col>.card,.col>.avaliacao{animation:entra 320ms var(--bt-ease-quint) backwards}
 
-.corpo>.avaliacao{margin:0;padding:20px;border:1px solid var(--bt-color-border);border-radius:18px;background:var(--bt-color-surface);box-shadow:var(--bt-shadow-panel)}
+.col>.avaliacao{margin:0;padding:20px;border:1px solid var(--bt-color-border);border-radius:18px;background:var(--bt-color-surface);box-shadow:var(--bt-shadow-panel)}
 .avaliacao h2{font-size:16px;line-height:22px}
 .faixa-pax{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border:1px dashed color-mix(in srgb,var(--bt-color-warning) 45%,transparent);border-radius:14px;background:var(--bt-color-warning-soft);font-size:13px;line-height:18px;font-weight:700;color:var(--bt-color-warning)}
 .btn-leve{min-height:40px;padding:0 14px;background:transparent;border:1px solid var(--bt-color-border)}
@@ -313,3 +320,32 @@ a,button,[role=button],label,summary,input,textarea{-webkit-tap-highlight-color:
 .linha-leve .btn-icone{flex:none;width:44px;border:1px solid var(--bt-color-border);background:transparent}
 .vazio .linha-leve{max-width:360px;margin:16px auto 0;text-align:left}
 .rodape{padding:4px 0 0;text-align:center;font-size:12px;line-height:16px;color:var(--bt-color-text-tertiary)}
+
+/* ---- Desktop (≥1024 px): faixa fina como no PROD, herói em card e duas colunas ---- */
+.faixa.fina{padding:calc(12px + env(safe-area-inset-top)) 24px 12px}
+.faixa.fina>*{max-width:1240px}
+.faixa.fina .faixa-topo{margin-bottom:0}
+.cab-lado{display:flex;align-items:center;gap:12px}
+.faixa.fina .reserva{margin:0 4px 0 0;font-size:14px;line-height:20px;font-weight:700;color:var(--bt-color-surface)}
+.corpo.duas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:20px;max-width:1288px;margin:20px auto 0;padding:0 24px}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.corpo.duas>.rodape{grid-column:1/-1;text-align:left}
+.corpo.duas .mapa-moldura{height:300px}
+/* Motorista em destaque: primeiro card da coluna esquerda, foto, nome e placa maiores. */
+.corpo.duas .c-motorista{order:-1}
+.corpo.duas .motorista .avatar{width:80px;height:80px;font-size:28px}
+.corpo.duas .motorista .m-topo{gap:18px}
+.corpo.duas .motorista .m-info b{font-size:24px;line-height:30px}
+.corpo.duas .motorista #m-carro{font-size:15px;line-height:20px}
+.corpo.duas .motorista .placa{font-size:16px;line-height:20px;padding:0 9px 2px}
+.corpo.duas .motorista .placa::before{margin:0 -9px 2px;font-size:6px;line-height:8px}
+.heroi-card .boasvindas{margin:0 0 4px;font-size:18px;line-height:24px;color:var(--bt-color-brand)}
+.heroi-card h1{margin:0;font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.01em;color:var(--bt-color-brand);overflow-wrap:anywhere}
+.heroi-card .esqueleto{width:60%;min-height:32px}
+.heroi-card .barra{margin-top:20px}
+.heroi-card .barra li{color:var(--bt-color-text-tertiary)}
+.heroi-card .barra i{background:var(--bt-color-border)}
+.heroi-card .barra li.feita{color:var(--bt-color-text-secondary)}
+.heroi-card .barra li.atual{color:var(--bt-color-brand)}
+.heroi-card .frase{margin-top:14px;color:var(--bt-color-text-secondary)}
+@media (max-height:780px){.corpo.duas{margin-top:12px}.corpo.duas .mapa-moldura{height:190px}.corpo.duas .etapa{padding-bottom:8px}.heroi-card .barra{margin-top:14px}.heroi-card .frase{margin-top:10px}}

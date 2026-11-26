@@ -3,8 +3,7 @@ import { useIdioma } from "../i18n";
 import { Compartilhar } from "../icones";
 
 // Compartilhar o próprio link: folha nativa no celular; no computador copia e avisa (visual + leitor de tela).
-export function CardCompartilhar() {
-  const { t } = useIdioma();
+export function useCompartilhar() {
   const [copiado, setCopiado] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -18,6 +17,12 @@ export function CardCompartilhar() {
       timer.current = setTimeout(() => setCopiado(false), 2000);
     }).catch(() => {});
   }
+  return { copiado, compartilhar };
+}
+
+export function CardCompartilhar() {
+  const { t } = useIdioma();
+  const { copiado, compartilhar } = useCompartilhar();
   return (
     <section className="linha-leve" aria-label={t("cp.titulo")}>
       <div className="ll-texto"><b>{t("cp.titulo")}</b><small>{t("cp.sub")}</small></div>

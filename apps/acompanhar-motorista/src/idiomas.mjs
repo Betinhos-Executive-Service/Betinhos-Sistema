@@ -105,7 +105,6 @@ export const TEXTOS = {
   "agendado.titulo": ["Aguardando a saída", "Waiting for departure", "Esperando la salida"],
   "agendado.texto": ["Viagem agendada para {dia} às {h}", "Ride scheduled for {dia} at {h}", "Viaje programado para el {dia} a las {h}"],
   "boasvindas": ["Seja bem-vindo", "Welcome", "Bienvenido"],
-  "faixa.saida": ["Saída {h}", "Pickup {h}", "Salida {h}"],
   "h.confirmada": ["Reserva confirmada", "Booking confirmed", "Reserva confirmada"],
   "h.definido": ["Motorista definido", "Driver assigned", "Conductor asignado"],
   "h.a_caminho": ["Seu motorista está a caminho", "Your driver is on the way", "Tu conductor está en camino"],
