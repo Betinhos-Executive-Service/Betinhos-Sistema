@@ -5,7 +5,7 @@ import type { Historico, PerfisPessoa, Pessoa } from '../domain/types'
 import { HistoricoLista } from './HistoricoLista'
 import { ErroPerfis, PerfisEditor, usePerfisEditor } from './PerfisEditor'
 
-type Props = { pessoa: Pessoa | null; euId: string; historico: Historico[]; source: Source; onClose: () => void; onSaved: (perfis: PerfisPessoa) => void }
+type Props = { pessoa: Pessoa | null; euId: string; historico: Historico[]; source: Source; onClose: () => void; onGravado: (perfis: PerfisPessoa, devolveuAmplo: boolean) => void }
 
 /** Gaveta de uma pessoa. A ficha é remontada a cada pessoa (`key`), então o rascunho nunca vaza de uma para outra. */
 export function AcessoDrawer({ pessoa, ...rest }: Props) {
@@ -13,10 +13,10 @@ export function AcessoDrawer({ pessoa, ...rest }: Props) {
   return <Ficha key={pessoa.id} pessoa={pessoa} {...rest} />
 }
 
-function Ficha({ pessoa, euId, historico, source, onClose, onSaved }: Omit<Props, 'pessoa'> & { pessoa: Pessoa }) {
+function Ficha({ pessoa, euId, historico, source, onClose, onGravado }: Omit<Props, 'pessoa'> & { pessoa: Pessoa }) {
   const [aba, setAba] = useState('perfis')
   const [confirmar, setConfirmar] = useState(false)
-  const editor = usePerfisEditor({ pessoa, euId, source, onSaved })
+  const editor = usePerfisEditor({ pessoa, euId, source, onGravado })
   const { salvando, alterado } = editor
   const daPessoa = historico.filter((h) => h.usuarioId === pessoa.id)
 
@@ -27,11 +27,11 @@ function Ficha({ pessoa, euId, historico, source, onClose, onSaved }: Omit<Props
     else onClose()
   }
 
-  const footer = editor.somenteLeitura
+  const footer = !editor.editavel
     ? <Button variant="secondary" onClick={onClose}>Fechar</Button>
     : <>
         <Button variant="secondary" disabled={salvando} onClick={fechar}>Cancelar</Button>
-        <Button disabled={!alterado} loading={salvando} onClick={() => void editor.salvar()}>Salvar</Button>
+        <Button disabled={!editor.podeSalvar} loading={salvando} onClick={() => void editor.salvar()}>Salvar</Button>
       </>
 
   return (
@@ -39,7 +39,7 @@ function Ficha({ pessoa, euId, historico, source, onClose, onSaved }: Omit<Props
       <Drawer open onClose={fechar} size="wide" eyebrow={pessoa.email || 'Acessos'} title={pessoa.nome} footer={footer}>
         <ErroPerfis editor={editor} />
         <Tabs aria-label="Seções dos acessos" value={aba} onChange={setAba} tabs={[{ value: 'perfis', label: 'Perfis' }, { value: 'historico', label: 'Histórico' }]}>
-          {aba === 'historico' ? <HistoricoLista itens={daPessoa} /> : <PerfisEditor editor={editor} comErro={false} />}
+          {aba === 'historico' ? <HistoricoLista itens={daPessoa} onDevolver={editor.podeDevolver ? editor.devolver : undefined} /> : <PerfisEditor editor={editor} comErro={false} />}
         </Tabs>
       </Drawer>
       <Dialog open={confirmar} onClose={() => setConfirmar(false)} title="Descartar alterações?" actions={<>

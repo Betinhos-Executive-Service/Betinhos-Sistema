@@ -63,7 +63,8 @@ function Acessos({ host }: { host: Host }) {
   // Link antigo de alguém que hoje tem ficha (ou que saiu da lista): depois da carga, o endereço deixa de apontar para uma gaveta que não abre.
   const alvoPerdido = ready && !cs.loading && target != null && !aberta
   useEffect(() => { if (alvoPerdido) setTarget(null) }, [alvoPerdido, setTarget])
-  const salvo = (perfis: PerfisPessoa) => {
+  const gravado = (perfis: PerfisPessoa, devolveuAmplo: boolean) => {
+    if (devolveuAmplo) { refresh(); return }
     const id = target && target.mode !== 'create' ? target.id : null
     const quando = new Date()
     if (id) cs.mutate((d) => ({ ...d, pessoas: d.pessoas.map((p) => (p.id === id ? { ...p, perfis, alteradoEm: quando } : p)) }))
@@ -106,7 +107,7 @@ function Acessos({ host }: { host: Host }) {
       </div>
       {cs.error && ready ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{cs.error} A lista mostra os dados da carga anterior.</Alert> : null}
       <SearchHits tokens={words}>{body}</SearchHits>
-      {cs.data ? <AcessoDrawer pessoa={aberta} euId={cs.data.euId} historico={cs.data.historico} source={source} onClose={() => setTarget(null)} onSaved={salvo} /> : null}
+      {cs.data ? <AcessoDrawer pessoa={aberta} euId={cs.data.euId} historico={cs.data.historico} source={source} onClose={() => setTarget(null)} onGravado={gravado} /> : null}
       <Drawer open={historicoAberto} onClose={() => setHistoricoAberto(false)} size="wide" eyebrow="Acessos" title="Histórico de acessos">
         {historicoAberto ? <HistoricoLista itens={cs.data?.historico ?? []} comPessoa /> : null}
       </Drawer>

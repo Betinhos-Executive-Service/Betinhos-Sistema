@@ -129,7 +129,7 @@ public sealed class DefinirPerfisHandlerTests
         Assert.Equal(admin, linha.GetAttributeValue<EntityReference>("cr40f_alteradopor").Id);
         Assert.Equal("[]", linha.GetAttributeValue<string>("cr40f_perfisantes"));
         Assert.Equal(FinanceiroOperador, linha.GetAttributeValue<string>("cr40f_perfisdepois"));
-        Assert.Equal("{\"antes\":[],\"depois\":" + FinanceiroOperador + ",\"historico\":\"" + linha.Id + "\"}", resultado);
+        Assert.Equal("{\"antes\":[],\"depois\":" + FinanceiroOperador + ",\"amplo\":null,\"historico\":\"" + linha.Id + "\"}", resultado);
     }
 
     [Fact]

@@ -2,11 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Messages;
+using Microsoft.Xrm.Sdk.Metadata;
+using Microsoft.Xrm.Sdk.Metadata.Query;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace Cr40f.Acesso.Plugin.Tests;
 
-/// <summary>Tabelas em memória: Create/Update/Retrieve e RetrieveMultiple com filtro Equal (sem join).</summary>
+/// <summary>Tabelas em memória: Create/Update/Retrieve e RetrieveMultiple com filtros Equal, In, Null, NotNull e GreaterEqual (and/or, sem join), paginado.</summary>
 public sealed class FakeService : IOrganizationService
 {
     private readonly Dictionary<string, List<Entity>> _tabelas = new();
@@ -32,12 +35,15 @@ public sealed class FakeService : IOrganizationService
     public void Update(Entity entity) { Atualizados.Add(entity); var alvo = _tabelas[entity.LogicalName].Single(e => e.Id == entity.Id); foreach (var kv in entity.Attributes) alvo[kv.Key] = kv.Value; Carimbar(alvo, false); }
 
     private static int _relogio;
+    /// <summary>Usuário que o WhoAmI devolve e que fica em createdby do histórico criado pelo serviço (o SYSTEM do plugin).</summary>
+    public Guid SistemaId { get; } = Guid.NewGuid();
     /// <summary>Só nas tabelas da configuração do App: a plataforma carimba createdon/modifiedon, e a marca do rascunho e a ordem das exceções dependem deles.</summary>
-    private static void Carimbar(Entity e, bool criacao)
+    private void Carimbar(Entity e, bool criacao)
     {
-        if (!e.LogicalName.StartsWith("cr40f_appconfig", StringComparison.Ordinal)) return;
+        if (!e.LogicalName.StartsWith("cr40f_appconfig", StringComparison.Ordinal) && e.LogicalName != "cr40f_acessohistorico") return;
         var agora = new DateTime(2026, 11, 23, 12, 0, 0, DateTimeKind.Utc).AddSeconds(System.Threading.Interlocked.Increment(ref _relogio));
         if (criacao) e["createdon"] = agora;
+        if (criacao && e.LogicalName == "cr40f_acessohistorico") e["createdby"] = new EntityReference("systemuser", SistemaId);
         e["modifiedon"] = agora;
     }
     public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => _tabelas[entityName].Single(e => e.Id == id);
@@ -47,10 +53,75 @@ public sealed class FakeService : IOrganizationService
         var expressao = (QueryExpression)query;
         Consultas.Add(expressao);
         var linhas = (_tabelas.TryGetValue(expressao.EntityName, out var lista) ? lista : new List<Entity>())
-            .Where(e => expressao.Criteria.Conditions.All(c => c.Operator == ConditionOperator.Null ? Valor(e, c.AttributeName, expressao.EntityName) is null : c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName, expressao.EntityName), c.Values[0])))
+            .Where(e => Passa(e, expressao.Criteria, expressao.EntityName))
             .ToList();
-        return new EntityCollection(linhas) { MoreRecords = false };
+        var pagina = expressao.PageInfo;
+        if (pagina == null || pagina.Count <= 0) return new EntityCollection(linhas) { MoreRecords = false };
+        var inicio = (Math.Max(pagina.PageNumber, 1) - 1) * pagina.Count;
+        return new EntityCollection(linhas.Skip(inicio).Take(pagina.Count).ToList()) { MoreRecords = linhas.Count > inicio + pagina.Count };
     }
+
+    /// <summary>Operador não simulado passa (como antes); and/or aninhados valem.</summary>
+    private static bool Passa(Entity e, FilterExpression f, string tabela)
+    {
+        bool Condicao(ConditionExpression c)
+        {
+            var v = Valor(e, c.AttributeName, tabela);
+            return c.Operator switch
+            {
+                ConditionOperator.Null => v is null,
+                ConditionOperator.NotNull => v is not null,
+                ConditionOperator.Equal => Igual(v, c.Values[0]),
+                ConditionOperator.In => c.Values.Any(x => Igual(v, x)),
+                ConditionOperator.GreaterEqual => v is DateTime d && c.Values[0] is DateTime limite && d >= limite,
+                _ => true,
+            };
+        }
+        var partes = f.Conditions.Select(Condicao).Concat(f.Filters.Select(sub => Passa(e, sub, tabela))).ToList();
+        if (partes.Count == 0) return true;
+        return f.FilterOperator == LogicalOperator.Or ? partes.Any(x => x) : partes.All(x => x);
+    }
+
+    /// <summary>Metadata simulada: tabela → coluna → IsSecured. Tabela fora daqui não existe.</summary>
+    public Dictionary<string, Dictionary<string, bool>> Metadados { get; } = new(StringComparer.Ordinal);
+    public FakeService Tabela(string tabela, params string[] colunas)
+    {
+        if (!Metadados.TryGetValue(tabela, out var c)) Metadados[tabela] = c = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var coluna in colunas) c[coluna] = c.TryGetValue(coluna, out var protegida) && protegida;
+        return this;
+    }
+    public FakeService Protegida(string tabela, string coluna) { Tabela(tabela); Metadados[tabela][coluna] = true; return this; }
+    /// <summary>Nome de exibição (DisplayName) da tabela na metadata.</summary>
+    public Dictionary<string, string> Rotulos { get; } = new(StringComparer.Ordinal);
+
+    private OrganizationResponse Metadata(RetrieveMetadataChangesRequest r)
+    {
+        static List<string>? Nomes(MetadataFilterExpression? f) =>
+            f?.Conditions.FirstOrDefault(c => c.PropertyName == "LogicalName") is { } c
+                ? (c.Value is string s ? new List<string> { s } : ((System.Collections.IEnumerable)c.Value).Cast<string>().ToList()) : null;
+        var tabelas = Nomes(r.Query.Criteria);
+        var colunas = Nomes(r.Query.AttributeQuery?.Criteria);
+        var soProtegidas = r.Query.AttributeQuery?.Criteria?.Conditions.Any(c => c.PropertyName == "IsSecured") == true;
+        var achadas = new EntityMetadataCollection();
+        foreach (var kv in Metadados.Where(m => tabelas == null || tabelas.Contains(m.Key)))
+        {
+            var em = new EntityMetadata { LogicalName = kv.Key };
+            if (Rotulos.TryGetValue(kv.Key, out var rotulo)) em.DisplayName = new Label(rotulo, 1046);
+            var atributos = kv.Value.Where(c => (colunas == null || colunas.Contains(c.Key)) && (!soProtegidas || c.Value))
+                .Select(c => (AttributeMetadata)new StringAttributeMetadata { LogicalName = c.Key, IsSecured = c.Value }).ToArray();
+            typeof(EntityMetadata).GetProperty(nameof(EntityMetadata.Attributes))!.SetValue(em, atributos);
+            achadas.Add(em);
+        }
+        var resposta = new RetrieveMetadataChangesResponse();
+        resposta.Results["EntityMetadata"] = achadas;
+        return resposta;
+    }
+
+    private static bool Igual(object? valor, object? condicao) =>
+        valor is string a && condicao is string b ? string.Equals(a, b, StringComparison.OrdinalIgnoreCase) : Equals(valor, condicao);
+
+    /// <summary>Privilégios que RetrieveRolePrivilegesRole devolve por papel.</summary>
+    public Dictionary<Guid, Microsoft.Crm.Sdk.Messages.RolePrivilege[]> PrivilegiosDoPapel { get; } = new();
 
     private static object? Valor(Entity e, string atributo, string tabela)
     {
@@ -74,6 +145,19 @@ public sealed class FakeService : IOrganizationService
         // SetState de systemuser: estado 1 = desabilitado.
         if (!IgnorarExecute && request is Microsoft.Crm.Sdk.Messages.SetStateRequest { EntityMoniker.LogicalName: "systemuser" } estado)
             _tabelas["systemuser"].Single(e => e.Id == estado.EntityMoniker.Id)["isdisabled"] = estado.State.Value == 1;
+        if (request is RetrieveMetadataChangesRequest metadata) return Metadata(metadata);
+        if (request is Microsoft.Crm.Sdk.Messages.WhoAmIRequest)
+        {
+            var quem = new Microsoft.Crm.Sdk.Messages.WhoAmIResponse();
+            quem.Results["UserId"] = SistemaId;
+            return quem;
+        }
+        if (request is Microsoft.Crm.Sdk.Messages.RetrieveRolePrivilegesRoleRequest papel)
+        {
+            var resposta = new Microsoft.Crm.Sdk.Messages.RetrieveRolePrivilegesRoleResponse();
+            resposta.Results["RolePrivileges"] = PrivilegiosDoPapel.TryGetValue(papel.RoleId, out var lista) ? lista : new Microsoft.Crm.Sdk.Messages.RolePrivilege[0];
+            return resposta;
+        }
         return new OrganizationResponse();
     }
     public List<(string Relacao, Guid Id, Guid Alvo)> Associados { get; } = new();

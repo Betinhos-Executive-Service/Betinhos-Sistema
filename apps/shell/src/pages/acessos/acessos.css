@@ -18,3 +18,13 @@
 
 .ac-historico > summary { cursor: pointer; font-weight: 600; min-height: var(--bt-control-height); display: flex; align-items: center; }
 .ac-historico[open] > summary { margin-bottom: var(--bt-space-3); }
+
+.ac-previa { display: grid; gap: var(--bt-space-3); }
+.ac-previa__cabeca { margin: 0; font-size: var(--bt-font-size-16); }
+.ac-previa__titulo { margin: 0 0 var(--bt-space-1); font-size: var(--bt-font-size-14); }
+.ac-previa__lista { margin: 0; padding-left: var(--bt-space-4); display: grid; gap: var(--bt-space-1); }
+.ac-previa__item { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.ac-previa__nada { margin: 0; }
+.ac-previa__outras > summary { cursor: pointer; font-weight: 600; min-height: var(--bt-control-height); display: flex; align-items: center; }
+.ac-previa p { margin: 0; overflow-wrap: anywhere; }
+.ac-hist__devolver { justify-self: start; }

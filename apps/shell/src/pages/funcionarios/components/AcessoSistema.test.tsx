@@ -7,6 +7,7 @@ import { AcessosContext } from '../../../app/AcessosProvider'
 import { NENHUM, TODOS, type Acessos } from '../../../app/acessos'
 import { createSource, type Source } from '../../acessos/data/source'
 import { AcessoSistema, type EstadoPerfis } from './AcessoSistema'
+import { salvar } from '../../acessos/testUtils'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
@@ -68,7 +69,7 @@ describe('AcessoSistema', () => {
     await waitFor(() => expect(estados.at(-1)?.alterado).toBe(false))
     fireEvent.click(screen.getAllByRole('radio', { name: 'Gestor' })[1])
     await waitFor(() => expect(estados.at(-1)?.alterado).toBe(true))
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar perfis' }))
+    await salvar('Salvar perfis')
     await waitFor(() => expect(estados.at(-1)).toEqual({ alterado: false, salvando: false }))
   })
 })

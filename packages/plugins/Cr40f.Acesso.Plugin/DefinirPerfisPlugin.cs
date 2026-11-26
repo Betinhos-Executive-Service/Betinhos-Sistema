@@ -21,7 +21,8 @@ public sealed class DefinirPerfisPlugin : IPlugin
             var sistema = factory.CreateOrganizationService(null);
             var usuario = context.InputParameters.Contains("Usuario") && context.InputParameters["Usuario"] is Guid id ? id : Guid.Empty;
             var perfis = context.InputParameters.Contains("Perfis") ? context.InputParameters["Perfis"] as string : null;
-            context.OutputParameters["Resultado"] = new DefinirPerfisHandler(sistema).Executar(context.InitiatingUserId, usuario, perfis);
+            context.OutputParameters["Resultado"] = new DefinirPerfisHandler(sistema).Executar(context.InitiatingUserId, usuario, perfis,
+                Sim(context, "RetirarAmplo"), Sim(context, "DevolverAmplo"));
         }
         catch (AcessoException erro)
         {
@@ -34,4 +35,6 @@ public sealed class DefinirPerfisPlugin : IPlugin
             throw new InvalidPluginExecutionException("Não foi possível definir os perfis.", erro);
         }
     }
+
+    internal static bool Sim(IPluginExecutionContext context, string nome) => context.InputParameters.Contains(nome) && context.InputParameters[nome] is true;
 }

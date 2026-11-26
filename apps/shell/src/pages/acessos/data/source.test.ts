@@ -47,6 +47,37 @@ describe('fonte real', () => {
     const chamada = pedidos.find((x) => x.path === 'cr40f_AcessoDefinirPerfis')
     expect(JSON.parse(chamada?.body ?? '{}')).toEqual({ Usuario: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', Perfis: '[{"perfil":"frota","nivel":"gestor"}]' })
   })
+
+  it('definir só manda RetirarAmplo ou DevolverAmplo quando pedidos', async () => {
+    const pedidos: { path: string; body?: string }[] = []
+    const source = createSource(real(respostas, pedidos))
+    await source.definir('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', { areas: {}, acessos: false }, { retirarAmplo: true })
+    await source.definir('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', { areas: {}, acessos: false }, { devolverAmplo: true })
+    const corpos = pedidos.filter((x) => x.path === 'cr40f_AcessoDefinirPerfis').map((x) => JSON.parse(x.body ?? '{}'))
+    expect(corpos[0]).toMatchObject({ RetirarAmplo: true })
+    expect(corpos[0]).not.toHaveProperty('DevolverAmplo')
+    expect(corpos[1]).toMatchObject({ DevolverAmplo: true })
+  })
+
+  it('prévia e uso vão por POST numa chamada só; RetirarAmplo e Tabelas só quando pedidos', async () => {
+    const pedidos: { path: string; init: { method?: string; body?: string } }[] = []
+    const resposta = (path: string, init: { body?: string }) => ({ Resultado: JSON.parse(init.body ?? '{}').Tabelas ? '{"uso":[{"tabela":"cr40f_a","registros":3,"limitado":false,"incerto":false}]}' : '{"admin":{"antes":true,"depois":false},"perdas":[],"colunas":[],"grupos":[],"apps":[],"flows":[],"conexoes":[]}' })
+    const host = { mode: 'dataverse', client: { getAll: async () => [], request: async (path: string, init: { method?: string; body?: string }) => { pedidos.push({ path, init }); return resposta(path, init) } } } as unknown as Host
+    const source = createSource(host)
+    const previa = await source.previa('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', { areas: { frota: 'gestor' }, acessos: false }, true)
+    expect(previa.admin).toEqual({ antes: true, depois: false })
+    const tabelas = Array.from({ length: 60 }, (_, i) => `cr40f_t${i}`)
+    const uso = await source.uso('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', { areas: {}, acessos: false }, false, tabelas)
+    expect(uso).toHaveLength(1)
+    expect(pedidos.map((x) => [x.path, x.init.method])).toEqual([['cr40f_AcessoPrevia', 'POST'], ['cr40f_AcessoPrevia', 'POST']])
+    expect(JSON.parse(pedidos[0].init.body!)).toEqual({ Usuario: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', Perfis: '[{"perfil":"frota","nivel":"gestor"}]', RetirarAmplo: true })
+    expect(JSON.parse(pedidos[1].init.body!)).toEqual({ Usuario: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', Perfis: '[]', Tabelas: JSON.stringify(tabelas) })
+  })
+
+  it('resposta da prévia sem o formato vira falha', async () => {
+    const host = { mode: 'dataverse', client: { getAll: async () => [], request: async () => ({ Resultado: '{"perdas":[]}' }) } } as unknown as Host
+    await expect(createSource(host).previa('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', { areas: {}, acessos: false }, false)).rejects.toThrow()
+  })
 })
 
 describe('fonte mock', () => {

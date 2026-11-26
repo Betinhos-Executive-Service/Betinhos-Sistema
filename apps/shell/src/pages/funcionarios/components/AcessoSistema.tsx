@@ -86,7 +86,7 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
     corpo = (
       <>
         {erro ? <Alert tone="warning" title="A última atualização falhou" action={tentar}>{erro} Os perfis e o histórico podem estar desatualizados.</Alert> : null}
-        <Editor key={pessoa.id} pessoa={pessoa} dados={dados} source={source} onSaved={salvo} onEstado={onEstado} />
+        <Editor key={pessoa.id} pessoa={pessoa} dados={dados} source={source} onGravado={salvo} onEstado={onEstado} />
       </>
     )
   }
@@ -99,8 +99,8 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
   )
 }
 
-function Editor({ pessoa, dados, source, onSaved, onEstado }: { pessoa: Pessoa; dados: Dados; source: AcessosSource; onSaved: (perfis: PerfisPessoa) => Promise<void>; onEstado?: (estado: EstadoPerfis) => void }) {
-  const editor = usePerfisEditor({ pessoa, euId: dados.euId, source, onSaved })
+function Editor({ pessoa, dados, source, onGravado, onEstado }: { pessoa: Pessoa; dados: Dados; source: AcessosSource; onGravado: (perfis: PerfisPessoa) => Promise<void>; onEstado?: (estado: EstadoPerfis) => void }) {
+  const editor = usePerfisEditor({ pessoa, euId: dados.euId, source, onGravado })
   const { alterado, salvando } = editor
   useEffect(() => { onEstado?.({ alterado, salvando }) }, [alterado, salvando, onEstado])
   useEffect(() => () => onEstado?.(PERFIS_LIVRES), [onEstado])
@@ -109,15 +109,15 @@ function Editor({ pessoa, dados, source, onSaved, onEstado }: { pessoa: Pessoa; 
   return (
     <>
       <PerfisEditor editor={editor} />
-      {editor.somenteLeitura ? null : (
+      {!editor.editavel ? null : (
         <div className="cluster">
-          <Button disabled={!alterado} loading={salvando} onClick={() => void editor.salvar()}>Salvar perfis</Button>
+          <Button disabled={!editor.podeSalvar} loading={salvando} onClick={() => void editor.salvar()}>Salvar perfis</Button>
           <Button variant="secondary" disabled={!alterado || salvando} onClick={editor.descartar}>Descartar</Button>
         </div>
       )}
       <details className="ac-historico">
         <summary>Histórico de acessos ({daPessoa.length})</summary>
-        <HistoricoLista itens={daPessoa} />
+        <HistoricoLista itens={daPessoa} onDevolver={editor.podeDevolver ? editor.devolver : undefined} />
       </details>
     </>
   )

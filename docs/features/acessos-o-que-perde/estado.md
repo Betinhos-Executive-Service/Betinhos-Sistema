@@ -2,12 +2,12 @@
 
 - Nível: 3 (é a tela que vai tirar acesso no PROD)
 - Etapa: 5 de 7 Construir
-- Próximo passo: tarefa 1 (regra C# e prévia) · sozinho
+- Próximo passo: prints, ux-audit e PR para a develop; depois card da ação A · sozinho
 - Branch e PR: feat/acessos-o-que-perde · ainda não
 - Protótipo: sem protótipo
 - Go: 26/11/2026 16:04 (Renan, card)
 - PROD: ainda não
-- Atualizado: 26/11/2026 16:04
+- Atualizado: 26/11/2026 17:35
 
 ## Decisões
 | Data | Decisão | Por quê | Quem decidiu |
@@ -22,9 +22,9 @@
 ## Tarefas e provas
 | # | Tarefa | Depende de | Cenário (ação → resultado) | Prova | Nível | Resultado |
 |---|---|---|---|---|---|---|
-| 1 | Regra única C# + Custom API `cr40f_AcessoPrevia` | Go | Frota, equipe sem herança, colunas de equipe, avulsos, flows → perda certa | dotnet test | unidade | |
-| 2 | `RetirarAmplo`/`DevolverAmplo` + migration `cr40f_amplo` | 1 | sem admin → SEM_PERMISSAO; 2 admins → ULTIMO_ADMIN; devolver repõe | dotnet test | unidade | |
-| 3 | Bloco "O que deixa de ter" e confirmação | 1 | mock: perda, uso, confirmação, falha | vitest + print | mock | |
+| 1 | Regra única C# + Custom API `cr40f_AcessoPrevia` | Go | Frota, equipe sem herança, colunas de equipe, avulsos, flows → perda certa | dotnet test | unidade | ok: 253/253 (26/11) |
+| 2 | `RetirarAmplo`/`DevolverAmplo` + migration `cr40f_amplo` | 1 | sem admin → SEM_PERMISSAO; 2 admins → ULTIMO_ADMIN; devolver repõe | dotnet test | unidade | ok: 253/253 (26/11) |
+| 3 | Bloco "O que deixa de ter" e confirmação | 1 | mock: perda, uso, confirmação, falha | vitest + print | mock | vitest e tsc ok; prints pendentes |
 | 4 | Preparar no DEV | card | Deploy aplica, conferência zera | log do Deploy | DEV | |
 | 5 | Prova no DEV | 1–4 | usuário de teste: prévia, retirar, histórico, voltar | print + consulta | DEV | |
 
@@ -40,6 +40,7 @@
 ## Pendências e fora de escopo
 - Tirar do grupo do Entra continua manual.
 - PR #772 (docs da garantia) aberto.
+- Achados do code-review aceitos (vão no PR): Devolver usa o `perfisJson` da tela; checagem de `ULTIMO_ADMIN` não é atômica; `RetirarAmplo` em quem só tem o amplo pela equipe devolve sucesso sem mudar nada.
 
 ## Retro
 -

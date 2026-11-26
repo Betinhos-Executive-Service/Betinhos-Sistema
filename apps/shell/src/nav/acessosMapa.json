@@ -260,7 +260,10 @@
     },
     "acessos": {
       "perfis": ["acessos"],
-      "pastas": ["apps/shell/src/pages/acessos"]
+      "pastas": ["apps/shell/src/pages/acessos"],
+      "ignorar": [
+        {"tabela": "cr40f_segredo", "motivo": "previa: so pula a medicao de uso, nao le a tabela"}
+      ]
     }
   }
 }
