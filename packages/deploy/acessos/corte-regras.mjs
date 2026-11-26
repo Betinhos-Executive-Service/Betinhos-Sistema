@@ -1,9 +1,10 @@
 // Regras puras do corte dos acessos (plano 4 dos acessos por perfil). Sem rede: corte-estado.mjs lê o Dataverse e
 // entrega o estado; relatorio-corte.mjs e corte.mjs só combinam estas funções. Nada aqui imprime id ou nome de pessoa.
+import { readFileSync } from 'node:fs'
 import { hashCurto } from './dv.mjs'
 
 export const AMBIENTES = ['dev', 'prod']
-export const MODOS = ['esperar', 'cortar', 'desfazer']
+export const MODOS = ['esperar', 'preparar', 'cortar', 'desfazer']
 export const EQUIPE = 'Team-Betinhos-MDA'
 export const PAPEL_BASE = 'Perfil - Base'
 // Saem da equipe e de quem os tem direto. Os papéis em si nunca mudam (estão na BetinhosCore).
@@ -12,7 +13,15 @@ export const ADMIN = ['Administrador do Sistema', 'System Administrator']
 export const DIAS = 90
 export const NIVEL = { Basic: 1, Local: 2, Deep: 4, Global: 8 }
 export const ESCRITA = ['Create', 'Write']
+// Administrativa não perde nenhum destes, usado ou não (fase 2); Delete, Assign e Share só informam.
+export const ESSENCIAIS = ['Read', 'Create', 'Write', 'Append', 'AppendTo']
+export const SECUNDARIOS = ['Delete', 'Assign', 'Share']
 export const PERFIL_AUTOMACAO = 'Passageiros - automação'
+export const PAPEL_PROJETOS = 'Projetos'
+const GERADO = JSON.parse(readFileSync(new URL('./perfis.gerado.json', import.meta.url), 'utf8'))
+// Os 4 Gestores (papel e perfil de coluna de mesmo nome), lidos do gerado: nada de nome escrito à mão.
+export const GESTORES = Object.keys(GERADO.papeis).filter((n) => n.endsWith(' - Gestor')).sort()
+export const COLUNAS_GESTOR = GESTORES.filter((n) => n in GERADO.colunas)
 export const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export function lerCorte(texto, ambiente) {
@@ -49,6 +58,50 @@ export function papeisDe(estado, pessoa) {
   return ids.map((id) => estado.papeis.get(id)).filter(Boolean)
 }
 
+// Pessoa administrativa: membro da equipe do corte ou com Administrador do Sistema direto (fora app e a conta que roda).
+export function administrativos(estado) {
+  // accessmode 0 (leitura-gravação): conta não interativa, só leitura ou stub não é administrativa.
+  return estado.pessoas.filter((p) => !p.app && !p.modo && p.id !== estado.servico &&
+    ((estado.equipe && p.equipes.includes(estado.equipe.id)) || p.diretos.some((r) => estado.papeis.get(r)?.admin)))
+}
+
+// Fase 1: só adiciona. Cada administrativa recebe direto, no papel da unidade dela, o que ainda não tiver (por nome,
+// então a cópia de um papel na unidade Frota conta): os 4 Gestores, Projetos, a Base (se não vier da equipe) e os
+// perfis de coluna dos Gestores.
+export function planoDoPreparo(estado) {
+  const papeis = [], colunas = [], erros = []
+  const porNome = new Map([...estado.papeis.values()].map((r) => [`${r.nome}|${r.bu}`, r]))
+  const perfis = COLUNAS_GESTOR.map((nome) => estado.colunas.perfis.get(nome))
+  COLUNAS_GESTOR.forEach((nome, i) => { if (!perfis[i]) erros.push({ motivo: `perfil de coluna ${nome} ausente` }) })
+  for (const p of administrativos(estado)) {
+    // Conta só o que fica depois do corte: a equipe do corte guarda apenas a Base, então Gestor ou Projetos que vêm dela
+    // não valem como "já tem".
+    const ficam = [...p.diretos, ...p.equipes.flatMap((t) => (estado.equipes.get(t) ?? []).filter((r) => t !== estado.equipe?.id || r === estado.base))]
+    const tem = new Set(ficam.map((id) => estado.papeis.get(id)?.nome).filter(Boolean))
+    for (const nome of [PAPEL_BASE, ...GESTORES, PAPEL_PROJETOS]) {
+      if (tem.has(nome)) continue
+      const papel = porNome.get(`${nome}|${p.bu}`)
+      if (papel) papeis.push({ usuario: p.id, papel: papel.id })
+      else erros.push({ id: p.id, motivo: `papel ${nome} ausente na unidade da pessoa` })
+    }
+    for (const perfil of perfis) {
+      if (perfil && !estado.colunas.deUsuario.get(p.id)?.has(perfil)) colunas.push({ usuario: p.id, perfil })
+    }
+  }
+  return { papeis, colunas, erros }
+}
+
+export const preparoVazio = (p) => !p.papeis.length && !p.colunas.length
+
+export function resumoDoPreparo(plano, { ambiente, sal, total }) {
+  const pessoas = new Set([...plano.papeis, ...plano.colunas].map((x) => x.usuario)).size
+  return [
+    `Preparo dos acessos (${ambiente}): ${plano.erros.length ? 'TRAVADO, nada aplicado' : 'pode aplicar'}`,
+    `Plano: ${total} pessoa(s) administrativa(s); ${pessoas} recebem ${plano.papeis.length} papel(is) e ${plano.colunas.length} perfil(is) de coluna; nada sai`,
+    ...plano.erros.map((e) => `Erro: ${e.id ? `${hashCurto(e.id, sal)}: ` : ''}${e.motivo}`),
+  ].join('\n')
+}
+
 export function efetivos(papeis) {
   const r = { admin: false, privs: new Map() }
   for (const p of papeis) {
@@ -69,6 +122,8 @@ export function perdas(antes, depois, universo) {
   }
   return { escrita, leitura }
 }
+
+const perdeEm = (antes, depois, t, tipos) => tipos.some((tipo) => nivelDe(depois, t, tipo) < nivelDe(antes, t, tipo))
 
 // A equipe fica só com a Base. Saem os papéis antigos diretos de todos e o admin direto de quem não está em manter.
 // Usuário de aplicação e a conta que roda nunca perdem papel direto.
@@ -105,12 +160,31 @@ export function aplicarPlano(estado, plano) {
   return { ...estado, equipes, pessoas }
 }
 
-export function perdasPorPessoa(estado, plano) {
+const SO_LEITURA_INFORMA = [...ESSENCIAIS.filter((t) => t !== 'Read'), ...SECUNDARIOS]
+const TUDO = [...ESSENCIAIS, ...SECUNDARIOS]
+// Tabelas padrão que o corte mede além das cr40f_/new_.
+export const PADRAO_MEDIDAS = ['account', 'annotation', 'appointment', 'contact', 'email', 'phonecall', 'task']
+
+// soLeitura: tabelas da automação em que a administrativa só precisa continuar lendo. Tabelas padrão (PADRAO_MEDIDAS)
+// não travam: o Base copia o Basic User e nenhum perfil dá Global nelas (decisão do Renan, 26/11/2026); a perda é informativa.
+// Colunas: quem perde o admin passa a obedecer a segurança de coluna; trava se os perfis diretos não cobrem a leitura
+// de toda coluna protegida das tabelas cr40f_/new_ (perfil de equipe não conta; soAdmin fica só com o admin).
+export function perdasPorPessoa(estado, plano, { fora = new Set(), soLeitura = new Set(), soAdmin = new Set() } = {}) {
   const depois = aplicarPlano(estado, plano)
-  return estado.pessoas.map((p, i) => ({
-    id: p.id,
-    ...perdas(efetivos(papeisDe(estado, p)), efetivos(papeisDe(depois, depois.pessoas[i])), estado.tabelas),
-  }))
+  const adm = new Set(administrativos(estado).map((p) => p.id))
+  const universo = estado.tabelas.filter((t) => !fora.has(t))
+  const protegidas = [...estado.colunas.protegidas].filter((c) => !fora.has(c.split('|')[0]) && !soAdmin.has(c)).sort()
+  return estado.pessoas.map((p, i) => {
+    const antes = efetivos(papeisDe(estado, p)), dep = efetivos(papeisDe(depois, depois.pessoas[i]))
+    const linha = { id: p.id, ...perdas(antes, dep, estado.tabelas) }
+    if (adm.has(p.id)) {
+      linha.essenciais = universo.filter((t) => !PADRAO_MEDIDAS.includes(t) && perdeEm(antes, dep, t, soLeitura.has(t) ? ['Read'] : ESSENCIAIS))
+      linha.secundarios = universo.filter((t) => perdeEm(antes, dep, t, PADRAO_MEDIDAS.includes(t) ? TUDO : soLeitura.has(t) ? SO_LEITURA_INFORMA : SECUNDARIOS))
+      const le = new Set([...(estado.colunas.deUsuario.get(p.id) ?? [])].flatMap((f) => [...(estado.colunas.leitura.get(f) ?? [])]))
+      linha.colunas = antes.admin && !dep.admin ? protegidas.filter((c) => !le.has(c)) : []
+    }
+    return linha
+  })
 }
 
 export function conferirManter(estado, manter) {
@@ -185,18 +259,23 @@ export function travasDeFlows(flows, { perdasPorUsuario, servico, manter, equipe
   return travas
 }
 
-export function montarRelatorio({ estado, manter, uso, incertas, flows, referencias = [] }) {
+export function montarRelatorio({ estado, manter, uso, incertas, flows, referencias = [], fora = new Set(), soLeitura, soAdmin }) {
   const erros = conferirManter(estado, manter)
   const plano = planoDoCorte(estado, { manter })
-  const lista = perdasPorPessoa(estado, plano)
+  const lista = perdasPorPessoa(estado, plano, { fora, soLeitura, soAdmin })
+  const travasAdmin = lista.filter((p) => p.essenciais?.length).map((p) => ({ id: p.id, tabelas: p.essenciais }))
+  const travasColunas = lista.filter((p) => p.colunas?.length).map((p) => ({ id: p.id, colunas: p.colunas }))
+  const secundariosAdmin = lista.filter((p) => p.secundarios?.length).map((p) => ({ id: p.id, tabelas: p.secundarios }))
   const { travas, informativo } = travasDePessoas(lista, { uso, incertas })
   const perdasPorUsuario = new Map(lista.map((p) => [p.id, p]))
   const travasFlows = travasDeFlows(flows, { perdasPorUsuario, servico: estado.servico, manter, equipeCorte: estado.equipe?.id })
   const perdem = new Set(lista.filter((p) => p.escrita.length || p.leitura.length).map((p) => p.id))
+  // Conexão de quem perde acesso trava: o flow que a usa passaria a falhar sem aviso.
+  const travasConexao = referencias.filter((r) => perdem.has(r.dono))
   return {
-    zero: !erros.length && !travas.length && !travasFlows.length,
-    erros, plano, travas, travasFlows, informativo,
-    referencias: referencias.filter((r) => perdem.has(r.dono)),
+    zero: !erros.length && !travas.length && !travasFlows.length && !travasAdmin.length && !travasColunas.length && !travasConexao.length,
+    erros, plano, travas, travasFlows, travasAdmin, travasColunas, travasConexao, informativo, secundariosAdmin,
+    administrativos: administrativos(estado).length,
     incertas: [...incertas].sort(),
   }
 }
@@ -211,8 +290,11 @@ export function resumoPublico(rel, { ambiente, sal }) {
     `Plano: equipe perde ${rel.plano.equipeRemover.length} papel(is) e ganha ${rel.plano.equipeAdicionar.length}; ${rel.plano.pessoasRemover.length} papel(is) direto(s) saem de ${pessoas} pessoa(s)`,
     `Travas de pessoas: ${rel.travas.length}${lista(rel.travas, (t) => `${h(t.id)}: ${t.tabelas.join(', ')}`)}`,
     `Travas de flows: ${rel.travasFlows.length}${lista(rel.travasFlows, (t) => `${h(t.id)}: ${t.motivo}`)}`,
+    `Travas de administrativos (${rel.administrativos} pessoa(s)): ${rel.travasAdmin.length}${lista(rel.travasAdmin, (t) => `${h(t.id)}: ${t.tabelas.join(', ')}`)}`,
+    `Travas de colunas protegidas: ${rel.travasColunas.length}${lista(rel.travasColunas, (t) => `${h(t.id)}: ${t.colunas.length} coluna(s), ex. ${t.colunas.slice(0, 3).join(', ')}`)}`,
+    `Travas de conexões: ${rel.travasConexao.length} referência(s) de conexão de quem perde acesso${lista(rel.travasConexao, (r) => h(r.id))}`,
     ...rel.erros.map((e) => `Erro: ${e.id ? `${h(e.id)}: ` : ''}${e.motivo}`),
-    `Informativo: ${rel.informativo.length} pessoa(s) perdem acesso sem uso nos últimos ${DIAS} dias; ${rel.referencias.length} referência(s) de conexão de quem perde acesso; tabelas sem medida de uso: ${rel.incertas.join(', ') || 'nenhuma'}`,
+    `Informativo: ${rel.informativo.length} pessoa(s) perdem acesso sem uso nos últimos ${DIAS} dias; ${rel.secundariosAdmin.length} administrativa(s) perdem só excluir, atribuir, compartilhar ou acesso em tabela padrão; tabelas sem medida de uso: ${rel.incertas.join(', ') || 'nenhuma'}`,
   ].join('\n')
 }
 
@@ -230,6 +312,11 @@ export function fotoDoCorte(estado, plano, { ambiente, host, quando, commit }, u
   }
 }
 
+// Foto do preparo: o que foi adicionado, para o desfazer tirar.
+export function fotoDoPreparo(plano, { ambiente, host, quando, commit }) {
+  return { versao: 3, ambiente, host, quando, commit, papeis: plano.papeis, colunas: plano.colunas }
+}
+
 export function lerFoto(texto) {
   let f
   try {
@@ -238,6 +325,13 @@ export function lerFoto(texto) {
     f = null
   }
   const ids = (lista) => Array.isArray(lista) && lista.every((x) => GUID.test(x))
+  const pares = (lista, campo) => Array.isArray(lista) && lista.every((x) => GUID.test(x?.usuario ?? '') && GUID.test(x?.[campo] ?? ''))
+  if (f?.versao === 3) {
+    if (!AMBIENTES.includes(f.ambiente) || typeof f.host !== 'string' || !pares(f.papeis, 'papel') || !pares(f.colunas, 'perfil')) {
+      throw new Error('foto do preparo em formato desconhecido; nada feito')
+    }
+    return f
+  }
   const ok = (f?.versao === 1 || f?.versao === 2) && AMBIENTES.includes(f.ambiente) && typeof f.host === 'string' &&
     (f.equipe === null || (GUID.test(f.equipe?.id ?? '') && ids(f.equipe.papeis))) && Array.isArray(f.pessoas) && f.pessoas.every((p) => GUID.test(p?.id ?? '') && ids(p.papeis))
   if (!ok) throw new Error('foto do corte em formato desconhecido; nada feito')
@@ -257,7 +351,8 @@ export function mesmoPlano(foto, plano) {
 }
 
 // União de todas as fotos: um corte em mais de uma execução continua desfazível. Perfil - Base fica na equipe.
-export function planoDesfazer(fotos, estado) {
+export function planoDesfazer(todas, estado) {
+  const fotos = todas.filter((f) => f.versao !== 3)
   const daEquipe = new Set(estado.equipe ? estado.equipes.get(estado.equipe.id) ?? [] : [])
   const pessoas = new Map(estado.pessoas.filter((p) => !p.app).map((p) => [p.id, p]))
   const equipe = new Set(), diretos = new Map(), ignorados = new Set()
@@ -277,4 +372,16 @@ export function planoDesfazer(fotos, estado) {
     }
   }
   return { equipeAdicionar: [...equipe], pessoasAdicionar: [...diretos.values()], ignorados: [...ignorados] }
+}
+
+// Tira só o que o preparo pôs e ainda está lá. Limitação: perfil igual dado depois à mão também sai.
+export function planoDesfazerPreparo(todas, estado) {
+  const fotos = todas.filter((f) => f.versao === 3)
+  const pessoas = new Map(estado.pessoas.map((p) => [p.id, p]))
+  const papeis = new Map(), colunas = new Map()
+  for (const f of fotos) {
+    for (const x of f.papeis) if (pessoas.get(x.usuario)?.diretos.includes(x.papel)) papeis.set(`${x.usuario}|${x.papel}`, x)
+    for (const x of f.colunas) if (estado.colunas.deUsuario.get(x.usuario)?.has(x.perfil)) colunas.set(`${x.usuario}|${x.perfil}`, x)
+  }
+  return { papeis: [...papeis.values()], colunas: [...colunas.values()] }
 }

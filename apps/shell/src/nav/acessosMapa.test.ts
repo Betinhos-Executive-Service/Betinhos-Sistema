@@ -10,7 +10,8 @@ type Modulo = Partial<Record<Classe, string[]>>
 /** `ignorar[].perfis` limita a exceção a esses perfis da rota; sem ele vale para todos. */
 type Rota = { perfis?: string[]; pastas: string[]; ignorar?: { tabela: string; motivo: string; perfis?: string[] }[] }
 type Base = { leitura: string[]; proprio: string[]; cria: string[]; donas: string[]; sistema: Record<string, Record<string, string>> }
-type Mapa = { base: Base; modulos: Record<string, Modulo>; rotas: Record<string, Rota> }
+type Mapa = { base: Base; modulos: Record<string, Modulo>; foraDosPerfis: { tabela: string; motivo: string }[]
+  travaSoLeitura: { tabela: string; motivo: string }[]; colunasSoAdmin: { tabela: string; coluna: string; motivo: string }[]; rotas: Record<string, Rota> }
 
 const mapa = mapaJson as unknown as Mapa
 const RAIZ = fileURLToPath(new URL('../../../../', import.meta.url))
@@ -62,6 +63,7 @@ function tabelasDaRota(id: string, rota: Rota): string[] {
 
 // base.cria nao entra: quem so cria nao le.
 const daBase = new Set([...mapa.base.leitura, ...mapa.base.proprio, ...mapa.base.donas, ...Object.keys(mapa.base.sistema)])
+const cobertas = new Set([...daBase, ...mapa.base.cria, ...Object.values(mapa.modulos).flatMap((m) => CLASSES.flatMap((c) => m[c] ?? []))])
 const doModulo = (perfil: string) => new Set(CLASSES.flatMap((c) => mapa.modulos[perfil]?.[c] ?? []))
 
 describe('mapa de acessos', () => {
@@ -121,6 +123,22 @@ describe('mapa de acessos', () => {
     ]
     const logicos = new Set(catalogo.map((t) => t.logico))
     expect([...new Set(doMapa)].filter((t) => !logicos.has(t)).sort()).toEqual([])
+  })
+
+  // Corte no PROD: tabela customizada sem perfil some para quem perde o administrador.
+  it('toda tabela cr40f_/new_ do catálogo tem perfil ou está fora dos perfis com motivo', () => {
+    const fora = new Set(mapa.foraDosPerfis.map((f) => f.tabela))
+    const customizadas = catalogo.map((t) => t.logico).filter((t) => /^(cr40f|new)_/.test(t))
+    expect(customizadas.filter((t) => !cobertas.has(t) && !fora.has(t)).sort(), 'sem perfil').toEqual([])
+    expect([...fora].filter((t) => cobertas.has(t)).sort(), 'com perfil e fora').toEqual([])
+    expect([...fora].filter((t) => !customizadas.includes(t)).sort(), 'fora do catálogo').toEqual([])
+    expect(mapa.foraDosPerfis.filter((f) => !f.motivo?.trim()).map((f) => f.tabela)).toEqual([])
+  })
+
+  // Exceções da trava do corte: só valem com motivo e sobre tabela que tem perfil.
+  it('exceções da trava do corte têm motivo e tabela com perfil', () => {
+    const excecoes = [...mapa.travaSoLeitura, ...mapa.colunasSoAdmin]
+    expect(excecoes.filter((f) => !cobertas.has(f.tabela) || !f.motivo?.trim()).map((f) => f.tabela)).toEqual([])
   })
 
   it('exceção por perfil só cita perfis da rota', () => {

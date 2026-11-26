@@ -5,13 +5,14 @@
 // Uso local (só DEV): DV_URL=https://org23b93544.crm2.dynamics.com DV_ACCESS_TOKEN=<az> ACESSOS_ADMINS_MANTER=<ids>
 //   node packages/deploy/acessos/relatorio-corte.mjs --pasta <pasta fora do repo>
 // Local, a "conta de serviço" é quem fez o az login: ela não perde papel direto no plano local.
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { criarCliente, limpo, tokenDoAmbiente } from './dv.mjs'
 import { desde, lerIds, montarRelatorio, perdasPorPessoa, planoDoCorte, resumoPublico } from './corte-regras.mjs'
 import { lerEstado, lerFlows, lerReferencias, lerUso } from './corte-estado.mjs'
+import { CAMINHO_MAPA } from './gerar.mjs'
 
 const RAIZ = resolve(fileURLToPath(new URL('../../..', import.meta.url)))
 
@@ -30,7 +31,12 @@ export async function avaliar(dv, { manter, hoje = new Date() }) {
   const { uso, incertas } = await lerUso(dv, medir, estado.conjuntoDe, desde(hoje))
   const flows = await lerFlows(dv, estado.catalogo)
   const referencias = await lerReferencias(dv)
-  return { estado, relatorio: montarRelatorio({ estado, manter, uso, incertas, flows, referencias }) }
+  // Tabelas que o mapa deixa fora dos perfis de propósito não travam administrativas.
+  const mapa = JSON.parse(readFileSync(CAMINHO_MAPA, 'utf8'))
+  const fora = new Set(mapa.foraDosPerfis.map((f) => f.tabela))
+  const soLeitura = new Set(mapa.travaSoLeitura.map((f) => f.tabela))
+  const soAdmin = new Set(mapa.colunasSoAdmin.map((f) => `${f.tabela}|${f.coluna}`))
+  return { estado, relatorio: montarRelatorio({ estado, manter, uso, incertas, flows, referencias, fora, soLeitura, soAdmin }) }
 }
 
 export function detalhe(relatorio, estado) {

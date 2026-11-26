@@ -85,8 +85,9 @@ jobs:
         env:
           BASE: ${{ github.base_ref }}
         run: |
-          tag=$(git ls-remote --tags origin refs/tags/acessos-corte-prod | wc -l)
-          git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/acessos/corte-ci.mjs --tag-prod "$tag"
+          tag=$(git ls-remote --tags origin refs/tags/acessos-cortado-prod | wc -l)
+          git show "origin/$BASE:packages/deploy/acessos/corte.json" > "$RUNNER_TEMP/corte-base.json"
+          git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/acessos/corte-ci.mjs --tag-prod "$tag" --corte "$RUNNER_TEMP/corte-base.json"
 
   # Pulado em PR só de documentação (.md, docs/, .claude/, legacy/): nenhum teste nem build lê esses arquivos.
   checagens:

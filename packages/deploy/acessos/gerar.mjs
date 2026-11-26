@@ -41,6 +41,10 @@ function tabelasDoModulo(modulo, gestor, nome = '') {
   const tabelas = {}
   for (const classe of Object.keys(ACOES)) for (const tabela of modulo[classe] ?? []) juntar(tabelas, tabela, ACOES[classe], prof(tabela))
   if (gestor) for (const tabela of modulo.donas ?? []) juntar(tabelas, tabela, ['Delete'], prof(tabela))
+  // gestorCria: cadastro de apoio que so o Gestor cria e edita (ex.: cidade, comunicado da home).
+  if (gestor) for (const tabela of modulo.gestorCria ?? []) juntar(tabelas, tabela, ACOES.cria)
+  // atribui: o modulo troca o dono e compartilha o registro (ex.: multa vai ao condutor).
+  for (const tabela of modulo.atribui ?? []) juntar(tabelas, tabela, ['Assign', 'Share'], prof(tabela))
   return ordenarTabelas(tabelas)
 }
 

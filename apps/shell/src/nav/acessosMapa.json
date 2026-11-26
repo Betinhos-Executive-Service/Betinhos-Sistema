@@ -10,24 +10,26 @@
   },
   "modulos": {
     "operacional": {
-      "donas": ["cr40f_reservadeveculos", "cr40f_servicosporpassageiro", "cr40f_bancodedados", "cr40f_clientes1", "cr40f_trocasdecarro", "cr40f_validacaoservico", "new_comunicadomotorista", "new_comunicadodestinatario", "cr40f_errooperacional", "cr40f_errooperacionalarquivo", "cr40f_acaooperacional", "cr40f_pedidodecotacao", "cr40f_cotacaopropostaversao", "new_marketing"],
+      "donas": ["cr40f_reservadeveculos", "cr40f_servicosporpassageiro", "cr40f_bancodedados", "cr40f_clientes1", "cr40f_trocasdecarro", "cr40f_validacaoservico", "new_comunicadomotorista", "new_comunicadodestinatario", "cr40f_errooperacional", "cr40f_errooperacionalarquivo", "cr40f_acaooperacional", "cr40f_pedidodecotacao", "cr40f_cotacaopropostaversao", "new_marketing", "cr40f_avaliacaoservico", "cr40f_compromissofds", "cr40f_escalafds", "cr40f_provamidia", "cr40f_linkcadastro", "cr40f_liberacaoanexo", "cr40f_appconfigpessoa", "cr40f_appconfigversao", "cr40f_fontenoticia", "new_avisomotorista", "new_centraldenotificacoes"],
       "filhas": ["cr40f_cotacaoopcao", "cr40f_cotacaoopcaoitem"],
-      "leitura": ["cr40f_funcionarios", "cr40f_veiculos", "cr40f_manutencoes", "cr40f_financeiro", "cr40f_anexorecebimento_v2", "new_possedeveiculo", "new_appmotoristaslog", "cr40f_errodosistema", "cr40f_agenteproposta", "cr40f_agenteexecucao"]
+      "leitura": ["cr40f_funcionarios", "cr40f_veiculos", "cr40f_manutencoes", "cr40f_financeiro", "cr40f_anexorecebimento_v2", "new_possedeveiculo", "new_appmotoristaslog", "cr40f_errodosistema", "cr40f_agenteproposta", "cr40f_agenteexecucao"],
+      "gestorCria": ["cr40f_cidade", "new_localdebase", "cr40f_comunicadohome", "cr40f_noticiaexterna", "cr40f_agenteproposta", "cr40f_errodosistema", "new_appmotoristaslog"]
     },
     "financeiro": {
-      "donas": ["cr40f_financeiro", "cr40f_pagantes", "cr40f_composicaodeprecos", "new_configuracaovisualizacaocomposicao", "new_formuladecelulacomposicao", "cr40f_anexorecebimento_v2", "cr40f_pagamentoaterceiro", "cr40f_eventopagamentoaterceiro", "cr40f_terceirofavorecido", "cr40f_vinculomotoristafavorecido", "cr40f_despesaoperacional", "cr40f_anexodespesaoperacional", "cr40f_transacaocartao", "cr40f_cartaocorporativo", "cr40f_validacaoservico", "cr40f_mensagemvalidacao", "cr40f_validadorcliente", "cr40f_fluxocaixalancamento", "cr40f_pedidodecotacao", "cr40f_cotacaopropostaversao", "cr40f_clientes1", "cr40f_bancodedados", "cr40f_categoriadespesaoperacional", "cr40f_formapagamentodespesa"],
+      "donas": ["cr40f_financeiro", "cr40f_pagantes", "cr40f_composicaodeprecos", "new_configuracaovisualizacaocomposicao", "new_formuladecelulacomposicao", "cr40f_anexorecebimento_v2", "cr40f_pagamentoaterceiro", "cr40f_eventopagamentoaterceiro", "cr40f_terceirofavorecido", "cr40f_vinculomotoristafavorecido", "cr40f_despesaoperacional", "cr40f_anexodespesaoperacional", "cr40f_transacaocartao", "cr40f_cartaocorporativo", "cr40f_validacaoservico", "cr40f_mensagemvalidacao", "cr40f_validadorcliente", "cr40f_fluxocaixalancamento", "cr40f_pedidodecotacao", "cr40f_cotacaopropostaversao", "cr40f_clientes1", "cr40f_bancodedados", "cr40f_categoriadespesaoperacional", "cr40f_formapagamentodespesa", "cr40f_anexorecebimento", "cr40f_cobrancastripe", "cr40f_fluxocaixacategoria", "cr40f_fluxocaixaconfiguracao", "cr40f_fluxocaixaconta", "cr40f_fluxocaixacontraparte", "cr40f_fluxocaixaevento", "cr40f_fluxocaixaferiado", "cr40f_fluxocaixaimportacao", "cr40f_fluxocaixarecorrencia", "cr40f_fluxocaixaregra", "cr40f_geracaopagantesoperacao", "cr40f_recibopersonalizado", "cr40f_recibos", "cr40f_recibos_v2", "cr40f_sincronizacaofinanceira"],
       "filhas": ["cr40f_itempagamentoaterceiro", "cr40f_cotacaoopcao", "cr40f_cotacaoopcaoitem"],
       "edita": ["cr40f_reservadeveculos"],
       "leitura": ["cr40f_funcionarios", "cr40f_veiculos", "cr40f_servicosporpassageiro", "cr40f_manutencoes", "cr40f_agenteproposta", "cr40f_agenteexecucao"]
     },
     "frota": {
-      "donas": ["cr40f_veiculos", "cr40f_manutencoes", "cr40f_multas", "cr40f_infracaodetransito", "cr40f_colisao_v2", "cr40f_baselinepreventiva", "cr40f_itemplanopreventivo", "new_checklistmodelo", "new_checklistmodeloitem", "new_checklistveiculo", "new_checklistveiculofoto", "new_fotomanutencao", "new_parcelamultafolha", "new_termomulta", "new_possedeveiculo", "cr40f_equipamento", "cr40f_despesaoperacional", "cr40f_anexodespesaoperacional"],
+      "donas": ["cr40f_veiculos", "cr40f_manutencoes", "cr40f_multas", "cr40f_infracaodetransito", "cr40f_colisao_v2", "cr40f_baselinepreventiva", "cr40f_itemplanopreventivo", "new_checklistmodelo", "new_checklistmodeloitem", "new_checklistveiculo", "new_checklistveiculofoto", "new_fotomanutencao", "new_parcelamultafolha", "new_termomulta", "new_possedeveiculo", "cr40f_equipamento", "cr40f_despesaoperacional", "cr40f_anexodespesaoperacional", "cr40f_colisao", "cr40f_anexocolisao", "cr40f_anexocolisao_v2", "new_avaliacaoposto", "new_postocombustivel", "new_resumocombustivelmensal", "new_notamotorista", "new_textotermomulta", "cr40f_tipoequipamento"],
+      "atribui": ["cr40f_multas"],
       "filhas": ["cr40f_fotoequipamento"],
       "cria": ["cr40f_reservadeveculos"],
       "leitura": ["cr40f_funcionarios", "new_telemetriadiariainfleet", "new_eventoinfleet", "new_viageminfleet", "cr40f_agenteproposta", "cr40f_agenteexecucao"]
     },
     "rh": {
-      "donas": ["cr40f_funcionarios", "cr40f_documento", "cr40f_tipodocumento", "cr40f_avisodestinatario", "new_curriculo", "cr40f_treinamento", "new_parcelamultafolha", "new_possedeveiculo"],
+      "donas": ["cr40f_funcionarios", "cr40f_documento", "cr40f_tipodocumento", "cr40f_avisodestinatario", "new_curriculo", "cr40f_treinamento", "new_parcelamultafolha", "new_possedeveiculo", "cr40f_jornadacolaborador"],
       "filhas": ["cr40f_treinamentoparticipacao"],
       "edita": ["cr40f_multas"],
       "leitura": ["cr40f_veiculos", "new_termomulta", "cr40f_agenteproposta", "cr40f_agenteexecucao"]
@@ -36,6 +38,31 @@
       "leitura": ["cr40f_funcionarios", "cr40f_documento", "cr40f_multas", "cr40f_veiculos", "new_possedeveiculo"]
     }
   },
+  "foraDosPerfis": [
+    {"tabela": "cr40f_segredo", "motivo": "segredos: so administrador do sistema e plugin (SYSTEM) leem"},
+    {"tabela": "cr40f_codigoacesso", "motivo": "login do portal: so o plugin e o Worker gravam"},
+    {"tabela": "cr40f_dispositivoconfiavel", "motivo": "login do portal: so o plugin e o Worker gravam"},
+    {"tabela": "cr40f_cielolinkcleanup", "motivo": "fila interna do plugin do Gerar Pagantes"},
+    {"tabela": "cr40f_travapublicacao", "motivo": "trava do deploy, so a conta de servico"},
+    {"tabela": "cr40f_conversaiaagendamento", "motivo": "legado da IA de agendamento, nao usar"},
+    {"tabela": "cr40f_solicitacaoiaagendamento", "motivo": "legado da IA de agendamento, nao usar"},
+    {"tabela": "cr40f_projeto", "motivo": "papel Projetos proprio"},
+    {"tabela": "cr40f_projetoetapa", "motivo": "papel Projetos proprio"},
+    {"tabela": "cr40f_projetoatualizacao", "motivo": "papel Projetos proprio"},
+    {"tabela": "new_inscricaopushmotorista", "motivo": "inscricao de push do App Motoristas, so o plugin grava"},
+    {"tabela": "cr40f_reservadeveculos_cr40f_bancodedad", "motivo": "tabela de relacao N:N, sem privilegio proprio"}
+  ],
+  "travaSoLeitura": [
+    {"tabela": "cr40f_agenteexecucao", "motivo": "execucoes dos agentes de IA, quem grava e a automacao"},
+    {"tabela": "new_eventoinfleet", "motivo": "sincronizado da Infleet pela automacao"},
+    {"tabela": "new_telemetriadiariainfleet", "motivo": "sincronizado da Infleet pela automacao"},
+    {"tabela": "new_viageminfleet", "motivo": "sincronizado da Infleet pela automacao"},
+    {"tabela": "cr40f_visaodetabela", "motivo": "visoes de outra pessoa: perda da escrita aceita pelo Renan (26/11/2026)"}
+  ],
+  "colunasSoAdmin": [
+    {"tabela": "cr40f_funcionarios", "coluna": "cr40f_loginsesenhas", "motivo": "logins e senhas: so o administrador do sistema"},
+    {"tabela": "cr40f_validadorcliente", "coluna": "cr40f_senhahash", "motivo": "hash da senha do portal: so o Worker do portal le"}
+  ],
   "rotas": {
     "inicio": {
       "pastas": ["apps/shell/src/pages/inicio"],

@@ -35,6 +35,7 @@ function estado() {
       { id: BIA, app: false, equipes: [EQ], diretos: [P.antigo, P.admin] },
     ],
     tabelas: ['cr40f_financeiro', 'cr40f_funcionarios', 'cr40f_reservadeveculos', 'cr40f_veiculos'],
+    colunas: { perfis: new Map(), deUsuario: new Map(), protegidas: new Set(), leitura: new Map() },
   }
 }
 const MANTER = new Set([MANTIDO])
@@ -56,7 +57,7 @@ test('corte.json: recusa modo, chave, ambiente e JSON inválidos', () => {
 test('o corte.json versionado tem modo válido nos dois ambientes', async () => {
   const { readFileSync } = await import('node:fs')
   const texto = readFileSync(new URL('./corte.json', import.meta.url), 'utf8')
-  for (const amb of ['dev', 'prod']) assert.ok(['esperar', 'cortar', 'desfazer'].includes(lerCorte(texto, amb)))
+  for (const amb of ['dev', 'prod']) assert.ok(['esperar', 'preparar', 'cortar', 'desfazer'].includes(lerCorte(texto, amb)))
 })
 
 test('ids da variável: vírgulas, espaços, maiúsculas e repetidos', () => {
@@ -100,9 +101,19 @@ test('perdas por pessoa: escrita e só leitura', () => {
   const lista = perdasPorPessoa(estado(), planoDoCorte(estado(), { manter: MANTER }))
   const de = (id) => lista.find((p) => p.id === id)
   assert.deepEqual(de(SERV), { id: SERV, escrita: [], leitura: [] })
-  assert.deepEqual(de(MANTIDO), { id: MANTIDO, escrita: [], leitura: [] })
-  assert.deepEqual(de(ANA), { id: ANA, escrita: ['cr40f_financeiro', 'cr40f_veiculos'], leitura: ['cr40f_funcionarios'] })
+  assert.deepEqual(de(MANTIDO), { id: MANTIDO, escrita: [], leitura: [], essenciais: [], secundarios: [], colunas: [] })
+  assert.deepEqual(de(ANA), {
+    id: ANA, escrita: ['cr40f_financeiro', 'cr40f_veiculos'], leitura: ['cr40f_funcionarios'],
+    essenciais: ['cr40f_financeiro', 'cr40f_funcionarios', 'cr40f_veiculos'], secundarios: [], colunas: [],
+  })
   assert.deepEqual(de(BIA).escrita, ['cr40f_financeiro', 'cr40f_funcionarios', 'cr40f_reservadeveculos', 'cr40f_veiculos'])
+})
+
+test('tabela padrão não trava a administrativa que perde o admin: a perda vai para o informativo', () => {
+  const e = { ...estado(), tabelas: [...estado().tabelas, 'contact'] }
+  const bia = perdasPorPessoa(e, planoDoCorte(e, { manter: MANTER })).find((p) => p.id === BIA)
+  assert.equal(bia.essenciais.includes('contact'), false)
+  assert.equal(bia.secundarios.includes('contact'), true)
 })
 
 test('admins a manter: vazio, inexistente e sem admin direto travam', () => {
@@ -179,7 +190,8 @@ test('flows: trava dono que perde tabela do flow, incerto de pessoa comum e equi
 
 test('relatório: zero só sem trava; resumo público sem GUID', () => {
   const e = estado()
-  const limpo = montarRelatorio({ estado: e, manter: MANTER, uso: new Map(), incertas: new Set(), flows: [], referencias: [] })
+  // Todas as tabelas fora dos perfis: a trava das administrativas não conta nenhuma.
+  const limpo = montarRelatorio({ estado: e, manter: MANTER, uso: new Map(), incertas: new Set(), flows: [], referencias: [], fora: new Set(e.tabelas) })
   assert.equal(limpo.zero, true)
   const travado = montarRelatorio({
     estado: e, manter: MANTER, uso: new Map([['cr40f_financeiro', new Set([ANA])]]), incertas: new Set(),
@@ -187,7 +199,7 @@ test('relatório: zero só sem trava; resumo público sem GUID', () => {
     referencias: [{ id: ID(800), dono: BIA }, { id: ID(801), dono: SERV }],
   })
   assert.equal(travado.zero, false)
-  assert.equal(travado.referencias.length, 1)
+  assert.equal(travado.travasConexao.length, 1)
   const texto = resumoPublico(travado, { ambiente: 'dev', sal: 'host' })
   assert.match(texto, /TRAVADO/)
   assert.match(texto, /Travas de pessoas: 1/)
