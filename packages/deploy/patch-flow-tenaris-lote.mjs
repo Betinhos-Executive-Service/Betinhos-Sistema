@@ -370,20 +370,20 @@ export function dataverse(ambiente) {
   }
 }
 
-export function backup(ambiente, clientdataTexto) {
+export function backup(ambiente, clientdataTexto, prefixo = 'Flow-Tenaris') {
   if (clientdataTexto.includes('sig=')) throw new Error('O clientdata contém URL assinada (sig=); revise antes de continuar.')
   const dir = join(dirname(fileURLToPath(import.meta.url)), 'flows', 'backup')
   mkdirSync(dir, { recursive: true })
   const agora = new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).replace(/\D/g, '')
-  const arquivo = join(dir, `Flow-Tenaris-${ambiente}-${agora.slice(0, 8)}-${agora.slice(8)}.json`)
+  const arquivo = join(dir, `${prefixo}-${ambiente}-${agora.slice(0, 8)}-${agora.slice(8)}.json`)
   writeFileSync(arquivo, clientdataTexto, { encoding: 'utf8', flag: 'wx' })
   console.log(`[tenaris-lote] backup: ${arquivo}`)
   return arquivo
 }
 
-export async function gravar(dv, flow, clientdataTexto) {
+export async function gravar(dv, flow, clientdataTexto, flowId = FLOW_ID) {
   semMojibake(clientdataTexto, 'clientdata novo')
-  const id = `workflows(${FLOW_ID})`
+  const id = `workflows(${flowId})`
   if (flow.statecode !== 1) return dv('PATCH', id, { clientdata: clientdataTexto })
   const reativar = async () => {
     await dv('PATCH', id, { statecode: 1, statuscode: 2 })

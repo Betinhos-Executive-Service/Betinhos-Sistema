@@ -49,7 +49,7 @@ var pluginTypeId = UpsertPluginType(service, assemblyId);
 EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyComponentType);
 const string Campos = "cr40f_destino,cr40f_endereodesada,cr40f_dataehorriodesada,cr40f_obsdeoperao,cr40f_horrioprevistoderetorno,cr40f_status,cr40f_trajeto,cr40f_cr,cr40f_idtenaris,cr40f_tipodeveiculo";
 const string Filtro = Campos + ",new_snapshotsharepoint";
-const string Imagem = Campos + ",new_camposprotegidos,new_snapshotsharepoint";
+const string Imagem = Campos + ",new_camposprotegidos,new_snapshotsharepoint,cr40f_cancelamentocliente";
 EnsureStep(service, pluginTypeId, "Update", "cr40f_reservadeveculos", "Cr40f.Protecao: protege campos editados da Tenaris", solutionUniqueName, Filtro, Imagem);
 
 if (publish)
