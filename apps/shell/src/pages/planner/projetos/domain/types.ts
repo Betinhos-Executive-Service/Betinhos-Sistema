@@ -1,4 +1,5 @@
 import type { ChecklistItem } from './checklist'
+import type { Prazo } from './prazo'
 
 /** Arquivo anexado (annotation) a uma atualização. */
 export type Anexo = { id: string; nome: string; tipo: string; tamanho: number | null }
@@ -27,6 +28,10 @@ export type Projeto = {
   /** Descrição (coluna `cr40f_briefing`). */
   briefing: string
   checklist: ChecklistItem[]
+  /** Tags livres (`cr40f_tags`). */
+  tags: string[]
+  /** Prazo opcional (`cr40f_prazo` + `cr40f_prazotipo`). */
+  prazo: Prazo | null
 }
 
 /** Etapa escondida do projeto (número 1): guarda a coluna do quadro (status); os outros campos são dos agentes e a tela não mostra. */
@@ -45,6 +50,8 @@ export type Etapa = {
   linkPr: string
   /** Data e hora (ISO) em que o workflow Produção publicou; null = ainda não. */
   publicadoProd: string | null
+  /** Motivo opcional informado ao mover para Pausado; '' = sem motivo. */
+  motivoPausa: string
 }
 
 /** Quem está usando a tela: define o autor gravado nos anexos. */

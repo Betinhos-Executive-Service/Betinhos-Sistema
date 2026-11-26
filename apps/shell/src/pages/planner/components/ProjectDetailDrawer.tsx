@@ -10,6 +10,10 @@ import { ehAudio } from "../projetos/domain/anexos";
 import { autorDoPerfil } from "../projetos/domain/choices";
 import { MAX_ITEM, gravarChecklist, progresso, type ChecklistItem } from "../projetos/domain/checklist";
 import type { Atualizacao, Perfil, Projeto } from "../projetos/domain/types";
+import { gravarPrazo, mesmoPrazo, type Prazo } from "../projetos/domain/prazo";
+import { gravarTags, mesmasTags } from "../projetos/domain/tags";
+import { PrazoPicker } from "../projetos/components/PrazoPicker";
+import { TagsInput } from "../projetos/components/TagsInput";
 import { acceptFiles, namePastedFile } from "../domain/projectsBoard";
 import "../projetos/projetos.css";
 
@@ -19,6 +23,8 @@ const NOME_MAX = 200;
 type Props = {
   projeto: Projeto | null;
   atualizacoes: Atualizacao[];
+  /** Tags já usadas nos projetos, para sugerir. */
+  tagsEmUso: string[];
   perfil: Perfil;
   source: Source;
   onClose: () => void;
@@ -30,12 +36,14 @@ export function ProjectDetailDrawer({ projeto, ...rest }: Props) {
   return projeto ? <Detalhe key={projeto.id} projeto={projeto} {...rest} /> : <Drawer open={false} onClose={rest.onClose} title="Projeto">{null}</Drawer>;
 }
 
-function Detalhe({ projeto, atualizacoes, perfil, source, onClose, onSaved, onAtualizacao }: Props & { projeto: Projeto }) {
+function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, onSaved, onAtualizacao }: Props & { projeto: Projeto }) {
   const toast = useToast();
   const [nome, setNome] = useState(projeto.nome);
   const [descricao, setDescricao] = useState(projeto.briefing);
   const [itens, setItens] = useState<ChecklistItem[]>(projeto.checklist);
   const [novoItem, setNovoItem] = useState("");
+  const [tags, setTags] = useState<string[]>(projeto.tags);
+  const [prazo, setPrazo] = useState<Prazo | null>(projeto.prazo);
   const [nomeErro, setNomeErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erroSalvar, setErroSalvar] = useState("");
@@ -47,7 +55,8 @@ function Detalhe({ projeto, atualizacoes, perfil, source, onClose, onSaved, onAt
 
   const enviando = envios > 0;
   const ocupado = salvando || enviando;
-  const sujo = nome.trim() !== projeto.nome || descricao.trim() !== projeto.briefing.trim() || gravarChecklist(itens) !== gravarChecklist(projeto.checklist) || Boolean(novoItem.trim());
+  const sujo = nome.trim() !== projeto.nome || descricao.trim() !== projeto.briefing.trim() || gravarChecklist(itens) !== gravarChecklist(projeto.checklist) || Boolean(novoItem.trim())
+    || !mesmasTags(tags, projeto.tags) || !mesmoPrazo(prazo, projeto.prazo);
   const doProjeto = useMemo(() => atualizacoes.filter((a) => a.projetoId === projeto.id).sort((a, b) => b.data.localeCompare(a.data)), [atualizacoes, projeto.id]);
   // A transcrição é da atualização: aparece só sob o primeiro áudio dela.
   const anexos = doProjeto.flatMap((a) => {
@@ -85,13 +94,15 @@ function Detalhe({ projeto, atualizacoes, perfil, source, onClose, onSaved, onAt
     if (titulo !== projeto.nome) changes.cr40f_name = titulo;
     if (texto !== projeto.briefing.trim()) changes.cr40f_briefing = texto || null;
     if (gravarChecklist(lista) !== gravarChecklist(projeto.checklist)) changes.cr40f_checklist = gravarChecklist(lista);
+    if (!mesmasTags(tags, projeto.tags)) changes.cr40f_tags = gravarTags(tags);
+    if (!mesmoPrazo(prazo, projeto.prazo)) Object.assign(changes, gravarPrazo(prazo));
     setSalvando(true);
     try {
       if (Object.keys(changes).length) await source.updateProjeto(projeto.id, changes);
       setErroSalvar("");
       setItens(lista);
       setNovoItem("");
-      onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista });
+      onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista, tags, prazo });
       toast({ tone: "success", message: `${projeto.codigo} salvo.` });
     } catch (reason) {
       setErroSalvar(`Não foi possível salvar. ${reasonText(reason)}`);
@@ -162,6 +173,16 @@ function Detalhe({ projeto, atualizacoes, perfil, source, onClose, onSaved, onAt
             <Textarea value={descricao} rows={3} disabled={salvando} onChange={(event) => setDescricao(event.target.value)} />
           </Field>
 
+          <section className="pj-bloco" aria-labelledby="pj-prazo">
+            <h3 id="pj-prazo" className="pj-lbl">Prazo <span className="pj-opcional">opcional</span></h3>
+            <PrazoPicker value={prazo} onChange={setPrazo} disabled={salvando} />
+          </section>
+
+          <section className="pj-bloco" aria-labelledby="pj-tags">
+            <h3 id="pj-tags" className="pj-lbl">Tags <span className="pj-opcional">opcional</span></h3>
+            <TagsInput value={tags} onChange={setTags} sugestoes={tagsEmUso} disabled={salvando} />
+          </section>
+
           <section className="pj-bloco" aria-labelledby="pj-checklist">
             <h3 id="pj-checklist" className="pj-lbl">Checklist {feito && <span className="pj-num">{feito}</span>}</h3>
             {itens.length > 0 && (
@@ -229,7 +250,7 @@ function Detalhe({ projeto, atualizacoes, perfil, source, onClose, onSaved, onAt
           <Button variant="secondary" onClick={() => setDescartar(false)}>Continuar editando</Button>
           <Button variant="danger" onClick={() => { setDescartar(false); onClose(); }}>Descartar</Button>
         </>}>
-        O título, a descrição ou o checklist deste projeto ainda não foram salvos.
+        As alterações deste projeto (título, descrição, prazo, tags ou checklist) ainda não foram salvas.
       </Dialog>
     </>
   );

@@ -2,6 +2,8 @@ import { cleanId, type Row } from '@betinhos/dataverse'
 import type { Anexo, Atualizacao, Etapa, Projeto } from '../domain/types'
 import { AUTOR, STATUS } from '../domain/choices'
 import { lerChecklist } from '../domain/checklist'
+import { lerPrazo } from '../domain/prazo'
+import { lerTags } from '../domain/tags'
 
 export const ENTITIES = { projeto: 'cr40f_projeto', etapa: 'cr40f_projetoetapa', atualizacao: 'cr40f_projetoatualizacao' } as const
 export type EntitySets = Record<keyof typeof ENTITIES, string>
@@ -11,10 +13,10 @@ export const NAV_ETAPA = 'cr40f_Etapa'
 /** Anexos (notas) da atualização: coleção da relação padrão annotation → tabela. */
 export const NAV_ANEXOS = 'cr40f_projetoatualizacao_Annotations'
 
-const PROJETO_SELECT = ['cr40f_projetoid', 'cr40f_codigo', 'cr40f_name', 'cr40f_briefing', 'cr40f_checklist']
+const PROJETO_SELECT = ['cr40f_projetoid', 'cr40f_codigo', 'cr40f_name', 'cr40f_briefing', 'cr40f_checklist', 'cr40f_tags', 'cr40f_prazo', 'cr40f_prazotipo']
 const ETAPA_SELECT = [
   'cr40f_projetoetapaid', '_cr40f_projeto_value', 'cr40f_numero', 'cr40f_codigo', 'cr40f_name', 'cr40f_status',
-  'cr40f_prazo', 'cr40f_andamento', 'cr40f_linkpr', 'cr40f_publicadoprod',
+  'cr40f_prazo', 'cr40f_andamento', 'cr40f_linkpr', 'cr40f_publicadoprod', 'cr40f_motivopausa',
 ]
 const ATUALIZACAO_SELECT = [
   'cr40f_projetoatualizacaoid', '_cr40f_projeto_value', '_cr40f_etapa_value', 'cr40f_data', 'cr40f_autor', 'cr40f_texto', 'cr40f_eprova', 'cr40f_transcricao', 'createdon',
@@ -38,7 +40,7 @@ export const anexoPath = (id: string) => `annotations(${cleanId(id)})?$select=do
 
 export const mapProjeto = (row: Row): Projeto => ({
   id: cleanId(str(row.cr40f_projetoid)), codigo: text(row.cr40f_codigo), nome: text(row.cr40f_name), briefing: str(row.cr40f_briefing),
-  checklist: lerChecklist(row.cr40f_checklist),
+  checklist: lerChecklist(row.cr40f_checklist), tags: lerTags(row.cr40f_tags), prazo: lerPrazo(row.cr40f_prazo, row.cr40f_prazotipo),
 })
 
 export const mapEtapa = (row: Row): Etapa => ({
@@ -46,6 +48,7 @@ export const mapEtapa = (row: Row): Etapa => ({
   codigo: text(row.cr40f_codigo), nome: text(row.cr40f_name), status: num(row.cr40f_status) ?? STATUS.ideia,
   prazo: text(row.cr40f_prazo).slice(0, 10) || null, andamento: Math.min(100, Math.max(0, num(row.cr40f_andamento) ?? 0)),
   linkPr: text(row.cr40f_linkpr), publicadoProd: localIso(text(row.cr40f_publicadoprod)) || null,
+  motivoPausa: text(row.cr40f_motivopausa),
 })
 
 export const mapAnexo = (row: Row): Anexo => ({ id: cleanId(str(row.annotationid)), nome: text(row.filename) || 'arquivo', tipo: text(row.mimetype), tamanho: num(row.filesize) })

@@ -1,19 +1,22 @@
 // Projetos no Planner: quadro dos projetos (cr40f_projeto) por situação; clique no cartão abre o detalhe.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, StatusBadge, ToastProvider, useToast } from "@betinhos/ui";
-import { CircleCheck, Film, Image as ImageIcon, Lightbulb, ListChecks, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
+import { Alert, Button, Dialog, StatusBadge, Textarea, ToastProvider, useToast } from "@betinhos/ui";
+import { CalendarClock, CircleCheck, Film, Image as ImageIcon, Lightbulb, ListChecks, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
 import PageHeader from '../components/PageHeader';
 import { NewProjectDrawer, type CreatedProject } from '../components/NewProjectDrawer';
 import { ProjectDetailDrawer } from '../components/ProjectDetailDrawer';
 import type { Host } from '../../../host';
+import type { Row } from "@betinhos/dataverse";
 import { useQueryId } from '../../../nav/queryState';
 import { createSource, reasonText } from '../projetos/data/source';
 import { useProjetos } from '../projetos/useProjetos';
 import { STATUS } from '../projetos/domain/choices';
 import { progresso } from '../projetos/domain/checklist';
 import { codigoEtapa1 } from '../projetos/domain/regras';
+import { faltaPrazo, hojeIso, rotuloPrazo, situacaoPrazo } from '../projetos/domain/prazo';
+import { corDaTag, tagsEmUso } from '../projetos/domain/tags';
 import type { Perfil } from '../projetos/domain/types';
-import { BOARD_COLUMNS, attachmentKind, cardsByStatus, projectCards, type ProjectCard } from '../domain/projectsBoard';
+import { BOARD_COLUMNS, attachmentKind, cardsByStatus, filterByTag, projectCards, type ProjectCard } from '../domain/projectsBoard';
 
 const COLUMN_STYLE: Record<number, { key: string; icon: any; hint: string }> = {
   [STATUS.ideia]: { key: "idea", icon: Lightbulb, hint: "Anotada, ainda sem forma" },
@@ -85,6 +88,9 @@ function Board({ host }: { host?: Host }) {
   const [movingId, setMovingId] = useState("");
   const [freshId, setFreshId] = useState("");
   const [announcement, setAnnouncement] = useState("");
+  const [filtroTag, setFiltroTag] = useState("");
+  const [pausar, setPausar] = useState<ProjectCard | null>(null);
+  const [motivo, setMotivo] = useState("");
 
   useEffect(() => { let alive = true; void source.perfil().then((p) => { if (alive) setPerfil(p); }); return () => { alive = false; }; }, [source]);
   useEffect(() => {
@@ -94,21 +100,29 @@ function Board({ host }: { host?: Host }) {
   }, [freshId]);
 
   const cards = useMemo(() => projectCards(data.projetos, data.etapas, data.atualizacoes), [data.projetos, data.etapas, data.atualizacoes]);
-  const columns = useMemo(() => cardsByStatus(cards), [cards]);
-  const flipRef = useFlip(cards.map((c) => `${c.projeto.id}:${c.status}`).join("|"));
+  const tags = useMemo(() => tagsEmUso(data.projetos.map((p) => p.tags)), [data.projetos]);
+  const tagAtiva = tags.includes(filtroTag) ? filtroTag : "";
+  const columns = useMemo(() => cardsByStatus(filterByTag(cards, tagAtiva)), [cards, tagAtiva]);
+  const hoje = hojeIso();
+  // O filtro entra na chave: mostrar/esconder cartões muda as posições e o FLIP precisa medir de novo.
+  const flipRef = useFlip(`${tagAtiva}#${cards.map((c) => `${c.projeto.id}:${c.status}`).join("|")}`);
 
-  async function move(card: ProjectCard, novo: number) {
+  /** Pausado grava o motivo (opcional) junto; sair de Pausado limpa o motivo. */
+  async function move(card: ProjectCard, novo: number, motivoPausa = "") {
     if (movingId) return;
     if (novo === card.status) return;
     setMovingId(card.projeto.id);
+    const motivoNovo = novo === STATUS.pausada ? motivoPausa.trim().slice(0, 500) : "";
     try {
       if (card.etapa) {
-        await source.updateEtapa(card.etapa.id, { cr40f_status: novo });
-        data.upsertEtapa({ ...card.etapa, status: novo });
+        const changes: Row = { cr40f_status: novo };
+        if (motivoNovo !== card.etapa.motivoPausa) changes.cr40f_motivopausa = motivoNovo || null;
+        await source.updateEtapa(card.etapa.id, changes);
+        data.upsertEtapa({ ...card.etapa, status: novo, motivoPausa: motivoNovo });
       } else {
         const codigo = codigoEtapa1(card.projeto.codigo);
-        const id = await source.createEtapa({ cr40f_status: novo }, { projetoId: card.projeto.id, numero: 1, codigo });
-        data.upsertEtapa({ id, projetoId: card.projeto.id, numero: 1, codigo, nome: "", status: novo, prazo: null, andamento: 0, linkPr: "", publicadoProd: null });
+        const id = await source.createEtapa({ cr40f_status: novo, ...(motivoNovo ? { cr40f_motivopausa: motivoNovo } : {}) }, { projetoId: card.projeto.id, numero: 1, codigo });
+        data.upsertEtapa({ id, projetoId: card.projeto.id, numero: 1, codigo, nome: "", status: novo, prazo: null, andamento: 0, linkPr: "", publicadoProd: null, motivoPausa: motivoNovo });
       }
       setAnnouncement(`${card.projeto.nome} agora em ${labelOf(novo)}.`);
       if (novo === STATUS.concluida) setFreshId(card.projeto.id);
@@ -123,7 +137,15 @@ function Board({ host }: { host?: Host }) {
     const card = cards.find((c) => c.projeto.id === dragId);
     setDragId("");
     setDropStatus(null);
-    if (card && card.status !== status) void move(card, status);
+    if (!card || card.status === status) return;
+    if (status === STATUS.pausada) { setMotivo(""); setPausar(card); return; }
+    void move(card, status);
+  };
+
+  const confirmarPausa = (comMotivo: boolean) => {
+    const card = pausar;
+    setPausar(null);
+    if (card) void move(card, STATUS.pausada, comMotivo ? motivo : "");
   };
 
   const onCreated = ({ projeto, etapa, atualizacao, warning }: CreatedProject) => {
@@ -163,6 +185,16 @@ function Board({ host }: { host?: Host }) {
         </div>
       )}
 
+      {tags.length > 0 && (
+        <div className="projects-filter" role="group" aria-label="Filtrar por tag">
+          <button type="button" className={`projects-filter-chip${tagAtiva ? "" : " is-active"}`} aria-pressed={!tagAtiva} onClick={() => setFiltroTag("")}>Todas</button>
+          {tags.map((t) => (
+            <button key={t} type="button" className={`projects-filter-chip pj-tag--${corDaTag(t)}${tagAtiva === t ? " is-active" : ""}`} aria-pressed={tagAtiva === t}
+              onClick={() => setFiltroTag(tagAtiva === t ? "" : t)}>{t}</button>
+          ))}
+        </div>
+      )}
+
       <div className="projects-board" aria-busy={!data.loaded}>
         {BOARD_COLUMNS.map((column, columnIndex) => {
           const style = COLUMN_STYLE[column.value];
@@ -194,6 +226,9 @@ function Board({ host }: { host?: Host }) {
                 {items.map((card, index) => {
                   const id = card.projeto.id;
                   const checklist = progresso(card.projeto.checklist);
+                  const prazo = card.projeto.prazo;
+                  const situacao = prazo && card.status !== STATUS.concluida ? situacaoPrazo(prazo, hoje) : "ok";
+                  const motivoPausa = card.status === STATUS.pausada ? card.etapa?.motivoPausa : "";
                   return (
                     <article
                       key={id}
@@ -208,7 +243,19 @@ function Board({ host }: { host?: Host }) {
                       <span className="projects-card-code">{card.projeto.codigo || "Novo"}</span>
                       <h3><button type="button" className="projects-card-open" onClick={() => setOpenId(id)}>{card.projeto.nome}</button></h3>
                       {card.projeto.briefing && <p>{card.projeto.briefing}</p>}
+                      {motivoPausa && <p className="projects-card-pausa" title={motivoPausa}><PauseCircle size={13} aria-hidden="true" /><span><span className="sr-only">Motivo da pausa: </span>{motivoPausa}</span></p>}
+                      {card.projeto.tags.length > 0 && (
+                        <ul className="projects-card-tags" aria-label="Tags">
+                          {card.projeto.tags.map((t) => <li key={t} className={`pj-tag pj-tag--${corDaTag(t)}`}>{t}</li>)}
+                        </ul>
+                      )}
                       <footer className="projects-card-foot">
+                        {prazo && (
+                          <span className={`projects-card-prazo is-${situacao}`} title={`Prazo: ${rotuloPrazo(prazo, hoje)}${card.status === STATUS.concluida ? "" : ` · ${faltaPrazo(prazo, hoje)}`}`}>
+                            <CalendarClock size={13} aria-hidden="true" /><span className="sr-only">Prazo: </span>{rotuloPrazo(prazo, hoje)}
+                            {situacao !== "ok" && <b>{faltaPrazo(prazo, hoje)}</b>}
+                          </span>
+                        )}
                         <span className="projects-card-meta">
                           {checklist && <span className="projects-card-media" aria-label={`Checklist ${checklist}`}><span><ListChecks size={13} aria-hidden="true" />{checklist}</span></span>}
                           <AttachmentCounts card={card} />
@@ -225,8 +272,21 @@ function Board({ host }: { host?: Host }) {
 
       {data.loaded && (
         <ProjectDetailDrawer projeto={data.projetos.find((p) => p.id === openId) ?? null} atualizacoes={data.atualizacoes}
-          perfil={perfil} source={source} onClose={() => setOpenId(null)} onSaved={data.upsert} onAtualizacao={data.addAtualizacao} />
+          tagsEmUso={tags} perfil={perfil} source={source} onClose={() => setOpenId(null)} onSaved={data.upsert} onAtualizacao={data.addAtualizacao} />
       )}
+      <Dialog open={!!pausar} onClose={() => setPausar(null)} title={`Pausar “${pausar?.projeto.nome ?? ""}”`}
+        actions={<>
+          <Button variant="secondary" onClick={() => confirmarPausa(false)}>Pausar sem motivo</Button>
+          <Button onClick={() => confirmarPausa(true)}>Pausar</Button>
+        </>}>
+        <label className="projects-pausa-field">
+          <span>Motivo (opcional)</span>
+          <Textarea value={motivo} maxLength={500} rows={3} autoFocus placeholder="Ex.: esperando o financeiro definir os limites."
+            onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setMotivo(event.target.value)}
+            onKeyDown={(event: React.KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); confirmarPausa(true); } }} />
+          <small>O motivo aparece no cartão enquanto ele estiver em Pausado. Ctrl+Enter pausa.</small>
+        </label>
+      </Dialog>
       <NewProjectDrawer open={drawerOpen} source={source} perfil={perfil} onClose={() => setDrawerOpen(false)} onCreated={onCreated} />
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>

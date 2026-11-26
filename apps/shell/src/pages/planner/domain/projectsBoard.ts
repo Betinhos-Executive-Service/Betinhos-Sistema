@@ -2,6 +2,7 @@
 import { STATUS, STATUS_OPTIONS } from '../projetos/domain/choices'
 import { MAX_ANEXOS, erroDoAnexo } from '../projetos/domain/anexos'
 import { etapaDoProjeto } from '../projetos/domain/regras'
+import { compararPrazo } from '../projetos/domain/prazo'
 import type { Anexo, Atualizacao, Etapa, Projeto } from '../projetos/domain/types'
 
 export const BOARD_COLUMNS = STATUS_OPTIONS
@@ -15,7 +16,7 @@ export type ProjectCard = {
   ultimaData: string
 }
 
-/** Um cartão por projeto; projeto sem etapa fica em Ideia. Mais recentes primeiro. */
+/** Um cartão por projeto; projeto sem etapa fica em Ideia. Prazo mais cedo primeiro (sem prazo no fim), depois os mais recentes. */
 export function projectCards(projetos: Projeto[], etapas: Etapa[], atualizacoes: Atualizacao[]): ProjectCard[] {
   return projetos.map((projeto) => {
     const etapa = etapaDoProjeto(etapas, projeto.id)
@@ -27,7 +28,14 @@ export function projectCards(projetos: Projeto[], etapas: Etapa[], atualizacoes:
       anexos: doProjeto.flatMap((a) => a.anexos),
       ultimaData: doProjeto[0]?.data ?? '',
     }
-  }).sort((a, b) => b.ultimaData.localeCompare(a.ultimaData) || b.projeto.codigo.localeCompare(a.projeto.codigo, 'pt-BR', { numeric: true }))
+  }).sort((a, b) => compararPrazo(a.projeto.prazo, b.projeto.prazo) || b.ultimaData.localeCompare(a.ultimaData) || b.projeto.codigo.localeCompare(a.projeto.codigo, 'pt-BR', { numeric: true }))
+}
+
+/** Cartões que têm a tag (maiúsculas não contam); '' = todos. */
+export function filterByTag(cards: ProjectCard[], tag: string): ProjectCard[] {
+  if (!tag) return cards
+  const t = tag.toLocaleLowerCase('pt-BR')
+  return cards.filter((c) => c.projeto.tags.some((x) => x.toLocaleLowerCase('pt-BR') === t))
 }
 
 export function cardsByStatus(cards: ProjectCard[]): Map<number, ProjectCard[]> {

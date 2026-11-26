@@ -6,8 +6,10 @@ import { AUTOR, STATUS, autorDoPerfil } from './domain/choices'
 import { gravarChecklist, lerChecklist, progresso } from './domain/checklist'
 import { codigoEtapa1, etapaDoProjeto } from './domain/regras'
 import type { Etapa } from './domain/types'
+import { compararPrazo, faltaPrazo, gravarPrazo, lerPrazo, prazoMes, prazoSemana, rotuloPrazo, semanasDoMes, situacaoPrazo } from './domain/prazo'
+import { addTag, corDaTag, gravarTags, lerTags, tagsEmUso } from './domain/tags'
 
-const et = (over: Partial<Etapa>): Etapa => ({ id: 'e1', projetoId: 'p', numero: 1, codigo: 'PRJ-1.1', nome: 'E', status: STATUS.ideia, prazo: null, andamento: 0, linkPr: '', publicadoProd: null, ...over })
+const et = (over: Partial<Etapa>): Etapa => ({ id: 'e1', projetoId: 'p', numero: 1, codigo: 'PRJ-1.1', nome: 'E', status: STATUS.ideia, prazo: null, andamento: 0, linkPr: '', publicadoProd: null, motivoPausa: '', ...over })
 
 describe('checklist', () => {
   it('lê o JSON da coluna; vazio, inválido e item sem texto viram nada', () => {
@@ -59,7 +61,10 @@ describe('consultas, payloads e mapeamento do Dataverse', () => {
   it('projeto lê título, descrição e checklist', () => {
     expect(projetosPath('cr40f_projetos')).toContain('cr40f_checklist')
     expect(mapProjeto({ cr40f_projetoid: 'P1', cr40f_codigo: 'PRJ-1', cr40f_name: 'X', cr40f_briefing: 'd', cr40f_checklist: '[{"texto":"A","feito":true}]' }))
-      .toEqual({ id: 'p1', codigo: 'PRJ-1', nome: 'X', briefing: 'd', checklist: [{ texto: 'A', feito: true }] })
+      .toEqual({ id: 'p1', codigo: 'PRJ-1', nome: 'X', briefing: 'd', checklist: [{ texto: 'A', feito: true }], tags: [], prazo: null })
+    expect(mapProjeto({ cr40f_projetoid: 'P1', cr40f_tags: 'Frota, frota ,App', cr40f_prazo: '2026-12-13T00:00:00Z', cr40f_prazotipo: 100000001 }))
+      .toMatchObject({ tags: ['Frota', 'App'], prazo: { tipo: 'semana', fim: '2026-12-13' } })
+    expect(mapEtapa({ cr40f_projetoetapaid: 'E1', cr40f_motivopausa: ' Esperando ' }).motivoPausa).toBe('Esperando')
   })
   it('atualizações, etapas e payloads', () => {
     const path = atualizacoesPath('cr40f_projetoatualizacaos')
@@ -74,5 +79,56 @@ describe('consultas, payloads e mapeamento do Dataverse', () => {
     expect(payload).toMatchObject({ 'cr40f_Projeto@odata.bind': '/cr40f_projetos(p1)' })
     expect(JSON.stringify(payload)).not.toContain('cr40f_Etapa@odata.bind')
     expect(etapaPayload({ cr40f_status: STATUS.ideia }, { projetoId: 'p1', numero: 1, codigo: 'PRJ-1.1' }, sets)).toMatchObject({ cr40f_numero: 1, cr40f_codigo: 'PRJ-1.1' })
+  })
+})
+
+describe('prazo', () => {
+  it('semanas de segunda a domingo, cortadas no mês', () => {
+    expect(semanasDoMes(2026, 11).map((s) => [s.ini, s.fim])).toEqual([[1, 6], [7, 13], [14, 20], [21, 27], [28, 31]])
+    expect(semanasDoMes(2026, 1).map((s) => [s.ini, s.fim])).toEqual([[1, 1], [2, 8], [9, 15], [16, 22], [23, 28]])
+  })
+  it('mês, semana e dia: fim, início e rótulo', () => {
+    expect(prazoMes(2026, 1)).toEqual({ tipo: 'mes', fim: '2026-02-28' })
+    const s3 = prazoSemana(2026, 11, 3)
+    expect(s3).toEqual({ tipo: 'semana', fim: '2026-12-20' })
+    expect(rotuloPrazo(s3, '2026-11-26')).toBe('Sem 3 de dez · 14–20')
+    expect(rotuloPrazo(prazoMes(2026, 11), '2026-11-26')).toBe('dez/2026')
+    expect(rotuloPrazo({ tipo: 'dia', fim: '2026-12-12' }, '2026-11-26')).toBe('12/12')
+    expect(rotuloPrazo({ tipo: 'dia', fim: '2027-01-05' }, '2026-11-26')).toBe('05/01/2027')
+    expect(() => prazoSemana(2026, 11, 6)).toThrow()
+  })
+  it('situação e quanto falta: perto ≤7 d (mês), ≤3 (semana), ≤2 (dia); atrasado depois do fim', () => {
+    const hoje = '2026-11-26'
+    expect(situacaoPrazo(prazoMes(2026, 10), hoje)).toBe('perto')
+    expect(situacaoPrazo(prazoMes(2026, 11), hoje)).toBe('ok')
+    expect(situacaoPrazo({ tipo: 'semana', fim: '2026-11-29' }, hoje)).toBe('perto')
+    expect(situacaoPrazo({ tipo: 'dia', fim: '2026-11-29' }, hoje)).toBe('ok')
+    expect(situacaoPrazo({ tipo: 'dia', fim: '2026-11-25' }, hoje)).toBe('atrasado')
+    expect(faltaPrazo({ tipo: 'dia', fim: '2026-11-26' }, hoje)).toBe('vence hoje')
+    expect(faltaPrazo({ tipo: 'dia', fim: '2026-11-27' }, hoje)).toBe('falta 1 d')
+    expect(faltaPrazo({ tipo: 'dia', fim: '2026-11-23' }, hoje)).toBe('atrasado 3 d')
+  })
+  it('lê e grava as colunas; data sem tipo vale como dia; ordem com sem prazo no fim', () => {
+    expect(lerPrazo('2026-12-01', null)).toEqual({ tipo: 'dia', fim: '2026-12-01' })
+    expect(lerPrazo('', 100000002)).toBeNull()
+    expect(gravarPrazo(prazoMes(2026, 11))).toEqual({ cr40f_prazo: '2026-12-31', cr40f_prazotipo: 100000002 })
+    expect(gravarPrazo(null)).toEqual({ cr40f_prazo: null, cr40f_prazotipo: null })
+    const lista = [null, { tipo: 'dia' as const, fim: '2026-12-10' }, { tipo: 'mes' as const, fim: '2026-11-30' }]
+    expect(lista.sort(compararPrazo).map((p) => p?.fim ?? null)).toEqual(['2026-11-30', '2026-12-10', null])
+  })
+})
+
+describe('tags', () => {
+  it('sem repetir (maiúsculas não contam), sem vírgula e lista vazia limpa a coluna', () => {
+    expect(lerTags(' Frota ,frota, App  Motoristas,, ')).toEqual(['Frota', 'App Motoristas'])
+    expect(addTag(['Frota'], 'FROTA')).toEqual(['Frota'])
+    expect(addTag([], '  ')).toEqual([])
+    expect(gravarTags(['A', 'B'])).toBe('A, B')
+    expect(gravarTags([])).toBeNull()
+  })
+  it('cor fixa por nome e tags em uso das mais usadas para as menos', () => {
+    expect(corDaTag('Frota')).toBe(corDaTag('frota'))
+    expect(corDaTag('Frota')).toBeGreaterThanOrEqual(0)
+    expect(tagsEmUso([['Frota', 'App'], ['frota'], ['Banco']])).toEqual(['Frota', 'App', 'Banco'])
   })
 })
