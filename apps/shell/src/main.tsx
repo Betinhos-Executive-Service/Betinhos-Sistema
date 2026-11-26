@@ -10,8 +10,10 @@ import { aplicarTema, lerTema } from './app/tema'
 import { instalarLogDeErros } from './app/errorLog'
 import { instalarMedicaoDesempenho } from './app/perfLog'
 import { instalarCorrecaoViewportIos } from './app/viewportIos'
+import { instalarFaixaAmbiente } from './app/faixaAmbiente'
 
 instalarLogDeErros()
+instalarFaixaAmbiente()
 aplicarTema(lerTema())
 
 // Item do sitemap do model-driven abre o WebResource com `?data=<rota>`; vira hash antes de montar.
