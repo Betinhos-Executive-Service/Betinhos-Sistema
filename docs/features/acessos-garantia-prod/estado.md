@@ -2,7 +2,7 @@
 
 - Nível: 3 (muda permissões; o alvo final é o PROD)
 - Etapa: 6 de 7 Entregar (prova no DEV)
-- Próximo passo: merge do PR da perda aceita do histórico; depois card da ação B' (cortar no DEV) · com você
+- Próximo passo: desfazer no DEV (PR dev = desfazer) e conferir o estado de antes do corte · sozinho
 - Branch e PR: feat/acessos-garantia-prod · https://github.com/Betinhos-Executive-Service/Betinhos-Sistema/pull/765
 - Protótipo: sem protótipo
 - Go: aprovado em 26/11/2026 11:32 (construir no DEV e abrir PR para a develop; card antes de cada ação crítica no DEV)
@@ -38,13 +38,13 @@
 |---|---|---|---|---|---|---|
 | 1 | Camada 1: `foraDosPerfis`, tabelas nas áreas, teste de cobertura, gerado e migration | — | 1 | teste do mapa e do gerar (vitest/node) | 4 | passou: mapa 11/11, gerar 15/15; hash 07cf6f3f… |
 | 2 | Fase 1 `preparar` (adições, foto v3, desfazer) e fase 2 (trava de administrativos, resumo) | 1 | 3, 6 | testes de corte-regras, corte-preparo e corte-estado | 4 | passou: node --test 79/79 (travas de só leitura, colunas e tabelas padrão) |
-| 3 | DEV: migration pelo Deploy, `preparar` → conferir (`prova.mjs`) → `desfazer` | 1, 2 (merge na develop) | 2, 4, 5 | saída do relatório e do prova.mjs | 5 | preparar aplicado (PR #767): 2 pessoas com Base + 4 Gestores + Projetos e perfis de coluna; rodar de novo = 0 a receber. Simulação do cortar: travas 0 depois da perda aceita (antes 1, histórico); falta cortar, prova e desfazer |
+| 3 | DEV: migration pelo Deploy, `preparar` → conferir (`prova.mjs`) → `desfazer` | 1, 2 (merge na develop) | 2, 4, 5 | saída do relatório e do prova.mjs | 5 | preparar aplicado (PR #767): 2 pessoas com Base + 4 Gestores + Projetos e perfis de coluna; rodar de novo = 0 a receber. Simulação do cortar: travas 0 depois da perda aceita (antes 1, histórico). Cortar aplicado (PR #770, tag acessos-cortado-dev): a administrativa que não está na MANTER ficou só com os perfis e a mantida continua admin; prova.mjs 9/9 OK com os usuários de teste. Falta conferir o desfazer |
 
 ## Ações críticas (só nível 3)
 | # | Ação | Alvo real (ambiente, tabela, registros) | Simulação | Backup conferido | Plano de volta | Executada em |
 |---|---|---|---|---|---|---|
 | A | Preparar no DEV (`corte.json` dev: preparar) | DEV: papéis e perfis de coluna das pessoas administrativas; DEV não tem a equipe | plano no log do modo preparar sem `--aplicar` | foto do corte (artefato cifrado) | `desfazer` | 26/11/2026 (Deploy da develop, PR #767) |
-| B' | Cortar no DEV (`corte.json` dev: cortar) | DEV: 4 papéis diretos saem de 2 pessoas | `corte.mjs --etapa avaliar` local: travas 0 | foto do corte (artefato cifrado) | `desfazer` | |
+| B' | Cortar no DEV (`corte.json` dev: cortar) | DEV: 4 papéis diretos saem de 2 pessoas | `corte.mjs --etapa avaliar` local: travas 0 | foto do corte (artefato cifrado) | `desfazer` | 26/11/2026 (Deploy da develop, PR #770); desfazer aprovado no card |
 | B | (futuro, fora desta entrega) cortar no PROD | PROD: equipe com 3 papéis a retirar, 4 membros ativos; admin direto sai de 1 pessoa; 1 pessoa só tem a equipe | relatório no PROD | foto | `desfazer` | |
 
 ## Pendências e fora de escopo
