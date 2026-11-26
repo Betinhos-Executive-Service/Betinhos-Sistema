@@ -1,13 +1,14 @@
 # Cancelado da Tenaris passa pela trava e vira Requer Análise
 
 - Nível: 2 (plugin de proteção, plugin do aviso, flow Tenaris, flow do aviso, flow da gestão e coluna nova)
-- Etapa: 6 de 7 Provar (concluída no DEV)
-- Próximo passo: homologação do Renan no DEV; depois PROD pelo develop → main · com você
+- Etapa: 7 de 7 Entregar (homologado no DEV)
+- Próximo passo: PROD pelo develop → main a pedido do Renan; depois o checklist pós-deploy abaixo · com você
 - Branch e PR: feat/tenaris-cancelado-requer-analise · #773
 - Protótipo: sem protótipo
 - Go: 26/11/2026 14:57 por Renan (card)
 - PROD: ainda não
-- Atualizado: 26/11/2026 16:32
+- Homologação: 26/11/2026, Renan no App Motoristas do DEV (OS-1950: aviso Cancelado chegou; flow da gestão ligado só durante o teste e devolvido a rascunho)
+- Atualizado: 26/11/2026 17:19
 
 ## Decisões
 | Data | Decisão | Por quê | Quem decidiu |
@@ -51,6 +52,27 @@
 - Em execução → Requer Análise pela sincronização não avisa o motorista (o aviso só parte de Programado, como hoje).
 - O portal do cliente mostra Requer Análise como "em análise".
 - PROD: plugins e flows pelas soluções no próximo develop → main; flow Tenaris no PROD pelo "Publicar soluções" (está na BetinhosAutomacao).
+
+## Checklist pós-deploy no PROD
+Rodar em leitura logo depois que o "Publicar soluções" passar no PROD:
+- [ ] Coluna `cr40f_cancelamentocliente` existe em `cr40f_reservadeveculos`.
+- [ ] Choice `new_tipo` de `new_avisomotorista` tem Cancelado (100000002).
+- [ ] Imagem `pre` do step do `Cr40f.Protecao` (Update de `cr40f_reservadeveculos`) traz `cr40f_cancelamentocliente` e `new_snapshotsharepoint`.
+- [ ] Assembly `Cr40f.Protecao.Plugin` com a descrição igual ao SHA da `main` publicada.
+- [ ] Flow Tenaris (`Upsert_Geral` deixa passar Cancelado e Requer Análise) ligado e com a definição nova.
+- [ ] Flow da gestão ligado, com o gatilho `cr40f_status eq 100000001 or (cr40f_status eq 202410008 and cr40f_cancelamentocliente ne null)` e o título "Cancelado pela Tenaris".
+- [ ] "Aviso Motorista | Enviar" e o Vigia ligados.
+- [ ] Primeiro cancelamento real da Tenaris: registro com a marca, aviso Cancelado Enviado ao motorista (se Programado) e notificação da gestão.
+
+### Análise do deploy (26/11/2026, somente leitura, sem bloqueio)
+- (a) Flows Tenaris (`cbcd9564…`) e da gestão (`3b12fce1…`) estão em rascunho no DEV; o `restaurar-estados.ps1` devolve o estado do PROD (ligados), então o import não os desliga.
+- (b) BetinhosCore 1.0.0.34 no DEV e no PROD; `cr40f_reservadeveculos` e `new_avisomotorista` entram com `rootcomponentbehavior 0`, então a coluna e o choice novo devem ir junto (inferência; o ensaio no TEST confirma).
+- (c) A imagem `pre` vai com o step na BetinhosAutomacao, importada depois da Core (coluna já existe). Risco baixo.
+- (d) O flow Tenaris do DEV é o do PROD com o patch; o hotfix do lote de 18/11 está preservado. O flow da gestão do DEV tem `Compose_Mensagem_Padrao`/`Compose_Mensagem_Tenaris` e título condicional.
+- (e) Os 1.902 snapshots do PROD são válidos: sem rajada de avisos nas Concluídas antigas.
+- (f) Notificação dupla em duas gravações em segundos: rara, não tratada.
+- Steps: a única diferença DEV × PROD são 2 "ObjectModel Implementation" do sistema. Irrelevante.
+- Atenção: o `develop → main` leva 515 commits; um NO-GO de outra mudança segura esta junto.
 
 ## Retro
 -
