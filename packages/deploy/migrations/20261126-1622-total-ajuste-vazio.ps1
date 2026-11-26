@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string] $EnvironmentUrl = "https://org23b93544.crm2.dynamics.com/",
   [switch] $Apply
 )
