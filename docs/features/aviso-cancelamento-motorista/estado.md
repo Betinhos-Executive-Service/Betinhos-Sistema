@@ -3,7 +3,7 @@
 - Nível: 2 (schema: opção nova em choice; plugin; flow)
 - Etapa: 7 de 7 Entregar
 - Próximo passo: QA e merge do PR na develop; depois a tarefa 4 (prova no DEV) · com você
-- Branch e PR: t3/notificacao-cancelamento-servico-motoristas · ainda não
+- Branch e PR: t3/notificacao-cancelamento-servico-motoristas · https://github.com/Betinhos-Executive-Service/Betinhos-Sistema/pull/768
 - Protótipo: sem protótipo (só texto de push)
 - Go: 26/11/2026 13:24 por Renan (card)
 - PROD: ainda não
