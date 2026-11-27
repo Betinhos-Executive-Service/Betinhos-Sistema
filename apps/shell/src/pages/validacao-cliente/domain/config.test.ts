@@ -111,7 +111,7 @@ describe('prazos do portal', () => {
     expect(prazosDoForm(form({ antecedenciaTexto: '48', prazoCancelarTexto: '0', contato: ' 99 ' }))).toEqual({ antecedenciaPedidoH: 48, prazoCancelarH: 0, contato: '99' })
   })
   it('a prévia repete as frases do portal', () => {
-    expect(previaPrazos({ antecedenciaPedidoH: null, prazoCancelarH: null, contato: '' })).toEqual(['Pedidos com pelo menos 24 h de antecedência.', 'Você cancela até 12 h antes da saída.', 'Fale com a Betinhos.'])
+    expect(previaPrazos({ antecedenciaPedidoH: null, prazoCancelarH: null, contato: '' })).toEqual(['Pedidos com pelo menos 4 h de antecedência.', 'Você cancela até 2 h antes da saída.', 'Fale com a Betinhos.'])
     expect(previaPrazos({ antecedenciaPedidoH: 0, prazoCancelarH: 0, contato: 'zap.' })).toEqual(['Você cancela até a hora da saída.', 'Fale com a Betinhos: zap.'])
   })
   it('lê as colunas: vazio ou inválido vira padrão (null), 0 é mantido', () => {

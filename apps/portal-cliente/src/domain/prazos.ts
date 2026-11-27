@@ -3,8 +3,8 @@ import type { PrazosSessao as Prazos, StatusPedido } from './types'
 /** Prazos do cliente (colunas `cr40f_portalantecedenciapedido`, `cr40f_portalprazocancelar` e `cr40f_portalcontato`). 0 = sem limite; coluna vazia = padrão. */
 export type { Prazos }
 
-export const PADRAO_ANTECEDENCIA_H = 24
-export const PADRAO_CANCELAR_H = 12
+export const PADRAO_ANTECEDENCIA_H = 4
+export const PADRAO_CANCELAR_H = 2
 export const MAX_PRAZO_H = 720
 export const MAX_CONTATO = 100
 const HORA_MS = 3_600_000

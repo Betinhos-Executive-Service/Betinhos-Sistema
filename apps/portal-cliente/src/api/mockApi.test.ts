@@ -156,7 +156,7 @@ describe('mockApi multi-cliente', () => {
   it('pedido entra como Solicitado em Meus serviços; o mesmo pedido em 1 minuto é duplicado; depois passa', async () => {
     const { api, relogio } = await latasa()
     const antes = (await api.meusServicos()).length
-    const novo = { passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + 2 * 86400_000).toISOString() }
+    const novo = { passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + 2 * 86400_000).toISOString(), tipoVeiculo: 202410001 }
     const criado = await api.pedir(novo)
     expect(criado).toMatchObject({ status: 'solicitado', numero: /^RV-/ })
     expect((await api.meusServicos())[0]).toEqual(criado)
@@ -172,7 +172,7 @@ describe('mockApi multi-cliente', () => {
   it('prazos: a sessão traz a regra do cliente; pedir com pouca antecedência é recusado e cancelar fora do prazo também', async () => {
     const { api, relogio } = await latasa()
     expect(await api.sessao()).toMatchObject({ prazos: { antecedenciaPedidoH: 24, prazoCancelarH: 12, contato: '(12) 99999-0000 (WhatsApp)' } })
-    const pedido = (h: number) => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + h * 3600_000).toISOString() })
+    const pedido = (h: number) => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + h * 3600_000).toISOString(), tipoVeiculo: 202410001 })
     await expect(api.pedir(pedido(23))).rejects.toMatchObject({ message: expect.stringMatching(/menos de 24 h.*Fale com a Betinhos: \(12\) 99999-0000/) })
     const criado = await api.pedir(pedido(30))
     relogio.t += 19 * 3600_000 // faltam 11 h para a saída: passou do prazo de cancelar (12 h)
@@ -212,7 +212,7 @@ describe('mockApi multi-cliente', () => {
   it('pedido com pessoa nova cadastra; repetir nome e contato reaproveita; id existente corrige o contato; id alheio é recusado', async () => {
     const { api, relogio } = await latasa()
     const saida = new Date(T0 + 2 * 86400_000).toISOString()
-    const pedido = (passageiros: PassageiroPedido[], origem = 'Latasa') => ({ passageiros, origem, destino: 'GRU', saida })
+    const pedido = (passageiros: PassageiroPedido[], origem = 'Latasa') => ({ passageiros, origem, destino: 'GRU', saida, tipoVeiculo: 202410001 })
     const criado = await api.pedir(pedido([{ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br' }]))
     expect(criado.pessoas).toEqual([expect.objectContaining({ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br' })])
     const idNilza = criado.pessoas[0].id!
@@ -231,7 +231,7 @@ describe('mockApi multi-cliente', () => {
   it('endereço padrão: vem na busca; pedido novo e correção gravam; ausente não mexe; "" limpa; o digitado no pedido não vira padrão', async () => {
     const { api, relogio } = await latasa()
     const saida = new Date(T0 + 2 * 86400_000).toISOString()
-    const pedido = (passageiros: PassageiroPedido[], origem = 'Latasa') => ({ passageiros, origem, destino: 'GRU', saida })
+    const pedido = (passageiros: PassageiroPedido[], origem = 'Latasa') => ({ passageiros, origem, destino: 'GRU', saida, tipoVeiculo: 202410001 })
     const [carla] = await api.buscarPassageiros('carla')
     expect(carla).toMatchObject({ saidaPadrao: expect.stringContaining('Latasa'), destinoPadrao: expect.stringContaining('GRU') })
     const nova = await api.pedir(pedido([{ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br', saidaPadrao: 'Rua A, 10', destinoPadrao: 'Hotel B' }]))
@@ -253,7 +253,7 @@ describe('mockApi multi-cliente', () => {
   describe('aprovação', () => {
     const SOLICITANTE = 'carlos.mendes@latasa.com.br'
     const APROVADOR = 'gestor@latasa.com.br'
-    const novo = { passageiros: [{ nome: 'Ana Lima', email: 'ana@exemplo.com.br' }], origem: 'A', destino: 'B', saida: '2026-10-30T10:00:00Z' }
+    const novo = { passageiros: [{ nome: 'Ana Lima', email: 'ana@exemplo.com.br' }], origem: 'A', destino: 'B', saida: '2026-10-30T10:00:00Z', tipoVeiculo: 202410001 }
 
     it('só o aprovador tem a sessão marcada e vê a lista, sem os próprios pedidos', async () => {
       expect((await (await latasa(APROVADOR)).api.sessao())?.aprovador).toBe(true)

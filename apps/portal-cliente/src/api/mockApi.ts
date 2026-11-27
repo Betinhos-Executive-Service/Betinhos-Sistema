@@ -22,7 +22,7 @@ const logoMock = (cor: string, sigla: string) =>
 const MARCAS: Record<string, Marca> = {
   Latasa: { nome: 'Latasa', logoUrl: logoMock('#0a7d4a', 'ReciclaBR') },
 }
-/** Prazos por cliente (no real, colunas de `cr40f_clientes1`); sem entrada vale o padrão de 24 h e 12 h. */
+/** Prazos por cliente (no real, colunas de `cr40f_clientes1`); sem entrada vale o padrão de 4 h e 2 h; a Latasa do mock tem 24 h e 12 h para exercitar a regra por cliente. */
 const PRAZOS_MOCK: Record<string, Prazos> = {
   Latasa: { antecedenciaPedidoH: 24, prazoCancelarH: 12, contato: '(12) 99999-0000 (WhatsApp)' },
 }

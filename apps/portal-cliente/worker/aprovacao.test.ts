@@ -45,7 +45,7 @@ async function logar(email: string) {
 }
 
 const amanha = () => new Date(Date.now() + 48 * 3600_000).toISOString()
-const pedido = (extra: object = {}) => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001', email: 'hiroshi@exemplo.com' }], origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), ...extra })
+const pedido = (extra: object = {}) => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001', email: 'hiroshi@exemplo.com' }], origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), tipoVeiculo: 202410001, ...extra })
 const tiposDe = () => emails.map((e) => e.tipo)
 
 /** Pedido feito por compras@latasa.com.br; devolve o id da reserva. */

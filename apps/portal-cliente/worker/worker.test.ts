@@ -105,7 +105,7 @@ describe('login', () => {
     expect(curta.status).toBe(400)
     expect(await curta.json()).toMatchObject({ erro: 'senha_fraca' })
     const ok = await chamar('POST', '/auth/senha', { senha: SENHA }, etapa)
-    expect(await ok.json()).toEqual({ nome: 'Marcos', email: 'fiscal@tenaris.com', cliente: 'Tenaris', modulos: ['validar'], prazos: { antecedenciaPedidoH: 24, prazoCancelarH: 12, contato: '' } })
+    expect(await ok.json()).toEqual({ nome: 'Marcos', email: 'fiscal@tenaris.com', cliente: 'Tenaris', modulos: ['validar'], prazos: { antecedenciaPedidoH: 4, prazoCancelarH: 2, contato: '' } })
     expect(ok.headers.getSetCookie().join('\n')).toMatch(/__Host-portal_sessao=[^;]+; Path=\/; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict/)
     const gravado = String(banco.validadorclientes[0].cr40f_senhahash)
     expect(gravado).toMatch(/^pbkdf2\$100000\$/)
@@ -222,7 +222,7 @@ describe('multi-cliente', () => {
 
 describe('pedidos', () => {
   const amanha = () => new Date(Date.now() + 48 * 3600_000).toISOString()
-  const pedido = () => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), observacao: 'Voo LA3421' })
+  const pedido = () => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), tipoVeiculo: 202410001, observacao: 'Voo LA3421' })
 
   it('campo inválido: 400 com a mensagem do campo e nada criado', async () => {
     const sessao = await logar('compras@latasa.com.br')
@@ -247,14 +247,34 @@ describe('pedidos', () => {
     expect(banco.servicosporpassageiros).toHaveLength(1)
     expect(banco.reservadeveculoses[0]).toMatchObject({
       cr40f_status: 202410004, _cr40f_cliente_value: LATASA, _cr40f_portalusuario_value: usuario.cr40f_validadorclienteid,
-      cr40f_portalpedido: JSON.stringify({ passageiros: ['Hiroshi Tanaka'], observacao: 'Voo LA3421' }),
+      cr40f_portalpedido: JSON.stringify({ passageiros: ['Hiroshi Tanaka'], observacao: 'Voo LA3421', tipoVeiculo: 202410001 }),
+      cr40f_trajeto: 'Latasa / GRU', cr40f_tipodoservico: 202410000,
       cr40f_passageirosetelefonedecontato: 'Hiroshi Tanaka – (12) 99999-0001', cr40f_observaointerna: 'Pedido pelo portal por Compras (compras@latasa.com.br): Voo LA3421',
     })
     expect(banco.reservadeveculoses[0].cr40f_id).toBe('RV-48500') // numerado pelo Dataverse, nunca pelo Worker
+    // Solicitante: pessoa do cliente com o e-mail da sessão, criada na 1ª vez.
+    const doUsuario = banco.bancodedadoses.filter((p) => p.cr40f_email === 'compras@latasa.com.br')
+    expect(doUsuario).toHaveLength(1)
+    expect(banco.reservadeveculoses[0]['cr40f_Solicitante@odata.bind']).toBe(`/cr40f_bancodedadoses(${doUsuario[0].cr40f_bancodedadosid})`)
     const repetido = await chamar('POST', '/pedidos', mesmo, sessao)
     expect(repetido.status).toBe(409)
     expect(await repetido.json()).toMatchObject({ erro: 'duplicado' })
     expect(banco.reservadeveculoses).toHaveLength(1)
+    // 2º pedido do mesmo usuário reaproveita a pessoa, sem criar outra.
+    const outro = await chamar('POST', '/pedidos', { ...pedido(), origem: 'Outro endereço' }, sessao)
+    expect(outro.status).toBe(201)
+    expect(banco.bancodedadoses.filter((p) => p.cr40f_email === 'compras@latasa.com.br')).toHaveLength(1)
+    expect(banco.reservadeveculoses[1]['cr40f_Solicitante@odata.bind']).toBe(banco.reservadeveculoses[0]['cr40f_Solicitante@odata.bind'])
+  })
+
+  it('passageiro com o e-mail do login e outro nome não vira o solicitante', async () => {
+    const sessao = await logar('compras@latasa.com.br')
+    const r = await chamar('POST', '/pedidos', { ...pedido(), passageiros: [{ nome: 'Hiroshi Tanaka', email: 'compras@latasa.com.br' }] }, sessao)
+    expect(r.status).toBe(201)
+    const comEmail = banco.bancodedadoses.filter((p) => p.cr40f_email === 'compras@latasa.com.br')
+    expect(comEmail.map((p) => p.cr40f_nomedopassageiro).sort()).toEqual(['Compras', 'Hiroshi Tanaka'])
+    const solicitante = comEmail.find((p) => p.cr40f_nomedopassageiro === 'Compras')!
+    expect(banco.reservadeveculoses[0]['cr40f_Solicitante@odata.bind']).toBe(`/cr40f_bancodedadoses(${solicitante.cr40f_bancodedadosid})`)
   })
 
   it('Meus serviços lista só os pedidos do usuário e reflete a programação feita no shell', async () => {
@@ -303,7 +323,7 @@ describe('pedidos', () => {
     const latasa = banco.clientes1s.find((c) => c.cr40f_clientes1id === LATASA)!
     Object.assign(latasa, { cr40f_portalantecedenciapedido: 48, cr40f_portalcontato: '(12) 90000-0000' })
     const sessao = await logar('paula@latasa.com.br')
-    expect(await (await chamar('GET', '/auth/sessao', undefined, sessao)).json()).toMatchObject({ prazos: { antecedenciaPedidoH: 48, prazoCancelarH: 12, contato: '(12) 90000-0000' } })
+    expect(await (await chamar('GET', '/auth/sessao', undefined, sessao)).json()).toMatchObject({ prazos: { antecedenciaPedidoH: 48, prazoCancelarH: 2, contato: '(12) 90000-0000' } })
     const cedo = await chamar('POST', '/pedidos', { ...pedido(), saida: new Date(Date.now() + 30 * 3600_000).toISOString() }, sessao)
     expect(cedo.status).toBe(400)
     expect(await cedo.json()).toMatchObject({ mensagem: expect.stringContaining('(12) 90000-0000') })
@@ -350,7 +370,7 @@ describe('pedidos', () => {
 
 describe('passageiros do pedido', () => {
   const amanha = () => new Date(Date.now() + 48 * 3600_000).toISOString()
-  const pedido = (passageiros: unknown[], extra: Record<string, unknown> = {}) => ({ passageiros, origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), ...extra })
+  const pedido = (passageiros: unknown[], extra: Record<string, unknown> = {}) => ({ passageiros, origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), tipoVeiculo: 202410001, ...extra })
   const pessoa = (nome: string, cliente = LATASA, extra: Record<string, unknown> = {}) => {
     const reg = { cr40f_bancodedadosid: `bbbbbbbb-0000-0000-0000-${String(banco.bancodedadoses.length + 1).padStart(12, '0')}`, cr40f_nomedopassageiro: nome, cr40f_telefone: '12999990001', cr40f_email: null, _cr40f_cliente_value: cliente, ...extra }
     banco.bancodedadoses.push(reg)
@@ -396,7 +416,7 @@ describe('passageiros do pedido', () => {
     const sessao = await logar('compras@latasa.com.br')
     const r = await chamar('POST', '/pedidos', pedido([{ nome: 'Ana Souza', telefone: '(12) 99999-0001' }, { nome: 'Bia Lima', email: 'bia@exemplo.com' }], { tipoVeiculo: 202410003 }), sessao)
     expect(r.status).toBe(201)
-    expect(banco.bancodedadoses).toHaveLength(2)
+    expect(banco.bancodedadoses).toHaveLength(3) // 2 passageiros + a pessoa do solicitante
     expect(banco.bancodedadoses[0]).toMatchObject({ cr40f_nomedopassageiro: 'Ana Souza', cr40f_telefone: '(12) 99999-0001', _cr40f_cliente_value: LATASA, cr40f_status: 202410000 })
     expect(banco.servicosporpassageiros.map((v) => [v._cr40f_bancodedados_value, v.cr40f_ordemdeselecao, v._cr40f_geral_value])).toEqual([
       [banco.bancodedadoses[0].cr40f_bancodedadosid, 1, banco.reservadeveculoses[0].cr40f_reservadeveculosid],
@@ -414,7 +434,7 @@ describe('passageiros do pedido', () => {
     const ana = pessoa('Ana Souza')
     const r = await chamar('POST', '/pedidos', pedido([{ id: ana.cr40f_bancodedadosid, nome: 'Ana Souza', telefone: '12988887777', email: 'ana@exemplo.com' }]), sessao)
     expect(r.status).toBe(201)
-    expect(banco.bancodedadoses).toHaveLength(1)
+    expect(banco.bancodedadoses).toHaveLength(2) // Ana + a pessoa do solicitante
     expect(banco.bancodedadoses[0]).toMatchObject({ cr40f_telefone: '12988887777', cr40f_email: 'ana@exemplo.com' })
     expect(banco.servicosporpassageiros).toHaveLength(1)
   })
@@ -497,10 +517,11 @@ describe('passageiros do pedido', () => {
     const sessao = await logar('compras@latasa.com.br')
     pessoa('Ana Souza')
     expect((await chamar('POST', '/pedidos', pedido([{ nome: 'ana souza', telefone: '(12) 99999-0001' }]), sessao)).status).toBe(201)
-    expect(banco.bancodedadoses).toHaveLength(1)
+    const passageiros = () => banco.bancodedadoses.filter((p) => p.cr40f_email !== 'compras@latasa.com.br') // fora a pessoa do solicitante
+    expect(passageiros()).toHaveLength(1)
     // Mesmo nome, contato diferente: outra pessoa.
     expect((await chamar('POST', '/pedidos', pedido([{ nome: 'Ana Souza', telefone: '12977776666' }], { origem: 'Outro lugar' }), sessao)).status).toBe(201)
-    expect(banco.bancodedadoses).toHaveLength(2)
+    expect(passageiros()).toHaveLength(2)
   })
 
   it('validação do contato e repetição vêm do domínio: 400 sem reserva', async () => {
@@ -515,14 +536,18 @@ describe('passageiros do pedido', () => {
     expect(banco.servicosporpassageiros).toHaveLength(4)
   })
 
-  it('tipo de veículo fora da lista: 400; sem tipo não grava a coluna', async () => {
+  it('tipo de veículo é obrigatório e fora da lista é 400', async () => {
     const sessao = await logar('compras@latasa.com.br')
     const ruim = await chamar('POST', '/pedidos', pedido([{ nome: 'Ana', email: 'a@b.co' }], { tipoVeiculo: 7 }), sessao)
     expect(ruim.status).toBe(400)
     expect(await ruim.json()).toMatchObject({ mensagem: 'Tipo de veículo inválido.' })
     expect((await chamar('POST', '/pedidos', pedido([{ nome: 'Ana', email: 'a@b.co' }], { tipoVeiculo: 'Van' }), sessao)).status).toBe(400)
+    const sem = await chamar('POST', '/pedidos', pedido([{ nome: 'Ana', email: 'a@b.co' }], { tipoVeiculo: undefined }), sessao)
+    expect(sem.status).toBe(400)
+    expect(await sem.json()).toMatchObject({ mensagem: 'Escolha o tipo de veículo.' })
+    expect(banco.reservadeveculoses).toHaveLength(0)
     expect((await chamar('POST', '/pedidos', pedido([{ nome: 'Ana', email: 'a@b.co' }]), sessao)).status).toBe(201)
-    expect(banco.reservadeveculoses[0]).not.toHaveProperty('cr40f_tipodeveiculo')
+    expect(banco.reservadeveculoses[0]).toMatchObject({ cr40f_tipodeveiculo: 202410001 })
   })
 
   it('vínculo recusado pelo Dataverse: apaga a reserva, devolve erro e libera a nova tentativa', async () => {

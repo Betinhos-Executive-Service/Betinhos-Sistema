@@ -7,9 +7,10 @@ import type { Ctx } from './auth'
 import { sha256Hex } from './cripto'
 import { erro, json, lerJson, type Sessao } from './http'
 import { mapearPedido, type PedidoPortal, type Registro } from './mapear'
-import { criarPedido as caminhoCriar, criarPessoa, ehGuid, guid, pedidoDe, pedidosDe, pessoaDoCliente, pessoasComNome, pessoasDoCliente } from './odata'
+import { criarPedido as caminhoCriar, criarPessoa, ehGuid, guid, pedidoDe, pedidosDe, pessoaComEmail, pessoaDoCliente, pessoasComNome, pessoasDoCliente } from './odata'
 import { alterarPendente, anexarNota, aprovadoresDoPedido, avisarAprovadores, dataHoraSp, ESTADO, quandoETrajeto } from './aprovacao'
 import { enviarEmail, ErroDataverse } from './dataverse'
+import { tipoServicoDoPedido, trajetoDoPedido } from './campos'
 import { prazosDoCliente } from './prazos'
 import { APROVACAO, NAV, PESSOA_ATIVA, PESSOA_CAMPOS, PESSOA_CAMPOS_ENDERECO, RESERVA_CANCELADO, RESERVA_SOLICITADO, SET } from './schema'
 
@@ -137,13 +138,15 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
 
   // 3) Reserva e, por último, o vínculo de cada pessoa (Serviços por Passageiro, ordem 1..N).
   // Cliente com aprovação ligada: o pedido nasce Pendente e só chega à operação depois da decisão (lido à parte, tolerante a coluna ausente).
-  const aprovadores = await aprovadoresDoPedido(c.dv, sessao.cid, sessao.vid)
+  const [aprovadores, solicitanteId] = await Promise.all([aprovadoresDoPedido(c.dv, sessao.cid, sessao.vid), solicitanteDoPedido(c, sessao, pessoas)])
   const portal: PedidoPortal = { passageiros: pessoas.map((p) => p.nome), ...(pedido.observacao ? { observacao: pedido.observacao } : {}), ...(pedido.tipoVeiculo !== undefined ? { tipoVeiculo: pedido.tipoVeiculo } : {}) }
   const criado = await c.dv.criar(caminhoCriar(), {
     cr40f_status: RESERVA_SOLICITADO,
     cr40f_dataehorriodesada: new Date(Date.parse(pedido.saida)).toISOString(),
     cr40f_endereodesada: pedido.origem,
     cr40f_destino: pedido.destino,
+    cr40f_trajeto: trajetoDoPedido(pedido.origem, pedido.destino),
+    cr40f_tipodoservico: tipoServicoDoPedido(pedido.origem, pedido.destino),
     ...(pedido.tipoVeiculo !== undefined ? { cr40f_tipodeveiculo: pedido.tipoVeiculo } : {}),
     cr40f_portalpedido: JSON.stringify(portal),
     ...(aprovadores.length ? { cr40f_portalaprovacao: APROVACAO.pendente } : {}),
@@ -152,6 +155,7 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
     cr40f_observaointerna: `Pedido pelo portal por ${sessao.nome} (${sessao.email})${pedido.observacao ? `: ${pedido.observacao}` : ''}`,
     [`${NAV.cliente}@odata.bind`]: `/${SET.cliente}(${sessao.cid})`,
     [`${NAV.portalUsuario}@odata.bind`]: `/${SET.validador}(${sessao.vid})`,
+    ...(solicitanteId ? { [`${NAV.solicitante}@odata.bind`]: `/${SET.pessoa}(${guid(solicitanteId)})` } : {}),
   })
   const reservaId = str(criado, 'cr40f_reservadeveculosid')
   try {
@@ -181,6 +185,32 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
   // Marca só depois de criar tudo: uma falha no Dataverse não bloqueia a nova tentativa por 1 minuto.
   c.waitUntil(c.env.KV.put(chave, '1', { expirationTtl: JANELA_DUPLICADO_MS / 1000 }))
   return json({ ...mapearPedido(criado, sessao.vid), passageiros: pessoas.map((p) => p.nome), pessoas, ...(pedido.tipoVeiculo !== undefined ? { tipoVeiculo: pedido.tipoVeiculo } : {}) }, 201)
+}
+
+/**
+ * Solicitante (obrigatório no Formulário Geral) é a pessoa do cliente com o e-mail do login (decisão do Renan, 27/11/2026):
+ * a de nome igual ao da sessão, senão a mais antiga que não seja passageiro deste pedido (quem pede para outro e põe o
+ * próprio e-mail no contato dele não vira o passageiro); sem nenhuma, ficha nova. Falha aqui não barra o pedido.
+ */
+async function solicitanteDoPedido(c: Ctx, sessao: Sessao, pessoas: PassageiroPedido[]): Promise<string | undefined> {
+  const email = sessao.email.trim().toLowerCase()
+  const nome = sessao.nome.trim().toLowerCase()
+  try {
+    const fichas = await c.dv.lista(pessoaComEmail(sessao.cid, email))
+    const doPedido = new Set(pessoas.map((p) => p.id))
+    const ficha = fichas.find((f) => str(f, 'cr40f_nomedopassageiro').trim().toLowerCase() === nome) ?? fichas.find((f) => !doPedido.has(str(f, 'cr40f_bancodedadosid')))
+    if (ficha) return str(ficha, 'cr40f_bancodedadosid')
+    const nova = await c.dv.criar(criarPessoa(), {
+      cr40f_nomedopassageiro: sessao.nome || email,
+      cr40f_email: email,
+      cr40f_status: PESSOA_ATIVA,
+      [`${NAV.pessoaCliente}@odata.bind`]: `/${SET.cliente}(${sessao.cid})`,
+    })
+    return str(nova, 'cr40f_bancodedadosid')
+  } catch (e) {
+    console.error('solicitante do pedido falhou', e instanceof Error ? e.message : e)
+    return undefined
+  }
 }
 
 /** Reserva sem passageiros não pode ficar na fila da operação: apaga; se o papel não deixar, cancela com nota. */

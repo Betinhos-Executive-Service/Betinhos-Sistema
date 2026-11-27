@@ -82,7 +82,7 @@ export const LADO_DV = { cliente: 100000000, betinhos: 100000001 } as const
 export const MOTIVO_DV = { espera: 100000000, km_rota: 100000001, valor: 100000002, passageiro: 100000003, outro: 100000004 } as const
 
 /** Navigation property do lookup cr40f_Reserva (schema name) e do lookup new_composicaodepreco da composição na reserva (navegação new_ComposicaodePreco, metadata DEV/PROD 23/11/2026). */
-export const NAV = { passageiros: 'cr40f_servicosporpassageiro_Geral_cr40f_reservadeveculos', reserva: 'cr40f_Reserva', composicao: 'new_ComposicaodePreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario', pessoaCliente: 'cr40f_Cliente', vinculoGeral: 'cr40f_Geral', vinculoPessoa: 'cr40f_BancodeDados' }
+export const NAV = { passageiros: 'cr40f_servicosporpassageiro_Geral_cr40f_reservadeveculos', reserva: 'cr40f_Reserva', composicao: 'new_ComposicaodePreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario', pessoaCliente: 'cr40f_Cliente', vinculoGeral: 'cr40f_Geral', vinculoPessoa: 'cr40f_BancodeDados', solicitante: 'cr40f_Solicitante' }
 
 export const RESERVA_CAMPOS = [
   'cr40f_id', 'cr40f_idtenaris', 'cr40f_cr', 'cr40f_dataehorriodesada', 'cr40f_endereodesada', 'cr40f_destino',

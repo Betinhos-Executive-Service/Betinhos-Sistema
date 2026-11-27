@@ -162,11 +162,11 @@ export function gerarPedidos(agora: Date): PedidoMock[] {
       ...(status === 'programado' || status === 'concluido' ? { veiculo: VEICULOS[i % VEICULOS.length], motorista: MOTORISTAS[i % MOTORISTAS.length][0], placa: MOTORISTAS[i % MOTORISTAS.length][1], voucherUrl: `https://exemplo.betinhos.com.br/voucher/${numero}.pdf` } : {}),
     }
   })
-  // Confirmado e saindo em 5 h: já passou do prazo de cancelar (12 h), para ver a regra com o contato.
-  const saida = new Date(agora.getTime() + 5 * 3600_000)
-  const em5h: PedidoMock = {
+  // Confirmado e saindo em 1 h: já passou de qualquer prazo de cancelar (padrão 2 h), para ver a regra com o contato.
+  const saida = new Date(agora.getTime() + 3600_000)
+  const emBreve: PedidoMock = {
     id: 'ped-seed-prazo', numero: 'RV-48299', origem: ROTAS_LATASA[0][0], destino: ROTAS_LATASA[0][1], saida: saida.toISOString(), status: 'confirmado', solicitante: SOLICITANTE_LATASA,
     passageiros: [PESSOAS_LATASA[1].nome], pessoas: [PESSOAS_LATASA[1]], criadoEm: new Date(agora.getTime() - DIA_MS).toISOString(),
   }
-  return [...planejados, em5h]
+  return [...planejados, emBreve]
 }
