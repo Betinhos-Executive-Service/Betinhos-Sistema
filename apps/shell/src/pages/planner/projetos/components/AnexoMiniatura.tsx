@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { FileText, Film, ImageOff, LoaderCircle, Play } from 'lucide-react'
+import { AlertCircle, FileText, Film, ImageOff, LoaderCircle, Play, RotateCcw, X } from 'lucide-react'
 import type { Source } from '../data/source'
-import { ehImagem, ehVideo } from '../domain/anexos'
+import { ehAudio, ehImagem, ehVideo } from '../domain/anexos'
 import type { Anexo } from '../domain/types'
 
 type Props = { anexo: Anexo; source: Source }
@@ -74,6 +74,45 @@ export function AnexoAudio({ anexo, source }: Props) {
           </button>
         )}
       {estado === 'erro' ? <span className="pj-muted" role="alert">Não foi possível baixar o áudio. Tente de novo.</span> : null}
+    </div>
+  )
+}
+
+type EnvioProps = { arquivo: File; previa: string; erro: string; onRetry: () => void; onDiscard: () => void }
+
+/** Anexo que acabou de ser escolhido: aparece na hora (com prévia da imagem) enquanto sobe; se falhar, oferece tentar de novo ou descartar. */
+export function AnexoEnviando({ arquivo, previa, erro, onRetry, onDiscard }: EnvioProps) {
+  const audio = ehAudio(arquivo.type)
+  const Icone = ehVideo(arquivo.type) ? Film : FileText
+  const estado = erro
+    ? <span className="pj-envio__falha" role="alert"><AlertCircle size={13} aria-hidden="true" />Falhou</span>
+    : <span className="pj-envio__sub">Enviando…</span>
+  const acoes = erro ? (
+    <span className="pj-envio__acoes">
+      <button type="button" onClick={onRetry} title={erro}><RotateCcw size={13} aria-hidden="true" />Tentar de novo</button>
+      <button type="button" onClick={onDiscard} aria-label={`Descartar ${arquivo.name}`}><X size={13} aria-hidden="true" /></button>
+    </span>
+  ) : null
+  if (audio) {
+    return (
+      <div className={`pj-audio pj-envio${erro ? ' is-erro' : ''}`} aria-busy={!erro || undefined}>
+        <span className="pj-audio__ouvir">
+          <span className="pj-audio__play" aria-hidden="true">{erro ? <AlertCircle size={16} /> : <LoaderCircle size={16} className="pj-spin" />}</span>
+          <span className="pj-audio__info"><strong>{arquivo.name}</strong>{estado}</span>
+          {acoes}
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className={`pj-anexo pj-envio${erro ? ' is-erro' : ''}`} aria-busy={!erro || undefined}>
+      <span className="pj-anexo__thumb">
+        {previa ? <img src={previa} alt="" /> : <Icone size={22} />}
+        <span className="pj-envio__selo" aria-hidden="true">{erro ? <AlertCircle size={16} /> : <LoaderCircle size={16} className="pj-spin" />}</span>
+      </span>
+      <span className="pj-anexo__nome">{arquivo.name}</span>
+      {estado}
+      {acoes}
     </div>
   )
 }
