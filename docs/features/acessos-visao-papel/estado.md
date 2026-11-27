@@ -1,11 +1,11 @@
 # Acessos: visão por papel, ver como e saída de administrativo
 
 - Nível: 2 (várias telas e um caminho novo de encerrar acesso; sem schema novo; saída com revisão Opus de segurança)
-- Etapa: 4 de 7 Go
-- Próximo passo: card do Go · com você
+- Etapa: 5 de 7 Construir
+- Próximo passo: tarefa 1 (plugin) · sozinho
 - Branch e PR: feat/acessos-visao-papel (base feat/acessos-o-que-perde, PR #777) · ainda não
 - Protótipo: A (matriz pessoa × área, filtros: ainda com o amplo, só o Base, encerrados) e ficha com banner "Vendo como", Encerrar com confirmação pelo primeiro nome e Reativar com os perfis anteriores; B descartada
-- Go: pendente
+- Go: 27/11/2026 09:26 por Renan (clique no card)
 - PROD: ainda não
 - Atualizado: 27/11/2026 09:26
 
