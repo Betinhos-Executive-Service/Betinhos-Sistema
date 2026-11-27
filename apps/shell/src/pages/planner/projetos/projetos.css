@@ -195,3 +195,40 @@
 .pj-drop:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
 .pj-drop[aria-disabled="true"] { opacity: .6; cursor: progress; }
 @media (prefers-reduced-motion: reduce) { .pj-audio__play, .pj-drop { transition: none; } .pj-audio__ouvir:active:not([aria-disabled="true"]) .pj-audio__play { transform: none; } }
+
+/* Anexos com cor: cada tipo tem seu tom, o play e a zona de soltar usam a cor de ação.
+   Vídeo e áudio derivam dos tokens herdados (surface e text-primary), então seguem o tema do container
+   (o Planner fixa o claro no .planner-page; um :root[data-theme] não serviria). Imagem e PDF usam action e danger. */
+.pj-detalhe {
+  --pj-tom-video: color-mix(in srgb, var(--bt-color-purple-700) 92%, var(--bt-color-text-primary)); --pj-tom-video-soft: color-mix(in srgb, var(--bt-color-purple-700) 14%, var(--bt-color-surface));
+  --pj-tom-audio: color-mix(in srgb, var(--bt-color-orange-700) 95%, var(--bt-color-text-primary)); --pj-tom-audio-soft: color-mix(in srgb, var(--bt-color-orange-700) 15%, var(--bt-color-surface));
+}
+.pj-acao { color: var(--bt-color-action); }
+.pj-acao:hover:not(:disabled) { background-color: var(--bt-color-action-soft); }
+.pj-acao.is-gravando:hover:not(:disabled) { background-color: var(--bt-color-danger-soft); }
+.pj-anexo .pj-anexo__thumb { position: relative; gap: 2px; align-content: center; }
+.pj-anexo.is-video .pj-anexo__thumb { background: var(--pj-tom-video-soft); border-color: transparent; color: var(--pj-tom-video); }
+.pj-anexo.is-pdf .pj-anexo__thumb { background: var(--bt-color-danger-soft); border-color: transparent; color: var(--bt-color-danger); }
+.pj-anexo__thumb small { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-semibold); }
+.pj-audios li { border-color: transparent; background: var(--pj-tom-audio-soft); }
+.pj-audio__play { width: 40px; height: 40px; background: var(--pj-tom-audio); color: var(--bt-color-on-solid); box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
+.pj-audio__play svg { margin-left: 2px; }
+@media (hover: hover) and (pointer: fine) { .pj-audio__ouvir:hover .pj-audio__play { background: var(--pj-tom-audio); transform: scale(1.06); } }
+.pj-audio__info small { color: var(--pj-tom-audio); font-weight: var(--bt-font-weight-semibold); }
+.pj-transcricao { padding: var(--bt-space-2) var(--bt-space-3); border: 0; border-radius: var(--bt-radius-sm); background: var(--bt-color-surface); }
+.pj-transcricao__lbl { display: flex; align-items: center; gap: 4px; color: var(--pj-tom-audio); }
+.pj-drop { gap: var(--bt-space-3); padding: var(--bt-space-3) var(--bt-space-4); border-color: var(--bt-color-action); border-width: 1.5px; background: var(--bt-color-action-soft); }
+.pj-drop__icone { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: var(--bt-radius-full); background: var(--bt-color-action); color: var(--bt-color-on-solid); transition: transform 160ms ease-out; }
+.pj-drop > .pj-drop__texto { display: grid; gap: 6px; min-width: 0; }
+.pj-drop strong { color: var(--bt-color-action); }
+.pj-drop__tipos { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pj-drop__tipos > span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--bt-radius-full); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-semibold); }
+.pj-drop__tipos .is-imagem { background: var(--bt-color-surface); color: var(--bt-color-action); }
+.pj-drop__tipos .is-video { background: var(--pj-tom-video-soft); color: var(--pj-tom-video); }
+.pj-drop__tipos .is-audio { background: var(--pj-tom-audio-soft); color: var(--pj-tom-audio); }
+.pj-drop__tipos .is-pdf { background: var(--bt-color-danger-soft); color: var(--bt-color-danger); }
+.pj-drop__tipos small { margin-left: 2px; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+@media (hover: hover) and (pointer: fine) { .pj-drop:hover:not([aria-disabled="true"]) { background: var(--bt-color-action-soft); border-style: solid; border-color: var(--bt-color-action); } .pj-drop:hover:not([aria-disabled="true"]) .pj-drop__icone { transform: translateY(-2px); } }
+.pj-drop.is-arrastando { border-style: solid; border-color: var(--bt-color-action); background: var(--bt-color-action-soft); }
+.pj-drop.is-arrastando .pj-drop__icone { transform: translateY(-2px) scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .pj-drop__icone { transition: none; } .pj-drop.is-arrastando .pj-drop__icone, .pj-drop:hover:not([aria-disabled="true"]) .pj-drop__icone, .pj-audio__ouvir:hover .pj-audio__play { transform: none; } }
