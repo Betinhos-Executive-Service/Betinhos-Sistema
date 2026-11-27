@@ -1,7 +1,7 @@
 // Detalhe do projeto no Planner: coluna (só leitura) e prazo no topo; título, descrição e checklist (Salvar) e anexos com áudio (enviados na hora).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Checkbox, Dialog, Drawer, Textarea, useToast } from "@betinhos/ui";
-import { Paperclip, Plus, X } from "lucide-react";
+import { Clock, Paperclip, Plus, Upload, X } from "lucide-react";
 import { AudioRecorder } from "./AudioRecorder";
 import type { Row } from "@betinhos/dataverse";
 import { reasonText, type Source } from "../projetos/data/source";
@@ -53,6 +53,8 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   const [descartar, setDescartar] = useState(false);
   // Item recém-adicionado entra com animação; só ele, para não piscar a lista inteira.
   const [novoIndex, setNovoIndex] = useState(-1);
+  // Arquivo sendo arrastado sobre o painel: destaca a zona de soltar.
+  const [arrastando, setArrastando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const tituloRef = useRef<HTMLInputElement>(null);
 
@@ -64,7 +66,8 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   // A transcrição é da atualização: aparece só sob o primeiro áudio dela.
   const anexos = doProjeto.flatMap((a) => {
     const primeiroAudio = a.anexos.findIndex((x) => ehAudio(x.tipo));
-    return a.anexos.map((anexo, i) => ({ anexo, transcricao: i === primeiroAudio ? a.transcricao || "Transcrição pendente" : "" }));
+    // null: não é o primeiro áudio (sem transcrição); "": transcrição pendente.
+    return a.anexos.map((anexo, i) => ({ anexo, transcricao: i === primeiroAudio ? a.transcricao : null }));
   });
   const arquivos = anexos.filter(({ anexo }) => !ehAudio(anexo.tipo));
   const audios = anexos.filter(({ anexo }) => ehAudio(anexo.tipo));
@@ -202,8 +205,9 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
           </div>
         }>
         <form id="pj-detalhe" className="pj-detalhe" onSubmit={salvar}
-          onDragOver={(event) => { if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) event.preventDefault(); }}
-          onDrop={(event) => { if (!event.dataTransfer.files.length) return; event.preventDefault(); void anexar(Array.from(event.dataTransfer.files)); }}>
+          onDragOver={(event) => { if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) { event.preventDefault(); if (!arrastando) setArrastando(true); } }}
+          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setArrastando(false); }}
+          onDrop={(event) => { setArrastando(false); if (!event.dataTransfer.files.length) return; event.preventDefault(); void anexar(Array.from(event.dataTransfer.files)); }}>
           {nomeErro && <p id="pj-titulo-erro" className="pj-erro" role="alert">{nomeErro}</p>}
           {erroSalvar && <Alert tone="danger" onDismiss={() => setErroSalvar("")}>{erroSalvar}</Alert>}
           <dl className="pj-props">
@@ -271,12 +275,19 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
                 {audios.map(({ anexo, transcricao }) => (
                   <li key={anexo.id} className={novoAnexo(anexo.id)}>
                     <AnexoAudio anexo={anexo} source={source} />
-                    {transcricao && <p className="pj-brief__transcricao">{transcricao}</p>}
+                    {transcricao !== null && (transcricao
+                      ? <p className="pj-transcricao"><span className="pj-transcricao__lbl">Transcrição</span>{transcricao}</p>
+                      : <p className="pj-transcricao is-pendente"><Clock size={12} aria-hidden="true" />Transcrição pendente</p>)}
                   </li>
                 ))}
               </ul>
             )}
-            <p className="pj-muted">Arraste ou cole (<kbd>Ctrl</kbd> + <kbd>V</kbd>) imagens, vídeos, áudios ou PDF de até 5 MB.</p>
+            {/* aria-disabled em vez de disabled: botão disabled não recebe dragover, e soltar o arquivo nele abriria o arquivo na aba. */}
+            <button type="button" className={arrastando ? "pj-drop is-arrastando" : "pj-drop"} aria-disabled={ocupado || undefined}
+              onClick={() => { if (!ocupado) inputRef.current?.click(); }}>
+              <Upload size={18} aria-hidden="true" />
+              <span><strong>Arraste, cole ou clique para anexar</strong><small>Imagem, vídeo, áudio ou PDF · até 5 MB</small></span>
+            </button>
             <input ref={inputRef} type="file" accept={ACCEPT} multiple hidden aria-label="Escolher anexos"
               onChange={(event) => { void anexar(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
             {avisos.length > 0 && (

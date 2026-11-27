@@ -125,8 +125,17 @@ describe('Projetos no Planner: detalhe do cartão', () => {
     expect(within(p).getByRole('button', { name: /Abrir anexo relatorio-atual.svg/ })).toBeTruthy()
     expect(within(p).getByRole('button', { name: /Ouvir áudio audio-conferencia.wav/ })).toBeTruthy()
     expect(within(p).getByText(/Só falta o filtro por cliente/)).toBeTruthy()
+    expect(within(p).getByText('Transcrição')).toBeTruthy()
     const p4 = await abrir('PRJ-4', false)
     expect(within(p4).getByText('Transcrição pendente')).toBeTruthy()
+  })
+
+  it('a zona de soltar abre o seletor de arquivos', async () => {
+    const p = await abrir('PRJ-3')
+    const input = within(p).getByLabelText('Escolher anexos') as HTMLInputElement
+    const click = vi.spyOn(input, 'click').mockImplementation(() => undefined)
+    fireEvent.click(within(p).getByRole('button', { name: /Arraste, cole ou clique para anexar/ }))
+    expect(click).toHaveBeenCalledTimes(1)
   })
 
   it('anexar arquivo envia na hora como anexo do projeto, com o autor do perfil', async () => {
