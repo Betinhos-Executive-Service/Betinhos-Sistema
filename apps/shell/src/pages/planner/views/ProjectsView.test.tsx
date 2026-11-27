@@ -84,7 +84,7 @@ describe('Projetos no Planner: detalhe do cartão', () => {
       cr40f_name: 'Documentos da frota', cr40f_briefing: 'Com vencimento.',
       cr40f_checklist: JSON.stringify([{ texto: 'Alerta de vencimento', feito: true }, { texto: 'Testar no DEV', feito: false }]),
     }))
-    expect(await screen.findByText('PRJ-2 salvo.')).toBeTruthy()
+    expect(await screen.findByText('Salvo')).toBeTruthy()
   })
 
   it('salvar só o título não regrava descrição nem checklist', async () => {
@@ -169,6 +169,30 @@ describe('Projetos no Planner: detalhe do cartão', () => {
     expect(await within(p).findByText(/não liberou o microfone/)).toBeTruthy()
   })
 
+  it('anexo aparece na hora como "Enviando…"; se falha, fica com Tentar de novo e Descartar', async () => {
+    let tentativas = 0
+    stubSource((r) => ({ addAtualizacao: async (n, f) => { tentativas += 1; if (tentativas === 1) throw new Error('sem rede'); return r.addAtualizacao(n, f) } }))
+    const p = await abrir('PRJ-3')
+    fireEvent.change(within(p).getByLabelText('Escolher anexos'), { target: { files: [new File(['x'], 'tela.png', { type: 'image/png' })] } })
+    expect(within(p).getByText('Enviando…')).toBeTruthy()
+    expect(await within(p).findByText('Falhou')).toBeTruthy()
+    expect(within(p).getByText(/Não foi possível anexar tela.png/)).toBeTruthy()
+    fireEvent.click(within(p).getByRole('button', { name: /Tentar de novo/ }))
+    expect(await within(p).findByRole('button', { name: /Abrir anexo tela.png/ })).toBeTruthy()
+    expect(within(p).queryByText('Falhou')).toBeNull()
+    expect(within(p).queryByText(/Não foi possível anexar tela.png/)).toBeNull()
+  })
+
+  it('falha ao salvar volta o projeto e mantém o que foi digitado', async () => {
+    stubSource(() => ({ updateProjeto: async () => { throw new Error('sem rede') } }))
+    const p = await abrir('PRJ-2')
+    const titulo = within(p).getByLabelText('Título') as HTMLInputElement
+    fireEvent.change(titulo, { target: { value: 'Título novo' } })
+    fireEvent.click(within(p).getByRole('button', { name: 'Salvar' }))
+    expect(await within(p).findByText(/Não foi possível salvar; o projeto voltou ao que estava/)).toBeTruthy()
+    expect(titulo.value).toBe('Título novo')
+  })
+
   it('arquivo acima de 5 MB é recusado com a mensagem do limite', async () => {
     const add = vi.fn()
     stubSource(() => ({ addAtualizacao: async () => { add(); throw new Error('não devia') } }))
@@ -204,6 +228,43 @@ describe('Projetos no Planner: detalhe do cartão', () => {
     fireEvent.drop(pronto, { dataTransfer })
     await waitFor(() => expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_status: 100000003 }))
     expect(screen.queryByRole('radio', { name: 'Gestor' })).toBeNull()
+  })
+
+  /** Arrasta o cartão do projeto para a coluna. */
+  async function arrastar(codigo: string, coluna: string) {
+    const cartao = (await screen.findByRole('button', { name: nomeDe(codigo) })).closest('article')!
+    const dataTransfer = { setData: () => undefined, effectAllowed: '' }
+    fireEvent.dragStart(cartao, { dataTransfer })
+    const alvo = screen.getByRole('region', { name: coluna })
+    fireEvent.dragOver(alvo, { dataTransfer }); fireEvent.drop(alvo, { dataTransfer })
+    return alvo
+  }
+
+  it('mover é otimista: o cartão já está na coluna nova enquanto grava, e Desfazer volta', async () => {
+    let liberar = () => undefined as void
+    const updateEtapa = vi.fn(() => new Promise<void>((ok) => { liberar = ok }))
+    stubSource(() => ({ updateEtapa }))
+    render(<ProjectsView host={{ mode: 'mock' }} />)
+    const pronto = await arrastar('PRJ-1', 'Pronto')
+    const cartao = within(pronto).getByRole('button', { name: nomeDe('PRJ-1') }).closest('article')!
+    expect(cartao.getAttribute('aria-busy')).toBe('true')
+    expect(within(cartao).getByText('Salvando…')).toBeTruthy()
+    liberar()
+    fireEvent.click(await screen.findByRole('button', { name: 'Desfazer' }))
+    await waitFor(() => expect(updateEtapa).toHaveBeenCalledTimes(2))
+    liberar()
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Pronto' })).queryByRole('button', { name: nomeDe('PRJ-1') })).toBeNull())
+  })
+
+  it('falha ao mover devolve o cartão à coluna e oferece Tentar de novo', async () => {
+    const updateEtapa = vi.fn(async () => { throw new Error('sem rede') })
+    stubSource(() => ({ updateEtapa }))
+    render(<ProjectsView host={{ mode: 'mock' }} />)
+    const pronto = await arrastar('PRJ-1', 'Pronto')
+    expect(await screen.findByText(/Não foi possível mover PRJ-1/)).toBeTruthy()
+    expect(within(pronto).queryByRole('button', { name: nomeDe('PRJ-1') })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }))
+    await waitFor(() => expect(updateEtapa).toHaveBeenCalledTimes(2))
   })
 
   it('soltar em Pausado pede o motivo (opcional), grava junto e mostra no cartão', async () => {

@@ -1,7 +1,7 @@
 // Projetos no Planner: quadro dos projetos (cr40f_projeto) por situação; clique no cartão abre o detalhe.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Dialog, StatusBadge, Textarea, ToastProvider, useToast } from "@betinhos/ui";
-import { CalendarClock, Film, Image as ImageIcon, ListChecks, Mic, PauseCircle, Plus, RefreshCw } from "lucide-react";
+import { CalendarClock, Film, Image as ImageIcon, ListChecks, LoaderCircle, Mic, PauseCircle, Plus, RefreshCw } from "lucide-react";
 import PageHeader from '../components/PageHeader';
 import { NewProjectDrawer, type CreatedProject } from '../components/NewProjectDrawer';
 import { ProjectDetailDrawer } from '../components/ProjectDetailDrawer';
@@ -15,7 +15,7 @@ import { COLUMN_STYLE, labelOf } from '../projetos/components/colunas';
 import { progresso } from '../projetos/domain/checklist';
 import { codigoEtapa1 } from '../projetos/domain/regras';
 import { faltaPrazo, hojeIso, rotuloPrazo, situacaoPrazo } from '../projetos/domain/prazo';
-import type { Perfil } from '../projetos/domain/types';
+import type { Etapa, Perfil } from '../projetos/domain/types';
 import { BOARD_COLUMNS, attachmentKind, cardsByStatus, projectCards, type ProjectCard } from '../domain/projectsBoard';
 
 function prefersReducedMotion() {
@@ -75,7 +75,8 @@ function Board({ host }: { host?: Host }) {
   const [openId, setOpenId] = useQueryId("projeto");
   const [dragId, setDragId] = useState("");
   const [dropStatus, setDropStatus] = useState<number | null>(null);
-  const [movingId, setMovingId] = useState("");
+  // Cartões com gravação em voo: já estão na coluna nova (otimista) e não podem ser movidos de novo até a resposta.
+  const [movendo, setMovendo] = useState<ReadonlySet<string>>(new Set());
   const [freshId, setFreshId] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [pausar, setPausar] = useState<ProjectCard | null>(null);
@@ -93,29 +94,66 @@ function Board({ host }: { host?: Host }) {
   const hoje = hojeIso();
   const flipRef = useFlip(cards.map((c) => `${c.projeto.id}:${c.status}`).join("|"));
 
-  /** Pausado grava o motivo (opcional) junto; sair de Pausado limpa o motivo. */
-  async function move(card: ProjectCard, novo: number, motivoPausa = "") {
-    if (movingId) return;
-    if (novo === card.status) return;
-    setMovingId(card.projeto.id);
+  // Guarda e cartões atuais em ref: "Desfazer" e "Tentar de novo" rodam a partir de toasts antigos (closure velha).
+  const movendoRef = useRef(new Set<string>());
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const cardAtual = (id: string) => cardsRef.current.find((c) => c.projeto.id === id);
+
+  const marcarMovendo = (id: string, ligado: boolean) => setMovendo((atual) => {
+    const proximo = new Set(atual);
+    if (ligado) proximo.add(id); else proximo.delete(id);
+    return proximo;
+  });
+
+  /**
+   * Otimista: o cartão vai para a coluna nova na hora e grava por trás; se falhar, volta e avisa com "Tentar de novo".
+   * Pausado grava o motivo (opcional) junto; sair de Pausado limpa o motivo. `podeDesfazer` falso no próprio desfazer.
+   */
+  async function move(card: ProjectCard, novo: number, motivoPausa = "", podeDesfazer = true) {
+    const id = card.projeto.id;
+    if (movendoRef.current.has(id) || novo === card.status) return;
+    movendoRef.current.add(id);
     const motivoNovo = novo === STATUS.pausada ? motivoPausa.trim().slice(0, 500) : "";
+    const anterior = card.etapa;
+    const codigo = codigoEtapa1(card.projeto.codigo);
+    const otimista: Etapa = anterior
+      ? { ...anterior, status: novo, motivoPausa: motivoNovo }
+      : { id: `tmp-${id}`, projetoId: id, numero: 1, codigo, nome: "", status: novo, prazo: null, andamento: 0, linkPr: "", publicadoProd: null, motivoPausa: motivoNovo };
+    data.upsertEtapa(otimista);
+    marcarMovendo(id, true);
+    const nome = card.projeto.codigo || card.projeto.nome;
     try {
-      if (card.etapa) {
+      let gravada = otimista;
+      if (anterior) {
         const changes: Row = { cr40f_status: novo };
-        if (motivoNovo !== card.etapa.motivoPausa) changes.cr40f_motivopausa = motivoNovo || null;
-        await source.updateEtapa(card.etapa.id, changes);
-        data.upsertEtapa({ ...card.etapa, status: novo, motivoPausa: motivoNovo });
+        if (motivoNovo !== anterior.motivoPausa) changes.cr40f_motivopausa = motivoNovo || null;
+        await source.updateEtapa(anterior.id, changes);
       } else {
-        const codigo = codigoEtapa1(card.projeto.codigo);
-        const id = await source.createEtapa({ cr40f_status: novo, ...(motivoNovo ? { cr40f_motivopausa: motivoNovo } : {}) }, { projetoId: card.projeto.id, numero: 1, codigo });
-        data.upsertEtapa({ id, projetoId: card.projeto.id, numero: 1, codigo, nome: "", status: novo, prazo: null, andamento: 0, linkPr: "", publicadoProd: null, motivoPausa: motivoNovo });
+        const etapaId = await source.createEtapa({ cr40f_status: novo, ...(motivoNovo ? { cr40f_motivopausa: motivoNovo } : {}) }, { projetoId: id, numero: 1, codigo });
+        gravada = { ...otimista, id: etapaId };
+        data.removeEtapa(otimista.id);
+        data.upsertEtapa(gravada);
       }
       setAnnouncement(`${card.projeto.nome} agora em ${labelOf(novo)}.`);
-      if (novo === STATUS.concluida) setFreshId(card.projeto.id);
+      if (novo === STATUS.concluida) setFreshId(id);
+      toast({
+        tone: "success",
+        message: podeDesfazer ? `${nome} movido para ${labelOf(novo)}.` : `${nome} voltou para ${labelOf(novo)}.`,
+        // Só desfaz se o cartão ainda estiver onde este movimento o deixou.
+        action: podeDesfazer ? { label: "Desfazer", onClick: () => { const atual = cardAtual(id); if (atual?.status === novo) void move(atual, card.status, anterior?.motivoPausa ?? "", false); } } : undefined,
+      });
     } catch (reason) {
-      toast({ tone: "danger", message: `Não foi possível mover ${card.projeto.codigo}. ${reasonText(reason)}` });
+      if (anterior) data.upsertEtapa(anterior); else data.removeEtapa(otimista.id);
+      setAnnouncement(`${card.projeto.nome} voltou para ${labelOf(card.status)}.`);
+      toast({
+        tone: "danger",
+        message: `Não foi possível mover ${nome}; ele voltou para ${labelOf(card.status)}. ${reasonText(reason)}`,
+        action: { label: "Tentar de novo", onClick: () => { const atual = cardAtual(id); if (atual) void move(atual, novo, motivoPausa, podeDesfazer); } },
+      });
     } finally {
-      setMovingId("");
+      movendoRef.current.delete(id);
+      marcarMovendo(id, false);
     }
   }
 
@@ -209,14 +247,15 @@ function Board({ host }: { host?: Host }) {
                     <article
                       key={id}
                       ref={flipRef(id)}
-                      className={`projects-card${dragId === id ? " is-dragging" : ""}${freshId === id ? " is-fresh" : ""}${movingId === id ? " is-moving" : ""}`}
+                      className={`projects-card${dragId === id ? " is-dragging" : ""}${freshId === id ? " is-fresh" : ""}${movendo.has(id) ? " is-moving" : ""}`}
                       style={{ "--i": Math.min(index, 8) } as any}
-                      draggable={!movingId}
-                      aria-busy={movingId === id}
+                      draggable={!movendo.has(id)}
+                      aria-busy={movendo.has(id)}
                       onDragStart={(event) => { setDragId(id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", id); }}
                       onDragEnd={() => { setDragId(""); setDropStatus(null); }}
                     >
                       <span className="projects-card-code">{card.projeto.codigo || "Novo"}</span>
+                      {movendo.has(id) && <span className="projects-card-salvando"><LoaderCircle size={12} className="pj-spin" aria-hidden="true" />Salvando…</span>}
                       <h3><button type="button" className="projects-card-open" onClick={() => setOpenId(id)}>{card.projeto.nome}</button></h3>
                       {card.projeto.briefing && <p>{card.projeto.briefing}</p>}
                       {motivoPausa && <p className="projects-card-pausa" title={motivoPausa}><PauseCircle size={13} aria-hidden="true" /><span><span className="sr-only">Motivo da pausa: </span>{motivoPausa}</span></p>}

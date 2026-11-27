@@ -42,10 +42,16 @@ export function useProjetos(source: Source) {
     setState((s) => ({ ...s, loading: false, etapas: trocar(s.etapas, e) }))
   }, [])
 
+  // Desfaz uma etapa otimista (ex.: a criada ao mover um projeto sem etapa, se a gravação falhar).
+  const removeEtapa = useCallback((id: string) => {
+    token.current += 1
+    setState((s) => ({ ...s, loading: false, etapas: s.etapas.filter((e) => e.id !== id) }))
+  }, [])
+
   const addAtualizacao = useCallback((a: Atualizacao) => {
     token.current += 1
     setState((s) => ({ ...s, loading: false, atualizacoes: trocar(s.atualizacoes, a) }))
   }, [])
 
-  return { ...state, reload, upsert, upsertEtapa, addAtualizacao }
+  return { ...state, reload, upsert, upsertEtapa, removeEtapa, addAtualizacao }
 }

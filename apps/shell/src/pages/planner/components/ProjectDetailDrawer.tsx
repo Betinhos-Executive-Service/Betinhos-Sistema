@@ -1,12 +1,12 @@
 // Detalhe do projeto no Planner: coluna (só leitura) e prazo no topo; título, descrição e checklist (Salvar) e anexos com áudio (enviados na hora).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Checkbox, Dialog, Drawer, Textarea, useToast } from "@betinhos/ui";
-import { Clock, FileText, Film, Image as ImageIcon, Mic, Paperclip, Plus, Quote, Upload, X } from "lucide-react";
+import { Check, Clock, FileText, Film, Image as ImageIcon, LoaderCircle, Mic, Paperclip, Plus, Quote, Upload, X } from "lucide-react";
 import { AudioRecorder } from "./AudioRecorder";
 import type { Row } from "@betinhos/dataverse";
 import { reasonText, type Source } from "../projetos/data/source";
-import { AnexoAudio, AnexoMiniatura } from "../projetos/components/AnexoMiniatura";
-import { ehAudio } from "../projetos/domain/anexos";
+import { AnexoAudio, AnexoEnviando, AnexoMiniatura } from "../projetos/components/AnexoMiniatura";
+import { ehAudio, ehImagem } from "../projetos/domain/anexos";
 import { MAX_ITEM, gravarChecklist, progresso, type ChecklistItem } from "../projetos/domain/checklist";
 import type { Atualizacao, Perfil, Projeto } from "../projetos/domain/types";
 import { gravarPrazo, mesmoPrazo, type Prazo } from "../projetos/domain/prazo";
@@ -18,6 +18,9 @@ import "../projetos/projetos.css";
 
 const ACCEPT = "image/*,video/*,audio/*,application/pdf";
 const NOME_MAX = 200;
+/** Lote de arquivos subindo como uma atualização; `erro` preenchido = falhou e espera tentar de novo ou descartar. */
+type Envio = { id: number; arquivos: File[]; previas: string[]; erro: string };
+
 // Rótulo do atalho de salvar: ⌘ no Mac, Ctrl no resto (o atalho aceita os dois).
 const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘" : "Ctrl";
 
@@ -46,9 +49,14 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   const [prazo, setPrazo] = useState<Prazo | null>(projeto.prazo);
   const [nomeErro, setNomeErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  // "Salvo" aparece no rodapé por alguns segundos depois de gravar.
+  const [salvo, setSalvo] = useState(false);
   const [erroSalvar, setErroSalvar] = useState("");
-  // Contador: gravação e colagem podem subir juntas; só libera o fechar quando todas terminam.
-  const [envios, setEnvios] = useState(0);
+  // Anexos aparecem na hora, cada lote com seu estado; gravação e colagem podem subir juntas.
+  const [envios, setEnvios] = useState<Envio[]>([]);
+  const envioSeq = useRef(0);
+  // Painel ainda aberto: erro de salvar vira alerta aqui; fechado, vira toast.
+  const montado = useRef(true);
   const [avisos, setAvisos] = useState<string[]>([]);
   const [descartar, setDescartar] = useState(false);
   // Item recém-adicionado entra com animação; só ele, para não piscar a lista inteira.
@@ -58,8 +66,9 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   const inputRef = useRef<HTMLInputElement>(null);
   const tituloRef = useRef<HTMLInputElement>(null);
 
-  const enviando = envios > 0;
-  const ocupado = salvando || enviando;
+  // Só lote em voo segura o fechar; lote que falhou fica na tela até tentar de novo ou descartar.
+  const enviando = envios.some((e) => !e.erro);
+  const falhados = envios.some((e) => e.erro);
   const sujo = nome.trim() !== projeto.nome || descricao.trim() !== projeto.briefing.trim() || gravarChecklist(itens) !== gravarChecklist(projeto.checklist) || Boolean(novoItem.trim())
     || !mesmoPrazo(prazo, projeto.prazo);
   const doProjeto = useMemo(() => atualizacoes.filter((a) => a.projetoId === projeto.id).sort((a, b) => b.data.localeCompare(a.data)), [atualizacoes, projeto.id]);
@@ -76,8 +85,10 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   const novoAnexo = (id: string) => (iniciais.has(id) ? undefined : "is-novo");
 
   function fechar() {
-    if (ocupado) { toast({ tone: "info", message: "Aguarde o envio terminar." }); return; }
-    if (sujo) { setDescartar(true); return; }
+    // Durante o salvamento não fecha: evita duas gravações do mesmo projeto em paralelo e o desfazer de uma apagar a outra.
+    if (salvando) { toast({ tone: "info", message: "Aguarde o salvamento terminar." }); return; }
+    if (enviando) { toast({ tone: "info", message: "Aguarde o envio dos anexos terminar." }); return; }
+    if (sujo || falhados) { setDescartar(true); return; }
     onClose();
   }
 
@@ -89,9 +100,10 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
     setNovoItem("");
   }
 
+  /** Otimista: o quadro e o painel já mostram o salvo; se a gravação falhar, voltam ao anterior e o texto editado fica nos campos. */
   async function salvar(event?: React.FormEvent) {
     event?.preventDefault();
-    if (ocupado) return;
+    if (salvando) return;
     const titulo = nome.trim();
     if (!titulo) { setNomeErro("Dê um título para o projeto."); return; }
     setNomeErro("");
@@ -105,38 +117,74 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
     if (texto !== projeto.briefing.trim()) changes.cr40f_briefing = texto || null;
     if (gravarChecklist(lista) !== gravarChecklist(projeto.checklist)) changes.cr40f_checklist = gravarChecklist(lista);
     if (!mesmoPrazo(prazo, projeto.prazo)) Object.assign(changes, gravarPrazo(prazo));
+    const antes = projeto;
+    setErroSalvar("");
+    setItens(lista);
+    setNovoItem("");
+    onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista, prazo });
+    if (!Object.keys(changes).length) return;
     setSalvando(true);
+    setSalvo(false);
     try {
-      if (Object.keys(changes).length) await source.updateProjeto(projeto.id, changes);
-      setErroSalvar("");
-      setItens(lista);
-      setNovoItem("");
-      onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista, prazo });
-      toast({ tone: "success", message: `${projeto.codigo} salvo.` });
+      await source.updateProjeto(projeto.id, changes);
+      if (montado.current) setSalvo(true);
+      else toast({ tone: "success", message: `${projeto.codigo} salvo.` });
     } catch (reason) {
-      setErroSalvar(`Não foi possível salvar. ${reasonText(reason)}`);
+      onSaved(antes);
+      if (montado.current) setErroSalvar(`Não foi possível salvar; o projeto voltou ao que estava. Suas alterações continuam nos campos. ${reasonText(reason)}`);
+      else toast({ tone: "danger", message: `Não foi possível salvar ${projeto.codigo}; as alterações foram desfeitas. ${reasonText(reason)}` });
     } finally {
       setSalvando(false);
     }
   }
 
-  // Anexo sobe na hora, como atualização sem etapa (anexo do projeto).
-  async function anexar(incoming: File[]) {
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
+  useEffect(() => {
+    if (!salvo) return undefined;
+    const timer = window.setTimeout(() => setSalvo(false), 2500);
+    return () => window.clearTimeout(timer);
+  }, [salvo]);
+  useEffect(() => { if (sujo) setSalvo(false); }, [sujo]);
+
+  // Anexo aparece na hora (imagem com prévia) e sobe como atualização sem etapa (anexo do projeto).
+  function anexar(incoming: File[]) {
     if (!incoming.length) return;
-    if (salvando) { setAvisos(["Aguarde o salvamento terminar para anexar."]); return; }
     const { accepted, errors } = acceptFiles([], incoming);
     setAvisos(errors);
     if (!accepted.length) return;
-    setEnvios((n) => n + 1);
+    const envio: Envio = { id: ++envioSeq.current, arquivos: accepted, previas: accepted.map((f) => (ehImagem(f.type) ? URL.createObjectURL(f) : "")), erro: "" };
+    setEnvios((lista) => [...lista, envio]);
+    void enviar(envio);
+  }
+
+  async function enviar(envio: Envio) {
+    if (envio.erro) setAvisos((lista) => lista.filter((a) => a !== envio.erro));
+    setEnvios((lista) => lista.map((e) => (e.id === envio.id ? { ...e, erro: "" } : e)));
     try {
-      const nova = await source.addAtualizacao({ projetoId: projeto.id, etapaId: null, data: new Date().toISOString(), autor: autorDoPerfil(perfil), texto: "", prova: false }, accepted);
+      const nova = await source.addAtualizacao({ projetoId: projeto.id, etapaId: null, data: new Date().toISOString(), autor: autorDoPerfil(perfil), texto: "", prova: false }, envio.arquivos);
       onAtualizacao(nova);
+      descartarEnvio(envio);
     } catch (reason) {
-      setAvisos([...errors, `Não foi possível anexar. ${reasonText(reason)}`]);
-    } finally {
-      setEnvios((n) => n - 1);
+      const erro = `Não foi possível anexar ${envio.arquivos.map((f) => f.name).join(", ")}. ${reasonText(reason)}`;
+      setEnvios((lista) => lista.map((e) => (e.id === envio.id ? { ...e, erro } : e)));
+      // O motivo fica visível também no toque (o title do botão só aparece com mouse).
+      setAvisos((lista) => (lista.includes(erro) ? lista : [...lista, erro]));
     }
   }
+
+  function descartarEnvio(envio: Envio) {
+    envio.previas.forEach((url) => { if (url) URL.revokeObjectURL(url); });
+    if (envio.erro) setAvisos((lista) => lista.filter((a) => a !== envio.erro));
+    setEnvios((lista) => lista.filter((e) => e.id !== envio.id));
+  }
+
+  // Prévias locais são liberadas ao fechar o painel.
+  const enviosRef = useRef(envios);
+  enviosRef.current = envios;
+  useEffect(() => () => enviosRef.current.forEach((e) => e.previas.forEach((url) => { if (url) URL.revokeObjectURL(url); })), []);
+  const pendentes = envios.flatMap((envio) => envio.arquivos.map((arquivo, i) => ({ envio, arquivo, previa: envio.previas[i], chave: `${envio.id}-${i}` })));
+  const arquivosPendentes = pendentes.filter(({ arquivo }) => !ehAudio(arquivo.type));
+  const audiosPendentes = pendentes.filter(({ arquivo }) => ehAudio(arquivo.type));
 
   // Ctrl+V com o detalhe aberto: print ou arquivo copiado vira anexo; texto colado segue normal.
   const anexarRef = useRef(anexar);
@@ -150,7 +198,7 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
       const editavel = alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement || Boolean(alvo?.isContentEditable);
       if (editavel && event.clipboardData?.types.includes("text/plain")) return;
       event.preventDefault();
-      void anexarRef.current(files.map((file) => namePastedFile(file)));
+      anexarRef.current(files.map((file) => namePastedFile(file)));
     };
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
@@ -160,7 +208,6 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   const salvarRef = useRef<() => void>(() => {});
   salvarRef.current = () => {
     if (!sujo || descartar) return;
-    if (enviando) { toast({ tone: "info", message: "Aguarde o envio terminar para salvar." }); return; }
     void salvar();
   };
   useEffect(() => {
@@ -192,22 +239,26 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
         title={<>
           {/* Nome do painel para leitor de tela (o título visível é o campo editável). */}
           <span className="bt-sr-only">{projeto.codigo} · {projeto.nome}</span>
-          <input ref={tituloRef} className="pj-titulo" form="pj-detalhe" value={nome} maxLength={NOME_MAX} disabled={salvando} aria-label="Título"
+          <input ref={tituloRef} className="pj-titulo" form="pj-detalhe" value={nome} maxLength={NOME_MAX} aria-label="Título"
             aria-invalid={nomeErro ? true : undefined} aria-describedby={nomeErro ? "pj-titulo-erro" : undefined}
             onChange={(event) => { setNome(event.target.value); if (nomeErro) setNomeErro(""); }} />
         </>}
         footer={
           <div className="projects-drawer-foot">
             {/* Região viva sempre montada: o leitor de tela só anuncia o que muda dentro dela. */}
-            <span className="pj-sujo" role="status">{sujo && !salvando && <span className="pj-sujo__txt">Alterações não salvas<span className="pj-sujo__atalho"> · <kbd>{MOD}</kbd> + <kbd>S</kbd></span></span>}</span>
-            <Button variant="secondary" onClick={fechar} disabled={ocupado}>Fechar</Button>
-            <Button type="submit" form="pj-detalhe" loading={salvando} disabled={!sujo || enviando}>Salvar</Button>
+            <span className="pj-sujo" role="status">
+              {salvando ? <span className="pj-sujo__txt is-salvando"><LoaderCircle size={13} className="pj-spin" aria-hidden="true" />Salvando…</span>
+                : sujo ? <span className="pj-sujo__txt">Alterações não salvas<span className="pj-sujo__atalho"> · <kbd>{MOD}</kbd> + <kbd>S</kbd></span></span>
+                  : salvo ? <span className="pj-sujo__txt is-salvo"><Check size={13} aria-hidden="true" />Salvo</span> : null}
+            </span>
+            <Button variant="secondary" onClick={fechar} disabled={enviando || salvando}>Fechar</Button>
+            <Button type="submit" form="pj-detalhe" disabled={!sujo || salvando}>Salvar</Button>
           </div>
         }>
         <form id="pj-detalhe" className="pj-detalhe" onSubmit={salvar}
           onDragOver={(event) => { if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) { event.preventDefault(); if (!arrastando) setArrastando(true); } }}
           onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setArrastando(false); }}
-          onDrop={(event) => { setArrastando(false); if (!event.dataTransfer.files.length) return; event.preventDefault(); void anexar(Array.from(event.dataTransfer.files)); }}>
+          onDrop={(event) => { setArrastando(false); if (!event.dataTransfer.files.length) return; event.preventDefault(); anexar(Array.from(event.dataTransfer.files)); }}>
           {nomeErro && <p id="pj-titulo-erro" className="pj-erro" role="alert">{nomeErro}</p>}
           {erroSalvar && <Alert tone="danger" onDismiss={() => setErroSalvar("")}>{erroSalvar}</Alert>}
           <dl className="pj-props">
@@ -220,13 +271,13 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
             </div>
             <div className="pj-props__linha">
               <dt>Prazo</dt>
-              <dd><PrazoCampo value={prazo} onChange={setPrazo} disabled={salvando} concluido={status === STATUS.concluida} /></dd>
+              <dd><PrazoCampo value={prazo} onChange={setPrazo} concluido={status === STATUS.concluida} /></dd>
             </div>
           </dl>
 
           <section className="pj-bloco" aria-labelledby="pj-descricao">
             <h3 id="pj-descricao" className="pj-lbl">Descrição</h3>
-            <Textarea className="pj-desc" aria-labelledby="pj-descricao" value={descricao} rows={2} disabled={salvando} placeholder="O que é, para quem e por quê."
+            <Textarea className="pj-desc" aria-labelledby="pj-descricao" value={descricao} rows={2} placeholder="O que é, para quem e por quê."
               onChange={(event) => setDescricao(event.target.value)} />
           </section>
 
@@ -240,15 +291,15 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
             <ul className="pj-check">
               {itens.map((item, index) => (
                 <li key={`${index}-${item.texto}`} className={[item.feito && "is-feito", index === novoIndex && "is-novo"].filter(Boolean).join(" ") || undefined}>
-                  <Checkbox label={item.texto} checked={item.feito} disabled={salvando}
+                  <Checkbox label={item.texto} checked={item.feito}
                     onChange={() => setItens((lista) => lista.map((it, i) => (i === index ? { ...it, feito: !it.feito } : it)))} />
-                  <button type="button" className="pj-check__rm" disabled={salvando} aria-label={`Remover ${item.texto}`}
+                  <button type="button" className="pj-check__rm" aria-label={`Remover ${item.texto}`}
                     onClick={() => { setNovoIndex(-1); setItens((lista) => lista.filter((_, i) => i !== index)); }}><X size={14} /></button>
                 </li>
               ))}
               <li className="pj-check__novo">
                 <Plus size={16} aria-hidden="true" />
-                <input value={novoItem} maxLength={MAX_ITEM} disabled={salvando} placeholder="Adicionar item" aria-label="Novo item do checklist"
+                <input value={novoItem} maxLength={MAX_ITEM} placeholder="Adicionar item" aria-label="Novo item do checklist"
                   onChange={(event) => setNovoItem(event.target.value)}
                   onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); adicionarItem(); } }} />
               </li>
@@ -257,21 +308,27 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
 
           <section className="pj-bloco" aria-labelledby="pj-anexos">
             <div className="pj-bloco__topo">
-              <h3 id="pj-anexos" className="pj-lbl">Anexos {anexos.length > 0 && <span className="pj-num">{anexos.length}</span>}</h3>
+              <h3 id="pj-anexos" className="pj-lbl">Anexos {anexos.length + pendentes.length > 0 && <span className="pj-num">{anexos.length + pendentes.length}</span>}</h3>
               <div className="pj-acoes">
-                <button type="button" className="pj-acao" disabled={ocupado} onClick={() => inputRef.current?.click()}>
-                  <Paperclip size={16} aria-hidden="true" /> {enviando ? "Enviando..." : "Anexar"}
+                <button type="button" className="pj-acao" onClick={() => inputRef.current?.click()}>
+                  <Paperclip size={16} aria-hidden="true" /> Anexar
                 </button>
-                <AudioRecorder compact disabled={ocupado} onRecorded={(file) => void anexar([file])} onError={(message) => setAvisos([message])} />
+                <AudioRecorder compact onRecorded={(file) => anexar([file])} onError={(message) => setAvisos([message])} />
               </div>
             </div>
-            {arquivos.length > 0 && (
+            {arquivos.length + arquivosPendentes.length > 0 && (
               <div className="pj-gal">
+                {arquivosPendentes.map(({ envio, arquivo, previa, chave }) => (
+                  <div key={chave} className="is-novo"><AnexoEnviando arquivo={arquivo} previa={previa} erro={envio.erro} onRetry={() => void enviar(envio)} onDiscard={() => descartarEnvio(envio)} /></div>
+                ))}
                 {arquivos.map(({ anexo }) => <div key={anexo.id} className={novoAnexo(anexo.id)}><AnexoMiniatura anexo={anexo} source={source} /></div>)}
               </div>
             )}
-            {audios.length > 0 && (
+            {audios.length + audiosPendentes.length > 0 && (
               <ul className="pj-audios">
+                {audiosPendentes.map(({ envio, arquivo, previa, chave }) => (
+                  <li key={chave} className="is-novo"><AnexoEnviando arquivo={arquivo} previa={previa} erro={envio.erro} onRetry={() => void enviar(envio)} onDiscard={() => descartarEnvio(envio)} /></li>
+                ))}
                 {audios.map(({ anexo, transcricao }) => (
                   <li key={anexo.id} className={novoAnexo(anexo.id)}>
                     <AnexoAudio anexo={anexo} source={source} />
@@ -282,12 +339,10 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
                 ))}
               </ul>
             )}
-            {/* aria-disabled em vez de disabled: botão disabled não recebe dragover, e soltar o arquivo nele abriria o arquivo na aba. */}
-            <button type="button" className={arrastando ? "pj-drop is-arrastando" : "pj-drop"} aria-disabled={ocupado || undefined}
-              onClick={() => { if (!ocupado) inputRef.current?.click(); }}>
+            <button type="button" className={arrastando ? "pj-drop is-arrastando" : "pj-drop"} onClick={() => inputRef.current?.click()}>
               <span className="pj-drop__icone" aria-hidden="true"><Upload size={20} /></span>
               <span className="pj-drop__texto">
-                <strong>{arrastando && !salvando ? "Solte para anexar" : "Arraste, cole ou clique para anexar"}</strong>
+                <strong>{arrastando ? "Solte para anexar" : "Arraste, cole ou clique para anexar"}</strong>
                 <span className="pj-drop__tipos">
                   <span className="is-imagem"><ImageIcon size={12} aria-hidden="true" />Imagem</span>
                   <span className="is-video"><Film size={12} aria-hidden="true" />Vídeo</span>
@@ -298,7 +353,7 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
               </span>
             </button>
             <input ref={inputRef} type="file" accept={ACCEPT} multiple hidden aria-label="Escolher anexos"
-              onChange={(event) => { void anexar(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
+              onChange={(event) => { anexar(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
             {avisos.length > 0 && (
               <Alert tone="danger" onDismiss={() => setAvisos([])}>
                 {avisos.map((aviso) => <div key={aviso}>{aviso}</div>)}
@@ -313,7 +368,7 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
           <Button variant="secondary" onClick={() => setDescartar(false)}>Continuar editando</Button>
           <Button variant="danger" onClick={() => { setDescartar(false); onClose(); }}>Descartar</Button>
         </>}>
-        As alterações deste projeto (título, descrição, prazo ou checklist) ainda não foram salvas.
+        As alterações deste projeto (título, descrição, prazo, checklist ou anexos que falharam) ainda não foram salvas.
       </Dialog>
     </>
   );
