@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button } from '@betinhos/ui'
 import { acessosDe, useAcessos } from '../../../app/AcessosProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
-import { ehAmplo, temAlgum } from '../../../app/acessos'
+import { temAlgum } from '../../../app/acessos'
 import { HistoricoLista, fmtQuando } from '../../acessos/components/HistoricoLista'
 import { PerfisEditor, usePerfisEditor } from '../../acessos/components/PerfisEditor'
 import type { Source as AcessosSource } from '../../acessos/data/source'
-import { rotulos } from '../../acessos/domain/perfis'
+import { cicloExigeAdmin, nomeDoItem, rotulos } from '../../acessos/domain/perfis'
 import type { Dados, Encerrado, PerfisPessoa, Pessoa } from '../../acessos/domain/types'
-import { parseAcessoError, type Etapa } from '../data/acesso'
+import { etapasRelevantes, parseAcessoError, type Etapa } from '../data/acesso'
 import { EncerrarAdministrativoDialog } from './EncerrarAdministrativoDialog'
 
 /** O que o bloco informa à ficha: alteração não salva entra na checagem de "Descartar alterações?" e salvar trava o fechamento. */
@@ -23,14 +23,14 @@ type Props = {
 }
 
 const norm = (v: string) => v.trim().toLowerCase()
-const MOTIVO_AMPLO = 'Só o Administrador do Sistema encerra o acesso de quem tem acesso amplo.'
-const MOTIVO_AMPLO_REATIVAR = 'Só o Administrador do Sistema reativa quem tinha acesso amplo.'
+const MOTIVO_AMPLO = 'Só o Administrador do Sistema encerra o acesso de quem tem acesso amplo ou é Administrador de acessos.'
+const MOTIVO_AMPLO_REATIVAR = 'Só o Administrador do Sistema reativa quem tinha acesso amplo ou era Administrador de acessos.'
 
 /** Resultado de uma ação que o usuário precisa ler: recusa, ou etapas puladas/com erro. */
 type Nota = { tom: 'danger' | 'warning'; titulo: string; linhas: string[] }
 const notaDasEtapas = (titulo: string, etapas: Etapa[]): Nota | null => {
-  const linhas = etapas.filter((e) => e.estado === 'pulada' || e.estado === 'erro').map((e) => `${e.etapa}: ${e.detalhe}`)
-  return linhas.length ? { tom: etapas.some((e) => e.estado === 'erro') ? 'danger' : 'warning', titulo, linhas } : null
+  const { erro, linhas } = etapasRelevantes(etapas)
+  return linhas.length ? { tom: erro ? 'danger' : 'warning', titulo, linhas } : null
 }
 
 /** Bloco "Acesso ao sistema" da aba Acesso: perfis da pessoa, só para quem administra acessos. Sem fonte ou sem permissão não renderiza nem lê nada. */
@@ -42,40 +42,47 @@ export function AcessoSistema({ email, source, onEstado }: Props) {
 
 function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
   const [dados, setDados] = useState<Dados | null>(null)
-  const [encerrados, setEncerrados] = useState<Encerrado[]>([])
+  const [encerramento, setEncerramento] = useState<Encerrado | null>(null)
   const [nota, setNota] = useState<Nota | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const temEmail = norm(email) !== ''
 
   const [relendo, setRelendo] = useState(false)
 
+  // A pessoa ativa vem da leitura geral; só quem não está nela precisa do encerramento, lido só para este e-mail.
+  const ler = useCallback(async () => {
+    const d = await source.load()
+    const ativa = d.pessoas.some((p) => norm(p.email) === norm(email))
+    return { d, enc: ativa ? null : await source.encerramento(email) }
+  }, [source, email])
+
   const carregar = useCallback(async () => {
     setRelendo(true)
     try {
-      const [d, enc] = await Promise.all([source.load(), source.encerrados().catch(() => [] as Encerrado[])])
+      const { d, enc } = await ler()
       setDados(d)
-      setEncerrados(enc)
+      setEncerramento(enc)
       setErro(null)
     } catch (reason) {
       setErro(reason instanceof Error ? reason.message : String(reason))
     } finally {
       setRelendo(false)
     }
-  }, [source])
+  }, [ler])
 
   useEffect(() => {
     if (!temEmail) return
     let vivo = true
     setDados(null)
-    setEncerrados([])
+    setEncerramento(null)
     setNota(null)
     setErro(null)
-    Promise.all([source.load(), source.encerrados().catch(() => [] as Encerrado[])]).then(
-      ([d, enc]) => { if (vivo) { setDados(d); setEncerrados(enc) } },
+    ler().then(
+      ({ d, enc }) => { if (vivo) { setDados(d); setEncerramento(enc) } },
       (reason) => { if (vivo) setErro(reason instanceof Error ? reason.message : String(reason)) },
     )
     return () => { vivo = false }
-  }, [source, temEmail])
+  }, [ler, temEmail])
 
   const pessoa = dados?.pessoas.find((p) => norm(p.email) === norm(email)) ?? null
   const pessoaId = pessoa?.id
@@ -84,12 +91,14 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
     setDados((d) => (d ? { ...d, pessoas: d.pessoas.map((p) => (p.id === pessoaId ? { ...p, perfis, alteradoEm: new Date() } : p)) } : d))
     await carregar()
   }, [carregar, pessoaId])
-  const encerrado = pessoa ? null : encerrados.find((e) => norm(e.email) === norm(email)) ?? null
+  const encerrado = pessoa ? null : encerramento
   const tentar = <Button variant="secondary" loading={relendo} onClick={() => void carregar()}>Tentar de novo</Button>
 
   let corpo
   if (!temEmail) corpo = <p className="muted">Esta pessoa ainda não tem conta no sistema. Libere o acesso primeiro.</p>
-  else if (dados && encerrado) {
+  else if (erro && !dados) {
+    corpo = <Alert tone="danger" title="Não foi possível carregar os perfis" action={tentar}>{erro}</Alert>
+  } else if (dados && encerrado) {
     corpo = <EncerradoView encerrado={encerrado} dados={dados} source={source} onFeito={carregar} onNota={setNota} />
   } else if (dados && !pessoa) {
     // A conta recém-liberada pode demorar a aparecer: dá para conferir de novo sem sair da aba.
@@ -100,8 +109,6 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
         <div className="cluster"><Button variant="secondary" loading={relendo} onClick={() => void carregar()}>Conferir de novo</Button></div>
       </>
     )
-  } else if (erro && !dados) {
-    corpo = <Alert tone="danger" title="Não foi possível carregar os perfis" action={tentar}>{erro}</Alert>
   } else if (!dados || !pessoa) corpo = <BrandLoader variant="inline" size="md" label="Carregando perfis" text="Carregando perfis…" />
   else {
     corpo = (
@@ -127,7 +134,7 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
   const viewerAdmin = acessosDe(useAcessos()).admin
   const [encerrando, setEncerrando] = useState(false)
   const amplo = pessoa.amplo || pessoa.admin
-  const travado = amplo && !viewerAdmin
+  const travado = (amplo || pessoa.perfis.acessos) && !viewerAdmin
   const editor = usePerfisEditor({ pessoa, euId: dados.euId, source, onGravado })
   const { alterado, salvando } = editor
   useEffect(() => { onEstado?.({ alterado, salvando }) }, [alterado, salvando, onEstado])
@@ -140,13 +147,13 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
     try {
       const etapas = await source.encerrar(pessoa.id, confirmacao)
       setEncerrando(false)
-      onNota(notaDasEtapas('Encerrado. Etapas que não rodaram:', etapas))
+      onNota(notaDasEtapas('Encerrado, mas nem tudo saiu. Confira:', etapas))
       await onFeito()
     } catch (reason) {
       const e = parseAcessoError(reason)
       if (e.codigo === 'CONFIRMACAO_INVALIDA') throw reason
       setEncerrando(false)
-      onNota({ tom: 'danger', titulo: 'Não foi possível encerrar o acesso', linhas: [e.message] })
+      onNota({ tom: 'danger', titulo: 'Não foi possível encerrar o acesso', linhas: [e.message, ...etapasRelevantes(e.etapas).linhas.filter((l) => !e.message.includes(l))] })
     }
   }
 
@@ -161,7 +168,7 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
       )}
       {pessoa.id === dados.euId ? null : (
         <div className="cluster">
-          <Button variant="danger" disabled={travado} aria-describedby={travado ? 'encerrar-motivo' : undefined} onClick={() => { onNota(null); setEncerrando(true) }}>Encerrar acesso…</Button>
+          <Button variant="danger" disabled={travado} aria-describedby={travado ? 'encerrar-motivo' : undefined} onClick={() => { onNota(null); setEncerrando(true) }}>Encerrar acesso ao sistema…</Button>
           {travado ? <span id="encerrar-motivo" className="muted">{MOTIVO_AMPLO}</span> : null}
         </div>
       )}
@@ -179,20 +186,22 @@ function EncerradoView({ encerrado, dados, source, onFeito, onNota }: { encerrad
   const viewerAdmin = acessosDe(useAcessos()).admin
   const [reativando, setReativando] = useState(false)
   const daPessoa = dados.historico.filter((h) => h.usuarioId === encerrado.id)
-  const ultimo = daPessoa.find((h) => h.amplo?.acao === 'encerrar')
-  const volta = ultimo ? rotulos(ultimo.antes) : []
-  const tinhaAmplo = !!ultimo?.amplo?.papeis.some((p) => ehAmplo([p.nome]))
-  const travado = tinhaAmplo && !viewerAdmin
+  const ciclo = encerrado.ciclo
+  const semNome = (ciclo?.papeis ?? []).filter((p) => !p.nome).length
+  const papeisSoltos = (ciclo?.papeis ?? []).filter((p) => p.nome && !p.nome.startsWith('Perfil - '))
+  const volta = [...rotulos(encerrado.antes ?? { areas: {}, acessos: false }), ...papeisSoltos.map((p) => `papel ${p.nome}`), ...(semNome ? [`${semNome} papel(is) sem nome gravado`] : []), ...(ciclo?.equipes ?? []).map((e) => `equipe ${nomeDoItem(e)}`)]
+  const travado = cicloExigeAdmin(ciclo, encerrado.antes, dados.equipesRestritas) && !viewerAdmin
 
   const reativar = async () => {
     setReativando(true)
     onNota(null)
     try {
       const etapas = await source.reativar(encerrado.id)
-      onNota(notaDasEtapas('Reativado. Etapas que não rodaram:', etapas))
+      onNota(notaDasEtapas('Reativado, mas nem tudo voltou. Confira:', etapas))
       await onFeito()
     } catch (reason) {
-      onNota({ tom: 'danger', titulo: 'Não foi possível reativar o acesso', linhas: [parseAcessoError(reason).message] })
+      const e = parseAcessoError(reason)
+      onNota({ tom: 'danger', titulo: 'Não foi possível reativar o acesso', linhas: [e.message, ...etapasRelevantes(e.etapas).linhas.filter((l) => !e.message.includes(l))] })
     } finally {
       setReativando(false)
     }
@@ -201,7 +210,7 @@ function EncerradoView({ encerrado, dados, source, onFeito, onNota }: { encerrad
   return (
     <>
       <Alert tone="warning" title={`Acesso encerrado em ${fmtQuando(encerrado.encerradoEm)} por ${encerrado.encerradoPor}`}>Peça à TI para desativar a conta Microsoft.</Alert>
-      {volta.length ? <p className="muted">Volta com: {volta.join(', ')}.</p> : null}
+      {volta.length ? <p className="muted">Volta com: {volta.join(', ')}.</p> : <p className="muted">Volta só com o perfil básico.</p>}
       <div className="cluster">
         <Button loading={reativando} disabled={travado || reativando} aria-describedby={travado ? 'reativar-motivo' : undefined} onClick={() => void reativar()}>Reativar com os perfis anteriores</Button>
         {travado ? <span id="reativar-motivo" className="muted">{MOTIVO_AMPLO_REATIVAR}</span> : null}

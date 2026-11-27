@@ -25,9 +25,12 @@ export type Pessoa = {
 
 /** `cr40f_amplo` do histórico: papéis que a retirada tirou ou a devolução repôs; `encerrar`/`reativar` são do ciclo do administrativo (papéis diretos). */
 export type AcaoAmplo = 'retirar' | 'devolver' | 'encerrar' | 'reativar'
-export type AmploHistorico = { acao: AcaoAmplo; papeis: { id: string; nome: string }[] }
+/** Item de papel, perfil de coluna ou equipe do JSON; `nome` vem vazio quando o plugin gravou só o id (JSON acima de 4000 caracteres). */
+export type ItemAmplo = { id: string; nome: string }
+export type AmploHistorico = { acao: AcaoAmplo; papeis: ItemAmplo[]; perfisColuna?: ItemAmplo[]; equipes?: ItemAmplo[] }
 export type Historico = { id: string; usuarioId: string; usuario: string; alteradoPor: string; antes: PerfisPessoa; depois: PerfisPessoa; quando: Date | null; amplo?: AmploHistorico | null }
-export type Dados = { pessoas: Pessoa[]; historico: Historico[]; euId: string }
+/** `equipesRestritas`: ids (minúsculos) das equipes cujos papéis exigem o Administrador do Sistema (amplo ou Administrador de acessos). */
+export type Dados = { pessoas: Pessoa[]; historico: Historico[]; euId: string; equipesRestritas?: string[] }
 export type ErroApi = { codigo: string | null; mensagem: string }
-/** Pessoa com a conta bloqueada cujo último registro do histórico é um encerramento. `encerradoPor` é o nome de quem encerrou. */
-export type Encerrado = { id: string; nome: string; email: string; encerradoEm: Date | null; encerradoPor: string; /** Ficha do funcionário com este e-mail, de qualquer situação; `null` sem ficha. */ fichaId?: string | null }
+/** Pessoa com a conta bloqueada cujo último registro do histórico é um encerramento. `encerradoPor` é o nome de quem encerrou; `ciclo` e `antes` são o JSON e os perfis desse encerramento (o que volta no Reativar). */
+export type Encerrado = { id: string; nome: string; email: string; encerradoEm: Date | null; encerradoPor: string; ciclo?: AmploHistorico | null; antes?: PerfisPessoa; /** Ficha do funcionário com este e-mail, de qualquer situação; `null` sem ficha. */ fichaId?: string | null }

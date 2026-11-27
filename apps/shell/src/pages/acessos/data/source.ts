@@ -1,11 +1,11 @@
-import { cleanId, type Row } from '@betinhos/dataverse'
+import { cleanId, odataString, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
-import { LEGADOS, ehAdmin, ehAmplo, perfisDosPapeis } from '../../../app/acessos'
+import { LEGADOS, ehAdmin, ehAmplo, exigeAdminDoSistema, perfisDosPapeis } from '../../../app/acessos'
 import { latenciaMock } from '../../../app/latenciaMock'
 import { mockFalhaCarga, param } from '../../../app/mockVolume'
 import { doAmplo, doPedido, erroDaApi, iguais, paraPedido, ultimaDoAmplo } from '../domain/perfis'
 import { lerPrevia, lerUso, type Previa, type Uso } from '../domain/previa'
-import { AcessoError, parseAcessoError, parseEtapas, type Etapa } from '../../funcionarios/data/acesso'
+import { AcessoError, MENSAGENS_DO_CICLO, parseAcessoError, parseEtapas, type Etapa } from '../../funcionarios/data/acesso'
 import type { Dados, Encerrado, Historico, PerfisPessoa, Pessoa } from '../domain/types'
 import { MOCK_CARLOS, previaDeExemplo, usoDeExemplo } from './mockPrevia'
 
@@ -19,8 +19,10 @@ export type Source = {
   encerrar: (usuarioId: string, confirmacao: string) => Promise<Etapa[]>
   /** Reativa com os perfis, as equipes e as colunas do último encerramento (`cr40f_AcessoReativar`); mesmos erros, mais NADA_A_REATIVAR. */
   reativar: (usuarioId: string) => Promise<Etapa[]>
-  /** Quem está encerrado (conta bloqueada e último histórico `encerrar`), do mais recente ao mais antigo. Leitura à parte de `load`. */
+  /** Quem está encerrado (conta bloqueada e último histórico `encerrar`), do mais recente ao mais antigo. Leitura à parte de `load`; lê só o histórico de encerramentos e as contas bloqueadas que aparecem nele. */
   encerrados: () => Promise<Encerrado[]>
+  /** O encerramento de uma pessoa pelo e-mail da conta (a ficha só conhece o e-mail): `null` se a conta não está bloqueada por um encerramento. Lê só o histórico e o `isdisabled` dela. */
+  encerramento: (email: string) => Promise<Encerrado | null>
   /** O que a pessoa deixa de ter com este pedido (`cr40f_AcessoPrevia`, só leitura). */
   previa: (usuarioId: string, perfis: PerfisPessoa, retirarAmplo: boolean, signal?: AbortSignal) => Promise<Previa>
   /** Uso de 90 dias das tabelas (registros criados ou alterados pela pessoa), até 200 numa chamada. */
@@ -38,13 +40,13 @@ const nomes = (v: unknown) => (Array.isArray(v) ? (v as Row[]).map((r) => str(r.
 const PESSOAS = `systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent('isdisabled eq false and applicationid eq null and azureactivedirectoryobjectid ne null')}&$expand=systemuserroles_association($select=name)&$orderby=fullname asc`
 const EQUIPES = 'teams?$select=name&$expand=teamroles_association($select=name),teammembership_association($select=systemuserid)'
 const FICHAS = `cr40f_funcionarioses?$select=cr40f_emailmicrosoft,cr40f_funcionariosid&$filter=${encodeURIComponent('statecode eq 0 and cr40f_emailmicrosoft ne null')}`
-// Para abrir a ficha de quem foi encerrado: o funcionário pode já estar inativo.
-const FICHAS_TODAS = `cr40f_funcionarioses?$select=cr40f_emailmicrosoft,cr40f_funcionariosid&$filter=${encodeURIComponent('cr40f_emailmicrosoft ne null')}`
 const HISTORICO = `cr40f_acessohistoricos?$select=cr40f_acessohistoricoid,_cr40f_usuario_value,_cr40f_alteradopor_value,cr40f_perfisantes,cr40f_perfisdepois,cr40f_amplo,createdon&$orderby=${encodeURIComponent('createdon desc')}`
 
-// Contas bloqueadas (gente); só entram em "Encerrados" as que têm encerramento como último registro do histórico.
-const DESATIVADOS = `systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent('isdisabled eq true and applicationid eq null')}&$orderby=fullname asc`
-const NOMES = `systemusers?$select=fullname,systemuserid&$filter=${encodeURIComponent('isdisabled eq false and applicationid eq null')}`
+// "Encerrados": só as linhas de encerramento do histórico (o JSON do plugin não tem espaços), depois as contas bloqueadas dessas pessoas e o histórico inteiro delas.
+const SO_ENCERRAMENTOS = `cr40f_acessohistoricos?$select=_cr40f_usuario_value&$filter=${encodeURIComponent(`contains(cr40f_amplo,'"acao":"encerrar"')`)}`
+const PEDACO = 15
+const pedacos = <T,>(itens: T[]) => Array.from({ length: Math.ceil(itens.length / PEDACO) }, (_, i) => itens.slice(i * PEDACO, (i + 1) * PEDACO))
+const filtroOr = (campo: string, valores: string[], aspas = false) => encodeURIComponent(`(${valores.map((v) => (aspas ? `${campo} eq '${odataString(v)}'` : `${campo} eq ${v}`)).join(' or ')})`)
 
 const minusculo = (v: unknown) => str(v).toLowerCase()
 
@@ -60,8 +62,10 @@ export function montar(usuarios: Row[], equipes: Row[], historico: Row[], euId: 
   const fichaPorEmail = fichasPorEmail(fichas ?? [])
   const adminsPorEquipe = new Set<string>()
   const amplosPorEquipe = new Set<string>()
+  const equipesRestritas: string[] = []
   for (const equipe of equipes) {
     const papeis = nomes(equipe.teamroles_association)
+    if (exigeAdminDoSistema(papeis)) equipesRestritas.push(cleanId(str(equipe.teamid)).toLowerCase())
     if (!ehAmplo(papeis)) continue
     const admin = ehAdmin(papeis)
     for (const m of (Array.isArray(equipe.teammembership_association) ? (equipe.teammembership_association as Row[]) : [])) {
@@ -86,22 +90,25 @@ export function montar(usuarios: Row[], equipes: Row[], historico: Row[], euId: 
   const ultima = new Map<string, Date | null>()
   for (const h of linhas) if (!ultima.has(h.usuarioId)) ultima.set(h.usuarioId, h.quando)
   const pessoas: Pessoa[] = base.map((p) => ({ ...p, alteradoEm: ultima.get(p.id) ?? null, temFicha: fichaPorEmail.has(p.email.toLowerCase()), fichaId: fichaPorEmail.get(p.email.toLowerCase()) || null }))
-  return { pessoas, historico: linhas, euId }
+  return { pessoas, historico: linhas, euId, equipesRestritas }
 }
 
-/** Cruza as contas bloqueadas com o histórico (do mais novo ao mais velho): a primeira linha de cada pessoa tem de ser um encerramento. `ativos` só dá os nomes de quem encerrou. */
-export function montarEncerrados(desativados: Row[], ativos: Row[], historico: Row[], fichas: Row[] = []): Encerrado[] {
+/** Cruza as contas bloqueadas com o histórico: a linha mais recente de cada pessoa tem de ser um encerramento (linha posterior de qualquer tipo invalida, como no servidor). `nomes` só dá os nomes de quem encerrou. */
+export function montarEncerrados(desativados: Row[], nomes: Row[], historico: Row[], fichas: Row[] = []): Encerrado[] {
   const fichaPorEmail = fichasPorEmail(fichas)
   const nomePorId = new Map<string, string>()
-  for (const u of [...ativos, ...desativados]) nomePorId.set(cleanId(str(u.systemuserid)), str(u.fullname))
+  for (const u of [...nomes, ...desativados]) nomePorId.set(cleanId(str(u.systemuserid)), str(u.fullname))
+  const quando = (h: Row) => date(h.createdon)?.getTime() ?? 0
   const ultima = new Map<string, Row>()
-  for (const h of historico) { const id = cleanId(str(h._cr40f_usuario_value)); if (!ultima.has(id)) ultima.set(id, h) }
+  // Ordena aqui em vez de confiar na ordem da API; empate fica com a primeira linha lida.
+  for (const h of [...historico].sort((a, b) => quando(b) - quando(a))) { const id = cleanId(str(h._cr40f_usuario_value)); if (!ultima.has(id)) ultima.set(id, h) }
   const lista: Encerrado[] = []
   for (const u of desativados) {
     const id = cleanId(str(u.systemuserid))
     const h = ultima.get(id)
-    if (!h || doAmplo(h.cr40f_amplo)?.acao !== 'encerrar') continue
-    lista.push({ id, nome: str(u.fullname), email: str(u.internalemailaddress), encerradoEm: date(h.createdon), encerradoPor: nomePorId.get(cleanId(str(h._cr40f_alteradopor_value))) ?? 'Usuário não listado', fichaId: fichaPorEmail.get(minusculo(u.internalemailaddress)) || null })
+    const ciclo = h ? doAmplo(h.cr40f_amplo) : null
+    if (!h || ciclo?.acao !== 'encerrar') continue
+    lista.push({ id, nome: str(u.fullname), email: str(u.internalemailaddress), encerradoEm: date(h.createdon), encerradoPor: nomePorId.get(cleanId(str(h._cr40f_alteradopor_value))) ?? 'Usuário não listado', fichaId: fichaPorEmail.get(minusculo(u.internalemailaddress)) || null, ciclo, antes: doPedido(h.cr40f_perfisantes) })
   }
   return lista.sort((a, b) => (b.encerradoEm?.getTime() ?? 0) - (a.encerradoEm?.getTime() ?? 0))
 }
@@ -110,7 +117,23 @@ export function montarEncerrados(desativados: Row[], ativos: Row[], historico: R
 function recusa(reason: unknown): AcessoError {
   if (reason instanceof AcessoError) return reason
   const { codigo, mensagem } = erroDaApi(reason)
-  return new AcessoError(codigo ?? 'DESCONHECIDO', mensagem, parseAcessoError(reason).etapas)
+  // Estas duas trazem contagens e jargão do servidor; a tela diz o que fazer.
+  return new AcessoError(codigo ?? 'DESCONHECIDO', codigo && MENSAGENS_DO_CICLO[codigo] ? MENSAGENS_DO_CICLO[codigo] : mensagem, parseAcessoError(reason).etapas)
+}
+
+type Cliente = { getAll: (caminho: string) => Promise<Row[]> }
+/** Do histórico inteiro dos bloqueados, só o que a lista precisa: as linhas deles, os nomes de quem encerrou e as fichas (qualquer situação). */
+async function lerEncerrados(client: Cliente, bloqueados: Row[]): Promise<Encerrado[]> {
+  if (!bloqueados.length) return []
+  const ids = bloqueados.map((u) => cleanId(str(u.systemuserid)))
+  const historico = (await Promise.all(pedacos(ids).map((p) => client.getAll(`${HISTORICO}&$filter=${filtroOr('_cr40f_usuario_value', p)}`)))).flat()
+  const autores = [...new Set(historico.map((h) => cleanId(str(h._cr40f_alteradopor_value))).filter((id) => id && !ids.includes(id)))]
+  const emails = [...new Set(bloqueados.map((u) => str(u.internalemailaddress)).filter(Boolean))]
+  const [nomes, fichas] = await Promise.all([
+    Promise.all(pedacos(autores).map((p) => client.getAll(`systemusers?$select=fullname,systemuserid&$filter=${filtroOr('systemuserid', p)}`))).then((r) => r.flat()),
+    Promise.all(pedacos(emails).map((p) => client.getAll(`cr40f_funcionarioses?$select=cr40f_emailmicrosoft,cr40f_funcionariosid&$filter=${filtroOr('cr40f_emailmicrosoft', p, true)}`))).then((r) => r.flat()).catch(() => [] as Row[]),
+  ])
+  return montarEncerrados(bloqueados, nomes, historico, fichas)
 }
 
 const comparavel = (v: string) => v.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase()
@@ -133,6 +156,7 @@ export const MOCK_ENCERRADA: Pessoa = { id: '66666666-6666-4666-8666-66666666666
 let seq = 0
 function createMockSource(): Source {
   const pessoas = MOCK_PESSOAS.map((p) => ({ ...p }))
+  const paraEncerrado = (e: { pessoa: Pessoa; quando: Date | null; por: string }): Encerrado => ({ id: e.pessoa.id, nome: e.pessoa.nome, email: e.pessoa.email, encerradoEm: e.quando, encerradoPor: e.por, fichaId: e.pessoa.fichaId ?? null, ciclo: { acao: 'encerrar', papeis: [{ id: 'papel-base', nome: 'Perfil - Base' }], perfisColuna: [], equipes: [] }, antes: e.pessoa.perfis })
   const encerradas: { pessoa: Pessoa; quando: Date | null; por: string }[] = [{ pessoa: { ...MOCK_ENCERRADA }, quando: MOCK_ENCERRADA.alteradoEm, por: 'Ana Exemplo' }]
   const historico: Historico[] = [
     { id: 'h-0', usuarioId: MOCK_ENCERRADA.id, usuario: MOCK_ENCERRADA.nome, alteradoPor: 'Ana Exemplo', antes: MOCK_ENCERRADA.perfis, depois: { areas: {}, acessos: false }, quando: MOCK_ENCERRADA.alteradoEm, amplo: { acao: 'encerrar', papeis: [{ id: 'papel-base', nome: 'Perfil - Base' }] } },
@@ -193,7 +217,13 @@ function createMockSource(): Source {
     },
     async encerrados() {
       await wait(200)
-      return encerradas.map((e) => ({ id: e.pessoa.id, nome: e.pessoa.nome, email: e.pessoa.email, encerradoEm: e.quando, encerradoPor: e.por, fichaId: e.pessoa.fichaId ?? null }))
+      return encerradas.map(paraEncerrado)
+    },
+    async encerramento(email) {
+      await wait(200)
+      if (param('falha') === 'encerramento') throw new Error('Falha simulada ao ler o encerramento.')
+      const e = encerradas.find((x) => x.pessoa.email.toLowerCase() === email.trim().toLowerCase())
+      return e ? paraEncerrado(e) : null
     },
     async previa(usuarioId, perfis, retirarAmplo) {
       await wait(250)
@@ -246,8 +276,16 @@ export function createSource(host: Host): Source {
       } catch (reason) { throw recusa(reason) }
     },
     async encerrados() {
-      const [desativados, ativos, historico, fichas] = await Promise.all([client.getAll(DESATIVADOS), client.getAll(NOMES), client.getAll(HISTORICO), client.getAll(FICHAS_TODAS).catch(() => [])])
-      return montarEncerrados(desativados, ativos, historico, fichas)
+      const linhas = await client.getAll(SO_ENCERRAMENTOS)
+      const ids = [...new Set(linhas.map((l) => cleanId(str(l._cr40f_usuario_value))).filter(Boolean))]
+      const bloqueados = (await Promise.all(pedacos(ids).map((p) => client.getAll(`systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent('isdisabled eq true and applicationid eq null and ')}${filtroOr('systemuserid', p)}`)))).flat()
+      return lerEncerrados(client, bloqueados)
+    },
+    async encerramento(email) {
+      const alvo = email.trim()
+      if (!alvo) return null
+      const contas = await client.getAll(`systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent(`isdisabled eq true and applicationid eq null and internalemailaddress eq '${odataString(alvo)}'`)}`)
+      return (await lerEncerrados(client, contas))[0] ?? null
     },
     async previa(usuarioId, perfis, retirarAmplo, signal) {
       return lerPrevia((await pedirPrevia(usuarioId, perfis, retirarAmplo, undefined, signal)).Resultado)

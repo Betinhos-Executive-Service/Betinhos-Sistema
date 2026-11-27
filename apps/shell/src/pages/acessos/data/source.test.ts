@@ -122,15 +122,76 @@ describe('encerrar e reativar (fonte real)', () => {
       h('cccccccc-cccc-4ccc-8ccc-cccccccccccc', encerrar, '2026-11-20T12:00:00Z'),
       // Diego sem histórico: bloqueada por outro motivo
     ]
-    expect(montarEncerrados(desativados, ativos, historico)).toEqual([{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nome: 'Bruno Modelo', email: 'bruno@exemplo.test', encerradoEm: new Date('2026-11-25T12:00:00Z'), encerradoPor: 'Ana Exemplo', fichaId: null }])
+    expect(montarEncerrados(desativados, ativos, historico)).toEqual([{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nome: 'Bruno Modelo', email: 'bruno@exemplo.test', encerradoEm: new Date('2026-11-25T12:00:00Z'), encerradoPor: 'Ana Exemplo', fichaId: null, ciclo: { acao: 'encerrar', papeis: [{ id: 'p', nome: 'Perfil - Base' }], perfisColuna: [], equipes: [] }, antes: { areas: {}, acessos: false } }])
   })
 
-  it('encerrados lê contas bloqueadas, nomes e histórico e não toca em `load`', async () => {
+  it('montarEncerrados: linha posterior de qualquer tipo invalida, mesmo vinda fora de ordem', () => {
+    const encerrar = '{"acao":"encerrar","papeis":[],"perfisColuna":[],"equipes":[]}'
+    const u = [{ systemuserid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', fullname: 'Bruno Modelo', internalemailaddress: 'bruno@exemplo.test' }]
+    const h = (amplo: string | null, createdon: string) => ({ _cr40f_usuario_value: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', cr40f_amplo: amplo, createdon })
+    // A API devolveu o encerramento primeiro, mas há uma troca de perfis depois dele.
+    expect(montarEncerrados(u, [], [h(encerrar, '2026-11-20T12:00:00Z'), h(null, '2026-11-24T12:00:00Z')])).toEqual([])
+    expect(montarEncerrados(u, [], [h('{"acao":"reativar","papeis":[]}', '2026-11-24T12:00:00Z'), h(encerrar, '2026-11-20T12:00:00Z')])).toEqual([])
+  })
+
+  it('montarEncerrados aceita itens sem nome (JSON grande) e guarda as equipes', () => {
+    const u = [{ systemuserid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', fullname: 'Bruno Modelo', internalemailaddress: 'bruno@exemplo.test' }]
+    const amplo = '{"acao":"encerrar","papeis":[{"id":"p1"}],"perfisColuna":[],"equipes":[{"id":"e1"},{"id":"e2","nome":"Frota"}]}'
+    const [e] = montarEncerrados(u, [], [{ _cr40f_usuario_value: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', cr40f_amplo: amplo, createdon: '2026-11-20T12:00:00Z' }])
+    expect(e.ciclo?.papeis).toEqual([{ id: 'p1', nome: '' }])
+    expect(e.ciclo?.equipes).toEqual([{ id: 'e1', nome: '' }, { id: 'e2', nome: 'Frota' }])
+  })
+
+  it('HISTORICO_GRANDE e HISTORICO_ILEGIVEL viram texto humano', async () => {
+    const fonte = createSource({ mode: 'dataverse', client: { getAll: async () => [], request: async () => { throw new Error('HISTORICO_GRANDE: Esta pessoa tem papéis demais (4100 de 4000 caracteres); nada foi alterado.') } } } as unknown as Host)
+    expect(await fonte.encerrar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Bruno').catch((e) => e)).toMatchObject({ codigo: 'HISTORICO_GRANDE', message: expect.stringContaining('fale com o administrador do sistema') })
+    const ilegivel = createSource({ mode: 'dataverse', client: { getAll: async () => [], request: async () => { throw new Error('HISTORICO_ILEGIVEL: registro ilegível.') } } } as unknown as Host)
+    expect(await ilegivel.reativar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb').catch((e) => e)).toMatchObject({ codigo: 'HISTORICO_ILEGIVEL', message: expect.stringContaining('ilegível') })
+  })
+
+  it('encerrados filtra o histórico no servidor, lê só as contas dessas pessoas e não toca em `load`', async () => {
     const caminhos: string[] = []
-    const host = { mode: 'dataverse', client: { getAll: async (p: string) => { caminhos.push(p); return [] }, request: async () => ({}) } } as unknown as Host
+    const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const host = {
+      mode: 'dataverse',
+      client: {
+        getAll: async (p: string) => {
+          caminhos.push(decodeURIComponent(p))
+          if (p.startsWith('cr40f_acessohistoricos') && !p.includes('%24orderby') && !p.includes('$orderby')) return [{ _cr40f_usuario_value: id }]
+          if (p.startsWith('systemusers') && decodeURIComponent(p).includes('isdisabled eq true')) return [{ systemuserid: id, fullname: 'Bruno Modelo', internalemailaddress: 'bruno@exemplo.test' }]
+          return []
+        },
+        request: async () => ({}),
+      },
+    } as unknown as Host
     expect(await createSource(host).encerrados()).toEqual([])
-    expect(caminhos.some((c) => c.startsWith('systemusers') && decodeURIComponent(c).includes('isdisabled eq true'))).toBe(true)
-    expect(caminhos.filter((c) => c.startsWith('systemusers') && decodeURIComponent(c).includes('isdisabled eq false'))).toHaveLength(1)
+    expect(caminhos[0]).toContain(`contains(cr40f_amplo,'"acao":"encerrar"')`)
+    expect(caminhos.some((c) => c.startsWith('systemusers') && c.includes('isdisabled eq true') && c.includes(`systemuserid eq ${id}`))).toBe(true)
+    expect(caminhos.some((c) => c.startsWith('cr40f_acessohistoricos') && c.includes(`_cr40f_usuario_value eq ${id}`))).toBe(true)
+    expect(caminhos.some((c) => c.includes('isdisabled eq false'))).toBe(false)
+  })
+
+  it('encerramento(email) lê só a conta bloqueada e o histórico daquela pessoa', async () => {
+    const caminhos: string[] = []
+    const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const host = {
+      mode: 'dataverse',
+      client: {
+        getAll: async (p: string) => {
+          const c = decodeURIComponent(p)
+          caminhos.push(c)
+          if (c.startsWith('systemusers') && c.includes('isdisabled eq true')) return [{ systemuserid: id, fullname: 'Bruno Modelo', internalemailaddress: "o'bruno@exemplo.test" }]
+          if (c.startsWith('cr40f_acessohistoricos')) return [{ _cr40f_usuario_value: id, _cr40f_alteradopor_value: id, cr40f_amplo: '{"acao":"encerrar","papeis":[]}', createdon: '2026-11-20T12:00:00Z' }]
+          return []
+        },
+        request: async () => ({}),
+      },
+    } as unknown as Host
+    const e = await createSource(host).encerramento("o'bruno@exemplo.test")
+    expect(e).toMatchObject({ id, nome: 'Bruno Modelo', encerradoPor: 'Bruno Modelo' })
+    expect(caminhos[0]).toContain("internalemailaddress eq 'o''bruno@exemplo.test'")
+    expect(caminhos.length).toBeLessThanOrEqual(4)
+    expect(caminhos.some((c) => c.includes('isdisabled eq false') || c.includes('cr40f_acessohistoricos?$select=_cr40f_usuario_value&'))).toBe(false)
   })
 })
 

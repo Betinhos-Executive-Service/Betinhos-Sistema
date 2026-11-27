@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amploTexto, doAmplo, doPedido, erroDaApi, ultimaDoAmplo, iguais, oQueMuda, paraPedido, perfisIndisponiveis, rotulos } from './perfis'
+import { amploTexto, cicloExigeAdmin, doAmplo, doPedido, erroDaApi, ultimaDoAmplo, iguais, oQueMuda, paraPedido, perfisIndisponiveis, rotulos } from './perfis'
 import { montar } from '../data/source'
 import { VAZIO, type Historico, type PerfisPessoa } from './types'
 
@@ -50,12 +50,25 @@ describe('erro da Custom API', () => {
 describe('histórico de encerrar e reativar', () => {
   it('doAmplo lê encerrar e reativar; amploTexto mostra Encerrado e Reativado sem mexer em retirar/devolver', () => {
     const encerrar = doAmplo('{"acao":"encerrar","papeis":[{"id":"p","nome":"Perfil - Base"}],"perfisColuna":[],"equipes":[]}')
-    expect(encerrar).toEqual({ acao: 'encerrar', papeis: [{ id: 'p', nome: 'Perfil - Base' }] })
+    expect(encerrar).toEqual({ acao: 'encerrar', papeis: [{ id: 'p', nome: 'Perfil - Base' }], perfisColuna: [], equipes: [] })
     expect(amploTexto(encerrar!)).toBe('Encerrado: Perfil - Base')
     expect(amploTexto(doAmplo('{"acao":"reativar","papeis":[]}')!)).toBe('Reativado')
     expect(amploTexto({ acao: 'retirar', papeis: [{ id: '1', nome: 'X' }] })).toBe('Acesso amplo retirado: X')
     expect(amploTexto({ acao: 'devolver', papeis: [] })).toBe('Acesso amplo devolvido')
     expect(doAmplo('{"acao":"outra"}')).toBeNull()
+  })
+
+  it('doAmplo aceita item sem nome e amploTexto avisa; cicloExigeAdmin vê amplo, Administrador de acessos e equipe restrita', () => {
+    const grande = doAmplo('{"acao":"encerrar","papeis":[{"id":"p1"}],"perfisColuna":[],"equipes":[{"id":"E1"}]}')!
+    expect(grande.papeis).toEqual([{ id: 'p1', nome: '' }])
+    expect(amploTexto(grande)).toBe('Encerrado: item sem nome')
+    const livre = { areas: {}, acessos: false }
+    expect(cicloExigeAdmin(grande, livre)).toBe(false)
+    expect(cicloExigeAdmin(grande, livre, ['e1'])).toBe(true)
+    expect(cicloExigeAdmin(grande, { areas: {}, acessos: true })).toBe(true)
+    expect(cicloExigeAdmin(doAmplo('{"acao":"encerrar","papeis":[{"id":"p","nome":"Administrador do Sistema"}]}'), livre)).toBe(true)
+    expect(cicloExigeAdmin(doAmplo('{"acao":"encerrar","papeis":[{"id":"p","nome":"Perfil - Base"}]}'), livre)).toBe(false)
+    expect(cicloExigeAdmin(null, livre)).toBe(false)
   })
 
   it('montar põe encerrar e reativar no histórico e o Devolver ignora os dois', () => {
