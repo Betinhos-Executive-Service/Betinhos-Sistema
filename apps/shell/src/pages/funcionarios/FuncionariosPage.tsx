@@ -1,5 +1,5 @@
 import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar, type MenuAction } from '@betinhos/ui'
-import { Cake, CloudOff, IdCard, KeyRound, Plus, RefreshCw, SearchX, ShieldCheck, Stethoscope } from 'lucide-react'
+import { Cake, CloudOff, Grid3x3, IdCard, KeyRound, Plus, RefreshCw, SearchX, ShieldCheck, Stethoscope } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -162,6 +162,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const comunicados = useMemo(() => createComunicadosSource(host), [host])
   const verAcessosSemFicha = temAlgum(acessos, ['acessos'])
   const irParaAcessos = useCallback(() => { location.hash = hrefFor('acessos') }, [])
+  const irParaMatriz = useCallback(() => { location.hash = hrefFor('acessos', { visao: 'papel' }) }, [])
   const acessosSistema = useMemo(() => createAcessosSource(host), [host])
   const onAcessoCadastrado = useCallback((id: string, emailPendente?: string) => {
     setAcessoAberto(null)
@@ -204,6 +205,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           onOpen={(id) => setSelection({ mode: 'open', id })}
           onNew={() => setSelection({ mode: 'new' })}
           onAcessosSemFicha={verAcessosSemFicha ? irParaAcessos : undefined}
+          onAcessosPorPapel={verAcessosSemFicha ? irParaMatriz : undefined}
         />
         {ficha}
         {acessoDrawer}
@@ -240,6 +242,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           primary={<>
             <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Recarregar lista" title="Atualizar" loading={loading} onClick={() => void reload()} />
             {verAcessosSemFicha ? <Button variant="secondary" icon={<ShieldCheck size={16} />} onClick={irParaAcessos}>Acessos sem ficha</Button> : null}
+            {verAcessosSemFicha ? <Button variant="secondary" icon={<Grid3x3 size={16} />} onClick={irParaMatriz}>Acessos por papel</Button> : null}
             <Button icon={<Plus size={16} />} onClick={() => setSelection({ mode: 'new' })}>Novo</Button>
           </>}>
           <EnvBadge env={source.envLabel} />

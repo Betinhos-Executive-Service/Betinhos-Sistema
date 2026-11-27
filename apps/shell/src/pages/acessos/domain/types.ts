@@ -19,6 +19,8 @@ export type Pessoa = {
   alteradoEm: Date | null
   /** Há funcionário ativo com este e-mail Microsoft; a tela Acessos lista só quem não tem. */
   temFicha: boolean
+  /** Id do funcionário ativo com este e-mail Microsoft (para abrir a ficha); `null` sem ficha. */
+  fichaId?: string | null
 }
 
 /** `cr40f_amplo` do histórico: papéis que a retirada tirou ou a devolução repôs; `encerrar`/`reativar` são do ciclo do administrativo (papéis diretos). */
@@ -28,4 +30,4 @@ export type Historico = { id: string; usuarioId: string; usuario: string; altera
 export type Dados = { pessoas: Pessoa[]; historico: Historico[]; euId: string }
 export type ErroApi = { codigo: string | null; mensagem: string }
 /** Pessoa com a conta bloqueada cujo último registro do histórico é um encerramento. `encerradoPor` é o nome de quem encerrou. */
-export type Encerrado = { id: string; nome: string; email: string; encerradoEm: Date | null; encerradoPor: string }
+export type Encerrado = { id: string; nome: string; email: string; encerradoEm: Date | null; encerradoPor: string; /** Ficha do funcionário com este e-mail, de qualquer situação; `null` sem ficha. */ fichaId?: string | null }

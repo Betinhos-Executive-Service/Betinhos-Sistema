@@ -1,5 +1,5 @@
 import { Button, EmptyState, PageHeader, SearchBox } from '@betinhos/ui'
-import { Cake, Check, ChevronRight, CloudOff, IdCard, Plus, RefreshCw, SearchX, ShieldCheck, SlidersHorizontal, Stethoscope } from 'lucide-react'
+import { Cake, Check, Grid3x3, ChevronRight, CloudOff, IdCard, Plus, RefreshCw, SearchX, ShieldCheck, SlidersHorizontal, Stethoscope } from 'lucide-react'
 import { useQueryBandeira } from '../../../nav/queryState'
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { AlertKind } from '../data/alerts'
@@ -36,6 +36,7 @@ type Props = {
   onNew: () => void
   /** Só para quem administra acessos: abre a lista das contas sem ficha. */
   onAcessosSemFicha?: () => void
+  onAcessosPorPapel?: () => void
 }
 
 const ALERTAS: { kind: AlertKind; label: string; icon: typeof IdCard }[] = [
@@ -58,7 +59,7 @@ function filtrosExtras(filters: Filters) {
 }
 
 export function MobileHome(props: Props) {
-  const { views, visible, shown = visible, footer, words, counts, alertas, vinculo, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew, onAcessosSemFicha } = props
+  const { onAcessosPorPapel, views, visible, shown = visible, footer, words, counts, alertas, vinculo, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew, onAcessosSemFicha } = props
   // A folha de filtros aberta vive na URL (`filtros=1`).
   const [sheet, setSheet] = useQueryBandeira('filtros')
   const extras = filtrosExtras(vinculo ? filters : { ...filters, vinculo: null })
@@ -73,6 +74,7 @@ export function MobileHome(props: Props) {
           meta={<><span>{ativos} ativos de {views.length}</span><EnvBadge env={envLabel} /></>}
           actions={<>
             {onAcessosSemFicha ? <Button variant="secondary" size="touch" icon={<ShieldCheck size={20} />} aria-label="Acessos sem ficha" title="Acessos sem ficha" onClick={onAcessosSemFicha} /> : null}
+            {onAcessosPorPapel ? <Button variant="secondary" size="touch" icon={<Grid3x3 size={20} />} aria-label="Acessos por papel" title="Acessos por papel" onClick={onAcessosPorPapel} /> : null}
             <Button variant="secondary" size="touch" icon={<RefreshCw size={20} className={loading ? 'spin' : ''} />} aria-label="Recarregar lista" onClick={onReload} disabled={loading} />
           </>}
         />

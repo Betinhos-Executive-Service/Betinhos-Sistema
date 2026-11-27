@@ -37,7 +37,9 @@ const nomes = (v: unknown) => (Array.isArray(v) ? (v as Row[]).map((r) => str(r.
 // Só gente: sem conta de aplicação, sem usuário desativado e sem conta interna sem Entra.
 const PESSOAS = `systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent('isdisabled eq false and applicationid eq null and azureactivedirectoryobjectid ne null')}&$expand=systemuserroles_association($select=name)&$orderby=fullname asc`
 const EQUIPES = 'teams?$select=name&$expand=teamroles_association($select=name),teammembership_association($select=systemuserid)'
-const FICHAS = `cr40f_funcionarioses?$select=cr40f_emailmicrosoft&$filter=${encodeURIComponent('statecode eq 0 and cr40f_emailmicrosoft ne null')}`
+const FICHAS = `cr40f_funcionarioses?$select=cr40f_emailmicrosoft,cr40f_funcionariosid&$filter=${encodeURIComponent('statecode eq 0 and cr40f_emailmicrosoft ne null')}`
+// Para abrir a ficha de quem foi encerrado: o funcionário pode já estar inativo.
+const FICHAS_TODAS = `cr40f_funcionarioses?$select=cr40f_emailmicrosoft,cr40f_funcionariosid&$filter=${encodeURIComponent('cr40f_emailmicrosoft ne null')}`
 const HISTORICO = `cr40f_acessohistoricos?$select=cr40f_acessohistoricoid,_cr40f_usuario_value,_cr40f_alteradopor_value,cr40f_perfisantes,cr40f_perfisdepois,cr40f_amplo,createdon&$orderby=${encodeURIComponent('createdon desc')}`
 
 // Contas bloqueadas (gente); só entram em "Encerrados" as que têm encerramento como último registro do histórico.
@@ -46,9 +48,16 @@ const NOMES = `systemusers?$select=fullname,systemuserid&$filter=${encodeURIComp
 
 const minusculo = (v: unknown) => str(v).toLowerCase()
 
+/** E-mail Microsoft (minúsculo) → id do funcionário (vazio quando a leitura não trouxe o id). */
+function fichasPorEmail(fichas: Row[]) {
+  const mapa = new Map<string, string>()
+  for (const f of fichas) { const email = minusculo(f.cr40f_emailmicrosoft); const id = cleanId(str(f.cr40f_funcionariosid)); if (email && !mapa.has(email)) mapa.set(email, id) }
+  return mapa
+}
+
 /** Monta a tela a partir das consultas. `fichas` são os e-mails Microsoft dos funcionários ativos; `null` = leitura falhou. O administrador costuma vir por equipe; os perfis, só dos papéis diretos. */
 export function montar(usuarios: Row[], equipes: Row[], historico: Row[], euId: string, fichas: Row[] | null = null): Dados {
-  const comFicha = new Set((fichas ?? []).map((f) => minusculo(f.cr40f_emailmicrosoft)).filter(Boolean))
+  const fichaPorEmail = fichasPorEmail(fichas ?? [])
   const adminsPorEquipe = new Set<string>()
   const amplosPorEquipe = new Set<string>()
   for (const equipe of equipes) {
@@ -76,12 +85,13 @@ export function montar(usuarios: Row[], equipes: Row[], historico: Row[], euId: 
   // O histórico vem do mais novo para o mais velho: a primeira linha de cada pessoa é a última alteração.
   const ultima = new Map<string, Date | null>()
   for (const h of linhas) if (!ultima.has(h.usuarioId)) ultima.set(h.usuarioId, h.quando)
-  const pessoas: Pessoa[] = base.map((p) => ({ ...p, alteradoEm: ultima.get(p.id) ?? null, temFicha: comFicha.has(p.email.toLowerCase()) }))
+  const pessoas: Pessoa[] = base.map((p) => ({ ...p, alteradoEm: ultima.get(p.id) ?? null, temFicha: fichaPorEmail.has(p.email.toLowerCase()), fichaId: fichaPorEmail.get(p.email.toLowerCase()) || null }))
   return { pessoas, historico: linhas, euId }
 }
 
 /** Cruza as contas bloqueadas com o histórico (do mais novo ao mais velho): a primeira linha de cada pessoa tem de ser um encerramento. `ativos` só dá os nomes de quem encerrou. */
-export function montarEncerrados(desativados: Row[], ativos: Row[], historico: Row[]): Encerrado[] {
+export function montarEncerrados(desativados: Row[], ativos: Row[], historico: Row[], fichas: Row[] = []): Encerrado[] {
+  const fichaPorEmail = fichasPorEmail(fichas)
   const nomePorId = new Map<string, string>()
   for (const u of [...ativos, ...desativados]) nomePorId.set(cleanId(str(u.systemuserid)), str(u.fullname))
   const ultima = new Map<string, Row>()
@@ -91,7 +101,7 @@ export function montarEncerrados(desativados: Row[], ativos: Row[], historico: R
     const id = cleanId(str(u.systemuserid))
     const h = ultima.get(id)
     if (!h || doAmplo(h.cr40f_amplo)?.acao !== 'encerrar') continue
-    lista.push({ id, nome: str(u.fullname), email: str(u.internalemailaddress), encerradoEm: date(h.createdon), encerradoPor: nomePorId.get(cleanId(str(h._cr40f_alteradopor_value))) ?? 'Usuário não listado' })
+    lista.push({ id, nome: str(u.fullname), email: str(u.internalemailaddress), encerradoEm: date(h.createdon), encerradoPor: nomePorId.get(cleanId(str(h._cr40f_alteradopor_value))) ?? 'Usuário não listado', fichaId: fichaPorEmail.get(minusculo(u.internalemailaddress)) || null })
   }
   return lista.sort((a, b) => (b.encerradoEm?.getTime() ?? 0) - (a.encerradoEm?.getTime() ?? 0))
 }
@@ -113,12 +123,12 @@ const MOCK_PESSOAS: Pessoa[] = [
   { id: '22222222-2222-4222-8222-222222222222', nome: 'Bruno Modelo', email: 'bruno@exemplo.test', perfis: { areas: { financeiro: 'operador' }, acessos: false }, admin: false, amplo: false, alteradoEm: new Date('2026-11-20T15:30:00Z'), temFicha: false },
   { id: '33333333-3333-4333-8333-333333333333', nome: 'Carla Amostra', email: 'carla@exemplo.test', perfis: { areas: { operacional: 'gestor', frota: 'operador' }, acessos: true }, admin: false, amplo: true, alteradoEm: new Date('2026-11-18T13:00:00Z'), temFicha: false },
   // Mesmo e-mail do funcionário m1 do mock de Funcionários, para a ficha de exemplo mostrar o editor.
-  { id: MOCK_CARLOS, nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com', perfis: { areas: { operacional: 'operador' }, acessos: false }, admin: false, amplo: true, alteradoEm: new Date('2026-11-21T12:00:00Z'), temFicha: true },
+  { id: MOCK_CARLOS, nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com', perfis: { areas: { operacional: 'operador' }, acessos: false }, admin: false, amplo: true, alteradoEm: new Date('2026-11-21T12:00:00Z'), temFicha: true, fichaId: 'm1' },
   { id: '44444444-4444-4444-8444-444444444444', nome: 'Diego Teste', email: 'diego@exemplo.test', perfis: { areas: {}, acessos: false }, admin: false, amplo: false, alteradoEm: null, temFicha: false },
 ]
 
 /** Pessoa de exemplo já encerrada (fictícia); fora de `MOCK_PESSOAS` porque a lista só traz contas ativas. */
-export const MOCK_ENCERRADA: Pessoa = { id: '55555555-5555-4555-8555-555555555555', nome: 'Elisa Desligada', email: 'elisa@exemplo.test', perfis: { areas: { operacional: 'operador' }, acessos: false }, admin: false, amplo: false, alteradoEm: new Date('2026-11-10T14:00:00Z'), temFicha: false }
+export const MOCK_ENCERRADA: Pessoa = { id: '55555555-5555-4555-8555-555555555555', nome: 'Elisa Desligada', email: 'elisa@exemplo.test', perfis: { areas: { operacional: 'operador' }, acessos: false }, admin: false, amplo: false, alteradoEm: new Date('2026-11-10T14:00:00Z'), temFicha: false, fichaId: 'm9' }
 
 let seq = 0
 function createMockSource(): Source {
@@ -183,7 +193,7 @@ function createMockSource(): Source {
     },
     async encerrados() {
       await wait(200)
-      return encerradas.map((e) => ({ id: e.pessoa.id, nome: e.pessoa.nome, email: e.pessoa.email, encerradoEm: e.quando, encerradoPor: e.por }))
+      return encerradas.map((e) => ({ id: e.pessoa.id, nome: e.pessoa.nome, email: e.pessoa.email, encerradoEm: e.quando, encerradoPor: e.por, fichaId: e.pessoa.fichaId ?? null }))
     },
     async previa(usuarioId, perfis, retirarAmplo) {
       await wait(250)
@@ -236,8 +246,8 @@ export function createSource(host: Host): Source {
       } catch (reason) { throw recusa(reason) }
     },
     async encerrados() {
-      const [desativados, ativos, historico] = await Promise.all([client.getAll(DESATIVADOS), client.getAll(NOMES), client.getAll(HISTORICO)])
-      return montarEncerrados(desativados, ativos, historico)
+      const [desativados, ativos, historico, fichas] = await Promise.all([client.getAll(DESATIVADOS), client.getAll(NOMES), client.getAll(HISTORICO), client.getAll(FICHAS_TODAS).catch(() => [])])
+      return montarEncerrados(desativados, ativos, historico, fichas)
     },
     async previa(usuarioId, perfis, retirarAmplo, signal) {
       return lerPrevia((await pedirPrevia(usuarioId, perfis, retirarAmplo, undefined, signal)).Resultado)

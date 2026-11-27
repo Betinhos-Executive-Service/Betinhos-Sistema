@@ -17,10 +17,13 @@ import type { Dados, PerfisPessoa, Pessoa } from './domain/types'
 import { AcessosCards, AcessosTable } from './components/AcessosList'
 import { AcessoDrawer } from './components/AcessoDrawer'
 import { HistoricoLista } from './components/HistoricoLista'
+import { MatrizPapel } from './components/MatrizPapel'
 import './acessos.css'
 
+/** `?visao=papel` abre a matriz por papel; sem ele, a lista de contas sem ficha. */
 export function AcessosPage({ host }: { host: Host }) {
-  return <ToastProvider><Acessos host={host} /></ToastProvider>
+  const [visao] = useQueryTexto('visao')
+  return <ToastProvider>{visao === 'papel' ? <MatrizPapel host={host} /> : <Acessos host={host} />}</ToastProvider>
 }
 
 const EMPTY: Pessoa[] = []

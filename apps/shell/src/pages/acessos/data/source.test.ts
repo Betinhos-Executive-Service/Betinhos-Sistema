@@ -122,7 +122,7 @@ describe('encerrar e reativar (fonte real)', () => {
       h('cccccccc-cccc-4ccc-8ccc-cccccccccccc', encerrar, '2026-11-20T12:00:00Z'),
       // Diego sem histórico: bloqueada por outro motivo
     ]
-    expect(montarEncerrados(desativados, ativos, historico)).toEqual([{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nome: 'Bruno Modelo', email: 'bruno@exemplo.test', encerradoEm: new Date('2026-11-25T12:00:00Z'), encerradoPor: 'Ana Exemplo' }])
+    expect(montarEncerrados(desativados, ativos, historico)).toEqual([{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nome: 'Bruno Modelo', email: 'bruno@exemplo.test', encerradoEm: new Date('2026-11-25T12:00:00Z'), encerradoPor: 'Ana Exemplo', fichaId: null }])
   })
 
   it('encerrados lê contas bloqueadas, nomes e histórico e não toca em `load`', async () => {
