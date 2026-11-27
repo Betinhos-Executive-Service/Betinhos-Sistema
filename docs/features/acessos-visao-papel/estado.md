@@ -2,7 +2,7 @@
 
 - Nível: 2 (várias telas e um caminho novo de encerrar acesso; sem schema novo; saída com revisão Opus de segurança)
 - Etapa: 5 de 7 Construir
-- Próximo passo: tarefa 2 (shell, dados) · sozinho
+- Próximo passo: tarefa 3 (matriz) · sozinho
 - Branch e PR: feat/acessos-visao-papel (base feat/acessos-o-que-perde, PR #777) · ainda não
 - Protótipo: A (matriz pessoa × área, filtros: ainda com o amplo, só o Base, encerrados) e ficha com banner "Vendo como", Encerrar com confirmação pelo primeiro nome e Reativar com os perfis anteriores; B descartada
 - Go: 27/11/2026 09:26 por Renan (clique no card)
@@ -29,7 +29,7 @@
 | # | Tarefa | Depende de | Cenário (ação → resultado) | Prova | Nível | Resultado |
 |---|---|---|---|---|---|---|
 | 1 | Plugin: `EncerrarAdministrativoHandler`, `ReativarAdministrativoHandler`, plugins, registro das 2 Custom APIs no registrador e `Devolver` ignorando encerrar/reativar; testes xUnit | — | cenários 7 a 11 em teste | `dotnet test` do Acesso.Plugin | Opus | passou (local): 266/0, 13 novos, commit 7b131cea. Incertos: SetState do reativar com conta sem licença; `cr40f_amplo` 4000 caracteres; perfil de coluna que o Dataverse recuse tirar; equipe de grupo do Entra fica (etapa pulada). 1ª execução do `dotnet test` deu 254 falhas e as 2 seguintes passaram: instável na 1ª compilação |
-| 2 | Shell (dados): `source.ts` com `encerrar`/`reativar`, leitura dos encerrados, `HistoricoLista` com Encerrado/Reativado, mock | 1 (contrato) | cenários 4, 7 e 10 no mock | vitest dos arquivos tocados | Sonnet | |
+| 2 | Shell (dados): `source.ts` com `encerrar`/`reativar`, leitura dos encerrados, `HistoricoLista` com Encerrado/Reativado, mock | 1 (contrato) | cenários 4, 7 e 10 no mock | vitest dos arquivos tocados | Sonnet | passou (mock): 233 testes em acessos+funcionarios, tsc limpo, commit dfd4606d. Revisar na tarefa 5: `encerrados()` lê todas as contas bloqueadas e cruza no cliente (peso) |
 | 3 | Shell (matriz): `#/acessos?visao=papel`, botão "Acessos por papel" em Funcionários, chips e busca, clique para a ficha ou a gaveta | 2 | cenários 1 a 5 | vitest + print no mock (1280 e 375) | Sonnet | |
 | 4 | Shell (ficha): Encerrar com diálogo e confirmação, estado encerrado e Reativar, botão travado para amplo | 2 | cenários 6, 8 e 11 | vitest + print no mock | Sonnet | |
 | 5 | Revisão de segurança (Opus) do diff 1 a 4, qualidade, verificar-acessos atualizada, PR 1 → develop (base #777) | 1 a 4 | — | code-review high + ux-audit Fluxo | Opus | |
