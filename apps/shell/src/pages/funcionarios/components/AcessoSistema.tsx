@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button } from '@betinhos/ui'
 import { acessosDe, useAcessos } from '../../../app/AcessosProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
-import { temAlgum } from '../../../app/acessos'
+import { TODOS, temAlgum, type Acessos } from '../../../app/acessos'
 import { HistoricoLista, fmtQuando } from '../../acessos/components/HistoricoLista'
 import { PerfisEditor, usePerfisEditor } from '../../acessos/components/PerfisEditor'
 import type { Source as AcessosSource } from '../../acessos/data/source'
@@ -20,6 +20,8 @@ type Props = {
   email: string
   source?: AcessosSource | null
   onEstado?: (estado: EstadoPerfis) => void
+  /** A ficha tem alteração não salva fora deste bloco: o "Ver como" troca de tela e a perderia sem o "Descartar alterações?". */
+  fichaPendente?: boolean
 }
 
 const norm = (v: string) => v.trim().toLowerCase()
@@ -39,13 +41,13 @@ const notaDaRecusa = (titulo: string, reason: unknown): Nota => {
 }
 
 /** Bloco "Acesso ao sistema" da aba Acesso: perfis da pessoa, só para quem administra acessos. Sem fonte ou sem permissão não renderiza nem lê nada. */
-export function AcessoSistema({ email, source, onEstado }: Props) {
+export function AcessoSistema({ email, source, onEstado, fichaPendente }: Props) {
   const acessos = acessosDe(useAcessos())
   if (!source || !temAlgum(acessos, ['acessos'])) return null
-  return <Bloco email={email} source={source} onEstado={onEstado} />
+  return <Bloco email={email} source={source} onEstado={onEstado} fichaPendente={fichaPendente} />
 }
 
-function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
+function Bloco({ email, source, onEstado, fichaPendente }: Props & { source: AcessosSource }) {
   const [dados, setDados] = useState<Dados | null>(null)
   const [encerramento, setEncerramento] = useState<Encerrado | null>(null)
   const [nota, setNota] = useState<Nota | null>(null)
@@ -126,7 +128,7 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
     corpo = (
       <>
         {erro ? <Alert tone="warning" title="A última atualização falhou" action={tentar}>{erro} Os perfis e o histórico podem estar desatualizados.</Alert> : null}
-        <Editor key={pessoa.id} pessoa={pessoa} dados={dados} source={source} onGravado={salvo} onEstado={onEstado} onFeito={carregar} onNota={setNota} />
+        <Editor key={pessoa.id} pessoa={pessoa} dados={dados} source={source} onGravado={salvo} onEstado={onEstado} onFeito={carregar} onNota={setNota} fichaPendente={fichaPendente} />
       </>
     )
   }
@@ -143,8 +145,9 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
 
 type Acao = { onFeito: () => Promise<void>; onNota: (n: Nota | null) => void }
 
-function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }: { pessoa: Pessoa; dados: Dados; source: AcessosSource; onGravado: (perfis: PerfisPessoa) => Promise<void>; onEstado?: (estado: EstadoPerfis) => void } & Acao) {
-  const viewerAdmin = acessosDe(useAcessos()).admin
+function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota, fichaPendente }: { pessoa: Pessoa; dados: Dados; source: AcessosSource; onGravado: (perfis: PerfisPessoa) => Promise<void>; onEstado?: (estado: EstadoPerfis) => void; fichaPendente?: boolean } & Acao) {
+  const contexto = useAcessos()
+  const viewerAdmin = acessosDe(contexto).admin
   const [encerrando, setEncerrando] = useState(false)
   const botaoRef = useRef<HTMLButtonElement>(null)
   const amplo = pessoa.amplo || pessoa.admin
@@ -156,6 +159,12 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
   const daPessoa = dados.historico.filter((h) => h.usuarioId === pessoa.id)
   const perfis = rotulos(pessoa.perfis)
   const perdas = [perfis.length ? `Perfis: ${perfis.join(', ')}` : 'Nenhum perfil de área', ...(amplo ? ['Acesso amplo (Administrador do Sistema ou papel antigo)'] : []), 'O perfil básico e as equipes que dão acesso ao sistema']
+
+  const verComo = () => {
+    // Mesma regra de `lerPapeis`: só o Administrador do Sistema vê tudo no shell; papel antigo amplo fica com os perfis de área.
+    const simulado: Acessos = pessoa.admin && !editor.retirarAmplo ? TODOS : { admin: false, areas: editor.rascunho.areas, acessos: editor.rascunho.acessos }
+    contexto.entrarVerComo?.({ nome: pessoa.nome, pessoaId: pessoa.id, acessos: simulado, amplo: simulado.admin, voltarPara: window.location.hash, edicao: editor.edicao })
+  }
 
   const confirmar = async (confirmacao: string) => {
     try {
@@ -178,6 +187,12 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
         <div className="cluster">
           <Button disabled={!editor.podeSalvar} loading={salvando} onClick={() => void editor.salvar()}>Salvar perfis</Button>
           <Button variant="secondary" disabled={!alterado || salvando} onClick={editor.descartar}>Descartar</Button>
+        </div>
+      )}
+      {contexto.verComo ? null : (
+        <div className="cluster">
+          <Button variant="secondary" disabled={salvando || fichaPendente} aria-describedby={fichaPendente ? 'ver-como-motivo' : undefined} onClick={verComo}>Ver como esta pessoa</Button>
+          {fichaPendente ? <span id="ver-como-motivo" className="muted">Salve ou descarte as alterações da ficha antes.</span> : null}
         </div>
       )}
       {pessoa.id === dados.euId ? null : (

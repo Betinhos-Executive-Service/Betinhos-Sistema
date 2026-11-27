@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Dialog, Radio, StatusBadge, Switch, useToast } from '@betinhos/ui'
 import { AREAS, AREA_LABEL, PERFIL_LABEL, type Area, type Nivel, type Perfil } from '../../../app/acessos'
 import { acessosDe, useAcessos } from '../../../app/AcessosProvider'
@@ -14,6 +14,7 @@ const OPCOES: { valor: Nivel | null; rotulo: string }[] = [{ valor: null, rotulo
 /** Só o que o usuário mexeu; o rascunho é derivado dos perfis atuais, então uma recarga com o editor aberto não o deixa velho. */
 type Edicao = { areas: Partial<Record<Area, Nivel | null>>; acessos?: boolean; retirarAmplo?: boolean }
 const LIMPA: Edicao = { areas: {} }
+const ehEdicao = (valor: unknown): valor is Edicao => typeof valor === 'object' && valor !== null && 'areas' in valor
 
 function aplicar(base: PerfisPessoa, edicao: Edicao): PerfisPessoa {
   const areas = { ...base.areas }
@@ -37,8 +38,13 @@ type Opcoes = {
 /** Rascunho, gravação e descarte dos perfis de uma pessoa. Remonte com `key` a cada pessoa: o rascunho nunca vaza de uma para outra. */
 export function usePerfisEditor({ pessoa, euId, source, onGravado }: Opcoes) {
   const toast = useToast()
-  const viewerAdmin = acessosDe(useAcessos()).admin
-  const [edicao, setEdicao] = useState<Edicao>(LIMPA)
+  const contexto = useAcessos()
+  const viewerAdmin = acessosDe(contexto).admin
+  const { rascunhoPendente, limparRascunhoPendente } = contexto
+  const simulando = !!contexto.verComo
+  // Volta do "Ver como": o rascunho guardado ao entrar reaparece, só para a mesma pessoa; durante a simulação não é consumido.
+  const [edicao, setEdicao] = useState<Edicao>(() => (rascunhoPendente?.pessoaId === pessoa.id && ehEdicao(rascunhoPendente.edicao) ? rascunhoPendente.edicao : LIMPA))
+  useEffect(() => { if (!simulando) limparRascunhoPendente?.() }, [limparRascunhoPendente, simulando])
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<ErroApi | null>(null)
   const [confirmando, setConfirmando] = useState(false)
@@ -88,6 +94,7 @@ export function usePerfisEditor({ pessoa, euId, source, onGravado }: Opcoes) {
     /** Radios travados; só o interruptor de acesso amplo continua livre para quem pode retirar. */
     editavel: !somenteLeitura || podeRetirar,
     retirarAmplo,
+    edicao,
     salvando,
     erro,
     rascunho,

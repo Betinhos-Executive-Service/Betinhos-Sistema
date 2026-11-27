@@ -333,7 +333,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                   onCadastrar={() => onCadastrarAcesso?.({ funcionarioId: original.id, nomeCompleto: String(original.values.cr40f_nomecompleto ?? ''), celular: String(original.values.cr40f_telefonecorporativo ?? '') })}
                 />
               )}
-              <AcessoSistema email={emailFicha} source={acessosSistema} onEstado={setPerfis} />
+              <AcessoSistema email={emailFicha} source={acessosSistema} onEstado={setPerfis} fichaPendente={touched || saving} />
               <section className="group">
                 <SecretText html={original.loginsesenhas} onSave={async (html) => { await source.saveLogins(original.id, html); setOriginal(await source.get(original.id)) }} />
               </section>

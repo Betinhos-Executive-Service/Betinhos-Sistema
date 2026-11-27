@@ -1,13 +1,13 @@
 # Acessos: visão por papel, ver como e saída de administrativo
 
 - Nível: 2 (várias telas e um caminho novo de encerrar acesso; sem schema novo; saída com revisão Opus de segurança)
-- Etapa: 7 de 7 Entregar (PR 1)
-- Próximo passo: QA e merge do #777 e do PR 1 · com você; depois tarefa 6 (prova no DEV, card antes)
-- Branch e PR: feat/acessos-visao-papel (base feat/acessos-o-que-perde, PR #777) · ainda não
+- Etapa: 7 de 7 Entregar (PR 2, Ver como)
+- Próximo passo: QA e merge do PR 2 (Ver como) · com você
+- Branch e PR: PR 1 #780 mergeado e provado no DEV; PR 2 feat/acessos-ver-como → develop
 - Protótipo: A (matriz pessoa × área, filtros: ainda com o amplo, só o Base, encerrados) e ficha com banner "Vendo como", Encerrar com confirmação pelo primeiro nome e Reativar com os perfis anteriores; B descartada
 - Go: 27/11/2026 09:26 por Renan (clique no card)
 - PROD: ainda não
-- Atualizado: 27/11/2026 09:26
+- Atualizado: 27/11/2026 15:01
 
 ## Decisões
 | Data | Decisão | Por quê | Quem decidiu |
@@ -24,6 +24,8 @@
 | 27/11/2026 | Encerrar quem tem o amplo (direto ou por equipe): só o Administrador do Sistema | mantém a regra do DefinirPerfis | Renan |
 | 27/11/2026 | Encerrar tira a pessoa das equipes que dão papel; o Reativar devolve | o papel da equipe valeria se o bloqueio fosse desfeito | Renan |
 | 27/11/2026 | "Ver como" na ficha, bloco Acesso ao sistema, mostrando também o rascunho | ver antes de salvar | Renan |
+| 27/11/2026 | Ver como mostra tudo só para o Administrador do Sistema; papel antigo amplo fica com os perfis de área, como o menu real (`lerPapeis`) | fidelidade ao que a pessoa vê | revisão (code-review) |
+| 27/11/2026 | Durante o Ver como, a faixa avisa "o que você gravar sai em seu nome" (sem travar gravação) | muda pouco; o Dataverse continua barrando | Renan (card) |
 
 ## Tarefas e provas
 | # | Tarefa | Depende de | Cenário (ação → resultado) | Prova | Nível | Resultado |
@@ -34,7 +36,7 @@
 | 4 | Shell (ficha): Encerrar com diálogo e confirmação, estado encerrado e Reativar, botão travado para amplo | 2 | cenários 6, 8 e 11 | vitest + print no mock | Sonnet | passou (mock): 251 testes em acessos+funcionarios, tsc limpo; prints `prints/ficha-*.png`. Mock: ficha m9 (Joana) é a encerrada, com id próprio (colidia com o de Carlos). Incertos: a lista "o que perde" não traz equipes (o bloco não as lê); 403 de recurso externo no console do mock |
 | 5 | Revisão de segurança (Opus) do diff 1 a 4, qualidade, verificar-acessos atualizada, PR 1 → develop (base #777) | 1 a 4 | — | code-review high + ux-audit Fluxo | Opus | passou (local): revisão Opus com 2 importantes e 9 menores corrigidos (cba17b72 plugin, d1648c37 shell), qualidade 023f8212, verificação bf6ea657 (277 testes do plugin, 263 do shell, tsc limpo, mock 1280/375). Segurança: superfície tocada (Custom API sem privilégio próprio), revisada |
 | 6 | Prova no DEV depois do merge (Deploy registra as APIs): encerrar e reativar um usuário de teste e conferir papéis, equipes, bloqueio e histórico | 5 | cenários 7, 9 e 10 reais | saída sem ids | — (sessão principal, card antes) | |
-| 7 | Ver como (PR 2): override no `AcessosProvider`, banner no AppShell, botão na ficha | 5 | cenários 12 a 14 | vitest + print | Sonnet | |
+| 7 | Ver como (PR 2): override no `AcessosProvider`, banner no AppShell, botão na ficha | 5 | cenários 12 a 14 | vitest + print | Sonnet | passou (mock): 582 testes em app+acessos+funcionarios+nav, tsc limpo; prints 1366/375 (simulado, sem acesso, Sair/Esc com rascunho de volta, aviso). Code-review high: 4 corrigidos (amplo legado, edição da ficha pendente trava o botão, Voltar do navegador, botão some na simulação), faixa sem sticky. Não verificável no mock: leitura real de papéis no DEV |
 
 ## Pendências e fora de escopo
 - Revisão periódica de uso: fora (decisão de 27/11/2026)
