@@ -36,13 +36,16 @@ export function AnexoMiniatura({ anexo, source }: Props) {
     } catch { janela?.close(); setEstado('erro') }
   }
 
-  const Icone = ehVideo(anexo.tipo) ? Film : FileText
+  const video = ehVideo(anexo.tipo)
+  const Icone = video ? Film : FileText
+  // Tipo vem do mimetype da anotação: pode ser vazio ou outro formato (anexo de agente), então só PDF de fato leva o rótulo PDF.
+  const tipo = imagem ? 'imagem' : video ? 'video' : anexo.tipo === 'application/pdf' ? 'pdf' : 'arquivo'
   return (
-    <button type="button" className="pj-anexo" onClick={() => void abrir()} title={anexo.nome} aria-label={`Abrir anexo ${anexo.nome}`}>
+    <button type="button" className={`pj-anexo is-${tipo}`} onClick={() => void abrir()} title={anexo.nome} aria-label={`Abrir anexo ${anexo.nome}`}>
       <span className="pj-anexo__thumb" aria-hidden="true">
         {estado === 'carregando' ? <LoaderCircle size={18} className="pj-spin" />
           : estado === 'erro' ? <ImageOff size={18} />
-          : url ? <img src={url} alt="" /> : <Icone size={22} />}
+          : url ? <img src={url} alt="" /> : <><Icone size={22} /><small>{video ? 'Vídeo' : tipo === 'pdf' ? 'PDF' : 'Arquivo'}</small></>}
       </span>
       <span className="pj-anexo__nome">{anexo.nome}</span>
     </button>
@@ -67,7 +70,7 @@ export function AnexoAudio({ anexo, source }: Props) {
         : (
           <button type="button" className="pj-audio__ouvir" aria-disabled={estado === 'carregando' || undefined} aria-busy={estado === 'carregando' || undefined} onClick={() => void ouvir()} aria-label={`Ouvir áudio ${anexo.nome}`}>
             <span className="pj-audio__play" aria-hidden="true">{estado === 'carregando' ? <LoaderCircle size={16} className="pj-spin" /> : <Play size={16} />}</span>
-            <span className="pj-audio__info"><strong>{anexo.nome}</strong><small>{estado === 'carregando' ? 'Carregando…' : 'Ouvir áudio'}</small></span>
+            <span className="pj-audio__info"><strong>{anexo.nome}</strong><small>{estado === 'carregando' ? 'Carregando…' : 'Toque para ouvir'}</small></span>
           </button>
         )}
       {estado === 'erro' ? <span className="pj-muted" role="alert">Não foi possível baixar o áudio. Tente de novo.</span> : null}

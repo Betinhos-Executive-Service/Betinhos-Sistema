@@ -1,7 +1,7 @@
 // Detalhe do projeto no Planner: coluna (só leitura) e prazo no topo; título, descrição e checklist (Salvar) e anexos com áudio (enviados na hora).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Checkbox, Dialog, Drawer, Textarea, useToast } from "@betinhos/ui";
-import { Clock, Paperclip, Plus, Upload, X } from "lucide-react";
+import { Clock, FileText, Film, Image as ImageIcon, Mic, Paperclip, Plus, Quote, Upload, X } from "lucide-react";
 import { AudioRecorder } from "./AudioRecorder";
 import type { Row } from "@betinhos/dataverse";
 import { reasonText, type Source } from "../projetos/data/source";
@@ -276,7 +276,7 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
                   <li key={anexo.id} className={novoAnexo(anexo.id)}>
                     <AnexoAudio anexo={anexo} source={source} />
                     {transcricao !== null && (transcricao
-                      ? <p className="pj-transcricao"><span className="pj-transcricao__lbl">Transcrição</span>{transcricao}</p>
+                      ? <p className="pj-transcricao"><span className="pj-transcricao__lbl"><Quote size={12} aria-hidden="true" />Transcrição</span>{transcricao}</p>
                       : <p className="pj-transcricao is-pendente"><Clock size={12} aria-hidden="true" />Transcrição pendente</p>)}
                   </li>
                 ))}
@@ -285,8 +285,17 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
             {/* aria-disabled em vez de disabled: botão disabled não recebe dragover, e soltar o arquivo nele abriria o arquivo na aba. */}
             <button type="button" className={arrastando ? "pj-drop is-arrastando" : "pj-drop"} aria-disabled={ocupado || undefined}
               onClick={() => { if (!ocupado) inputRef.current?.click(); }}>
-              <Upload size={18} aria-hidden="true" />
-              <span><strong>Arraste, cole ou clique para anexar</strong><small>Imagem, vídeo, áudio ou PDF · até 5 MB</small></span>
+              <span className="pj-drop__icone" aria-hidden="true"><Upload size={20} /></span>
+              <span className="pj-drop__texto">
+                <strong>{arrastando && !salvando ? "Solte para anexar" : "Arraste, cole ou clique para anexar"}</strong>
+                <span className="pj-drop__tipos">
+                  <span className="is-imagem"><ImageIcon size={12} aria-hidden="true" />Imagem</span>
+                  <span className="is-video"><Film size={12} aria-hidden="true" />Vídeo</span>
+                  <span className="is-audio"><Mic size={12} aria-hidden="true" />Áudio</span>
+                  <span className="is-pdf"><FileText size={12} aria-hidden="true" />PDF</span>
+                  <small>até 5 MB</small>
+                </span>
+              </span>
             </button>
             <input ref={inputRef} type="file" accept={ACCEPT} multiple hidden aria-label="Escolher anexos"
               onChange={(event) => { void anexar(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
