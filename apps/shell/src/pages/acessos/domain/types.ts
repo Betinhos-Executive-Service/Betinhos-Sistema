@@ -21,8 +21,11 @@ export type Pessoa = {
   temFicha: boolean
 }
 
-/** `cr40f_amplo` do histórico: papéis que a retirada tirou ou a devolução repôs. */
-export type AmploHistorico = { acao: 'retirar' | 'devolver'; papeis: { id: string; nome: string }[] }
+/** `cr40f_amplo` do histórico: papéis que a retirada tirou ou a devolução repôs; `encerrar`/`reativar` são do ciclo do administrativo (papéis diretos). */
+export type AcaoAmplo = 'retirar' | 'devolver' | 'encerrar' | 'reativar'
+export type AmploHistorico = { acao: AcaoAmplo; papeis: { id: string; nome: string }[] }
 export type Historico = { id: string; usuarioId: string; usuario: string; alteradoPor: string; antes: PerfisPessoa; depois: PerfisPessoa; quando: Date | null; amplo?: AmploHistorico | null }
 export type Dados = { pessoas: Pessoa[]; historico: Historico[]; euId: string }
 export type ErroApi = { codigo: string | null; mensagem: string }
+/** Pessoa com a conta bloqueada cujo último registro do histórico é um encerramento. `encerradoPor` é o nome de quem encerrou. */
+export type Encerrado = { id: string; nome: string; email: string; encerradoEm: Date | null; encerradoPor: string }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { doPedido, erroDaApi, iguais, oQueMuda, paraPedido, perfisIndisponiveis, rotulos } from './perfis'
-import { VAZIO, type PerfisPessoa } from './types'
+import { amploTexto, doAmplo, doPedido, erroDaApi, ultimaDoAmplo, iguais, oQueMuda, paraPedido, perfisIndisponiveis, rotulos } from './perfis'
+import { montar } from '../data/source'
+import { VAZIO, type Historico, type PerfisPessoa } from './types'
 
 const fin: PerfisPessoa = { areas: { financeiro: 'operador' }, acessos: false }
 const finGestor: PerfisPessoa = { areas: { financeiro: 'gestor', rh: 'operador' }, acessos: true }
@@ -43,5 +44,29 @@ describe('erro da Custom API', () => {
     const erro = erroDaApi(new Error('PERFIL_INDISPONIVEL: Perfil ainda não publicado neste ambiente: Perfil - Frota - Gestor; Perfil - Administrador de acessos.'))
     expect(perfisIndisponiveis(erro)).toEqual(['frota', 'acessos'])
     expect(perfisIndisponiveis({ codigo: 'SEM_PERMISSAO', mensagem: 'Perfil - Frota - Gestor' })).toEqual([])
+  })
+})
+
+describe('histórico de encerrar e reativar', () => {
+  it('doAmplo lê encerrar e reativar; amploTexto mostra Encerrado e Reativado sem mexer em retirar/devolver', () => {
+    const encerrar = doAmplo('{"acao":"encerrar","papeis":[{"id":"p","nome":"Perfil - Base"}],"perfisColuna":[],"equipes":[]}')
+    expect(encerrar).toEqual({ acao: 'encerrar', papeis: [{ id: 'p', nome: 'Perfil - Base' }] })
+    expect(amploTexto(encerrar!)).toBe('Encerrado: Perfil - Base')
+    expect(amploTexto(doAmplo('{"acao":"reativar","papeis":[]}')!)).toBe('Reativado')
+    expect(amploTexto({ acao: 'retirar', papeis: [{ id: '1', nome: 'X' }] })).toBe('Acesso amplo retirado: X')
+    expect(amploTexto({ acao: 'devolver', papeis: [] })).toBe('Acesso amplo devolvido')
+    expect(doAmplo('{"acao":"outra"}')).toBeNull()
+  })
+
+  it('montar põe encerrar e reativar no histórico e o Devolver ignora os dois', () => {
+    const usuario = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const linha = (id: string, amplo: string, createdon: string) => ({ cr40f_acessohistoricoid: id, _cr40f_usuario_value: usuario, _cr40f_alteradopor_value: usuario, cr40f_perfisantes: '[]', cr40f_perfisdepois: '[]', cr40f_amplo: amplo, createdon })
+    const dados = montar([{ systemuserid: usuario, fullname: 'Bruno Modelo', internalemailaddress: 'b@exemplo.test', systemuserroles_association: [] }], [], [
+      linha('3', '{"acao":"reativar","papeis":[]}', '2026-11-26T00:00:00Z'),
+      linha('2', '{"acao":"encerrar","papeis":[]}', '2026-11-25T00:00:00Z'),
+      linha('1', '{"acao":"retirar","papeis":[{"id":"p","nome":"DEV - Usuário"}]}', '2026-11-24T00:00:00Z'),
+    ], usuario)
+    expect(dados.historico.map((h: Historico) => h.amplo?.acao)).toEqual(['reativar', 'encerrar', 'retirar'])
+    expect(ultimaDoAmplo(dados.historico, usuario)?.id).toBe('1')
   })
 })

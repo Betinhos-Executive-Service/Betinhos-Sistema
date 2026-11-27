@@ -118,7 +118,7 @@ export function whatsappComMensagem(celular: string, texto: string) {
   return href ? `${href}?text=${encodeURIComponent(texto)}` : null
 }
 
-function parseEtapas(json: string): Etapa[] {
+export function parseEtapas(json: string): Etapa[] {
   try { return JSON.parse(json) as Etapa[] } catch { return [] }
 }
 

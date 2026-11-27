@@ -3,9 +3,10 @@ import type { Host } from '../../../host'
 import { LEGADOS, ehAdmin, ehAmplo, perfisDosPapeis } from '../../../app/acessos'
 import { latenciaMock } from '../../../app/latenciaMock'
 import { mockFalhaCarga, param } from '../../../app/mockVolume'
-import { doAmplo, doPedido, iguais, paraPedido, ultimaDoAmplo } from '../domain/perfis'
+import { doAmplo, doPedido, erroDaApi, iguais, paraPedido, ultimaDoAmplo } from '../domain/perfis'
 import { lerPrevia, lerUso, type Previa, type Uso } from '../domain/previa'
-import type { Dados, Historico, PerfisPessoa, Pessoa } from '../domain/types'
+import { AcessoError, parseAcessoError, parseEtapas, type Etapa } from '../../funcionarios/data/acesso'
+import type { Dados, Encerrado, Historico, PerfisPessoa, Pessoa } from '../domain/types'
 import { MOCK_CARLOS, previaDeExemplo, usoDeExemplo } from './mockPrevia'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
@@ -14,6 +15,12 @@ export type Source = {
   load: () => Promise<Dados>
   /** Troca os perfis da pessoa pela Custom API (única porta de escrita). Erro vem como `CODIGO: mensagem`. */
   definir: (usuarioId: string, perfis: PerfisPessoa, amplo?: Amplo) => Promise<void>
+  /** Encerra o acesso de um administrativo (`cr40f_AcessoEncerrar`): `confirmacao` é o primeiro nome da pessoa. Devolve as etapas; recusa vira `AcessoError` com `codigo` (PROPRIO_ACESSO, ULTIMO_ADMIN, SEM_PERMISSAO, CONFIRMACAO_INVALIDA, JA_ENCERRADO...), a mensagem do servidor e as etapas já feitas. */
+  encerrar: (usuarioId: string, confirmacao: string) => Promise<Etapa[]>
+  /** Reativa com os perfis, as equipes e as colunas do último encerramento (`cr40f_AcessoReativar`); mesmos erros, mais NADA_A_REATIVAR. */
+  reativar: (usuarioId: string) => Promise<Etapa[]>
+  /** Quem está encerrado (conta bloqueada e último histórico `encerrar`), do mais recente ao mais antigo. Leitura à parte de `load`. */
+  encerrados: () => Promise<Encerrado[]>
   /** O que a pessoa deixa de ter com este pedido (`cr40f_AcessoPrevia`, só leitura). */
   previa: (usuarioId: string, perfis: PerfisPessoa, retirarAmplo: boolean, signal?: AbortSignal) => Promise<Previa>
   /** Uso de 90 dias das tabelas (registros criados ou alterados pela pessoa), até 200 numa chamada. */
@@ -32,6 +39,10 @@ const PESSOAS = `systemusers?$select=fullname,internalemailaddress,systemuserid&
 const EQUIPES = 'teams?$select=name&$expand=teamroles_association($select=name),teammembership_association($select=systemuserid)'
 const FICHAS = `cr40f_funcionarioses?$select=cr40f_emailmicrosoft&$filter=${encodeURIComponent('statecode eq 0 and cr40f_emailmicrosoft ne null')}`
 const HISTORICO = `cr40f_acessohistoricos?$select=cr40f_acessohistoricoid,_cr40f_usuario_value,_cr40f_alteradopor_value,cr40f_perfisantes,cr40f_perfisdepois,cr40f_amplo,createdon&$orderby=${encodeURIComponent('createdon desc')}`
+
+// Contas bloqueadas (gente); só entram em "Encerrados" as que têm encerramento como último registro do histórico.
+const DESATIVADOS = `systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent('isdisabled eq true and applicationid eq null')}&$orderby=fullname asc`
+const NOMES = `systemusers?$select=fullname,systemuserid&$filter=${encodeURIComponent('isdisabled eq false and applicationid eq null')}`
 
 const minusculo = (v: unknown) => str(v).toLowerCase()
 
@@ -69,6 +80,31 @@ export function montar(usuarios: Row[], equipes: Row[], historico: Row[], euId: 
   return { pessoas, historico: linhas, euId }
 }
 
+/** Cruza as contas bloqueadas com o histórico (do mais novo ao mais velho): a primeira linha de cada pessoa tem de ser um encerramento. `ativos` só dá os nomes de quem encerrou. */
+export function montarEncerrados(desativados: Row[], ativos: Row[], historico: Row[]): Encerrado[] {
+  const nomePorId = new Map<string, string>()
+  for (const u of [...ativos, ...desativados]) nomePorId.set(cleanId(str(u.systemuserid)), str(u.fullname))
+  const ultima = new Map<string, Row>()
+  for (const h of historico) { const id = cleanId(str(h._cr40f_usuario_value)); if (!ultima.has(id)) ultima.set(id, h) }
+  const lista: Encerrado[] = []
+  for (const u of desativados) {
+    const id = cleanId(str(u.systemuserid))
+    const h = ultima.get(id)
+    if (!h || doAmplo(h.cr40f_amplo)?.acao !== 'encerrar') continue
+    lista.push({ id, nome: str(u.fullname), email: str(u.internalemailaddress), encerradoEm: date(h.createdon), encerradoPor: nomePorId.get(cleanId(str(h._cr40f_alteradopor_value))) ?? 'Usuário não listado' })
+  }
+  return lista.sort((a, b) => (b.encerradoEm?.getTime() ?? 0) - (a.encerradoEm?.getTime() ?? 0))
+}
+
+/** Recusa do plugin (`CODIGO: mensagem | etapas=[...]`) como AcessoError, mantendo a mensagem do servidor (a tabela de mensagens do fluxo de motorista diz outra coisa em SEM_PERMISSAO). */
+function recusa(reason: unknown): AcessoError {
+  if (reason instanceof AcessoError) return reason
+  const { codigo, mensagem } = erroDaApi(reason)
+  return new AcessoError(codigo ?? 'DESCONHECIDO', mensagem, parseAcessoError(reason).etapas)
+}
+
+const comparavel = (v: string) => v.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase()
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 export const MOCK_EU = '11111111-1111-4111-8111-111111111111'
@@ -81,10 +117,15 @@ const MOCK_PESSOAS: Pessoa[] = [
   { id: '44444444-4444-4444-8444-444444444444', nome: 'Diego Teste', email: 'diego@exemplo.test', perfis: { areas: {}, acessos: false }, admin: false, amplo: false, alteradoEm: null, temFicha: false },
 ]
 
+/** Pessoa de exemplo já encerrada (fictícia); fora de `MOCK_PESSOAS` porque a lista só traz contas ativas. */
+export const MOCK_ENCERRADA: Pessoa = { id: '55555555-5555-4555-8555-555555555555', nome: 'Elisa Desligada', email: 'elisa@exemplo.test', perfis: { areas: { operacional: 'operador' }, acessos: false }, admin: false, amplo: false, alteradoEm: new Date('2026-11-10T14:00:00Z'), temFicha: false }
+
 let seq = 0
 function createMockSource(): Source {
   const pessoas = MOCK_PESSOAS.map((p) => ({ ...p }))
+  const encerradas: { pessoa: Pessoa; quando: Date | null; por: string }[] = [{ pessoa: { ...MOCK_ENCERRADA }, quando: MOCK_ENCERRADA.alteradoEm, por: 'Ana Exemplo' }]
   const historico: Historico[] = [
+    { id: 'h-0', usuarioId: MOCK_ENCERRADA.id, usuario: MOCK_ENCERRADA.nome, alteradoPor: 'Ana Exemplo', antes: MOCK_ENCERRADA.perfis, depois: { areas: {}, acessos: false }, quando: MOCK_ENCERRADA.alteradoEm, amplo: { acao: 'encerrar', papeis: [{ id: 'papel-base', nome: 'Perfil - Base' }] } },
     { id: 'h-2', usuarioId: pessoas[1].id, usuario: pessoas[1].nome, alteradoPor: 'Ana Exemplo', antes: { areas: {}, acessos: false }, depois: pessoas[1].perfis, quando: pessoas[1].alteradoEm },
     { id: 'h-1', usuarioId: pessoas[2].id, usuario: pessoas[2].nome, alteradoPor: 'Ana Exemplo', antes: { areas: { operacional: 'operador' }, acessos: false }, depois: pessoas[2].perfis, quando: pessoas[2].alteradoEm },
   ]
@@ -113,6 +154,36 @@ function createMockSource(): Source {
       pessoa.alteradoEm = quando
       if (amplo?.retirarAmplo) { pessoa.amplo = false; pessoa.admin = false }
       if (amplo?.devolverAmplo) pessoa.amplo = true
+    },
+    async encerrar(usuarioId, confirmacao) {
+      await wait(500)
+      if (usuarioId === MOCK_EU) throw new AcessoError('PROPRIO_ACESSO', 'Ninguém encerra o próprio acesso.', [])
+      if (encerradas.some((e) => e.pessoa.id === usuarioId)) throw new AcessoError('JA_ENCERRADO', 'O acesso desta pessoa já está encerrado.', [])
+      const pessoa = pessoas.find((p) => p.id === usuarioId)
+      if (!pessoa) throw new AcessoError('USUARIO_INVALIDO', 'Usuário não encontrado ou de aplicação.', [])
+      if (param('falha') === 'salvar') throw new AcessoError('SEM_PERMISSAO', 'Falha simulada: sem permissão para encerrar.', [])
+      if (comparavel(pessoa.nome.split(/\s+/)[0]) !== comparavel(confirmacao)) throw new AcessoError('CONFIRMACAO_INVALIDA', 'Digite o primeiro nome da pessoa para confirmar.', [{ etapa: 'confirmacao', estado: 'erro', detalhe: 'não confere' }])
+      const quando = new Date()
+      historico.unshift({ id: `h-novo-${++seq}`, usuarioId, usuario: pessoa.nome, alteradoPor: 'Ana Exemplo', antes: pessoa.perfis, depois: { areas: {}, acessos: false }, quando, amplo: { acao: 'encerrar', papeis: [{ id: 'papel-base', nome: 'Perfil - Base' }] } })
+      pessoas.splice(pessoas.indexOf(pessoa), 1)
+      encerradas.unshift({ pessoa: { ...pessoa, alteradoEm: quando }, quando, por: 'Ana Exemplo' })
+      return [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'papeis', estado: 'feita', detalhe: '1 retirado(s)' }, { etapa: 'perfisColuna', estado: 'pulada', detalhe: 'não tinha' }, { etapa: 'equipes', estado: 'pulada', detalhe: 'sem equipe com papel' }, { etapa: 'historico', estado: 'feita', detalhe: 'gravado' }, { etapa: 'bloqueio', estado: 'feita', detalhe: 'bloqueado no Dataverse' }]
+    },
+    async reativar(usuarioId) {
+      await wait(500)
+      if (usuarioId === MOCK_EU) throw new AcessoError('PROPRIO_ACESSO', 'Ninguém reativa o próprio acesso.', [])
+      const i = encerradas.findIndex((e) => e.pessoa.id === usuarioId)
+      if (i < 0) throw new AcessoError('NADA_A_REATIVAR', 'Não há encerramento de acesso a reativar para esta pessoa.', [])
+      if (param('falha') === 'salvar') throw new AcessoError('SEM_PERMISSAO', 'Falha simulada: sem permissão para reativar.', [])
+      const [{ pessoa }] = encerradas.splice(i, 1)
+      const quando = new Date()
+      historico.unshift({ id: `h-novo-${++seq}`, usuarioId, usuario: pessoa.nome, alteradoPor: 'Ana Exemplo', antes: { areas: {}, acessos: false }, depois: pessoa.perfis, quando, amplo: { acao: 'reativar', papeis: [{ id: 'papel-base', nome: 'Perfil - Base' }] } })
+      pessoas.push({ ...pessoa, alteradoEm: quando })
+      return [{ etapa: 'bloqueio', estado: 'feita', detalhe: 'desbloqueado no Dataverse' }, { etapa: 'papeis', estado: 'feita', detalhe: '1 reposto(s)' }, { etapa: 'historico', estado: 'feita', detalhe: 'gravado' }]
+    },
+    async encerrados() {
+      await wait(200)
+      return encerradas.map((e) => ({ id: e.pessoa.id, nome: e.pessoa.nome, email: e.pessoa.email, encerradoEm: e.quando, encerradoPor: e.por }))
     },
     async previa(usuarioId, perfis, retirarAmplo) {
       await wait(250)
@@ -151,6 +222,22 @@ export function createSource(host: Host): Source {
     async definir(usuarioId, perfis, amplo) {
       const corpo = { Usuario: usuarioId, Perfis: JSON.stringify(paraPedido(perfis)), ...(amplo?.retirarAmplo ? { RetirarAmplo: true } : {}), ...(amplo?.devolverAmplo ? { DevolverAmplo: true } : {}) }
       await client.request('cr40f_AcessoDefinirPerfis', { method: 'POST', body: JSON.stringify(corpo) })
+    },
+    async encerrar(usuarioId, confirmacao) {
+      try {
+        const r = await client.request<{ Etapas: string }>('cr40f_AcessoEncerrar', { method: 'POST', body: JSON.stringify({ Usuario: usuarioId, Confirmacao: confirmacao }) })
+        return parseEtapas(r.Etapas)
+      } catch (reason) { throw recusa(reason) }
+    },
+    async reativar(usuarioId) {
+      try {
+        const r = await client.request<{ Etapas: string }>('cr40f_AcessoReativar', { method: 'POST', body: JSON.stringify({ Usuario: usuarioId }) })
+        return parseEtapas(r.Etapas)
+      } catch (reason) { throw recusa(reason) }
+    },
+    async encerrados() {
+      const [desativados, ativos, historico] = await Promise.all([client.getAll(DESATIVADOS), client.getAll(NOMES), client.getAll(HISTORICO)])
+      return montarEncerrados(desativados, ativos, historico)
     },
     async previa(usuarioId, perfis, retirarAmplo, signal) {
       return lerPrevia((await pedirPrevia(usuarioId, perfis, retirarAmplo, undefined, signal)).Resultado)

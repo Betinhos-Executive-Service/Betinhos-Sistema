@@ -24,18 +24,19 @@ export function doPedido(texto: unknown): PerfisPessoa {
 export function doAmplo(texto: unknown): AmploHistorico | null {
   let obj: { acao?: unknown; papeis?: unknown } | null
   try { obj = typeof texto === 'string' && texto.trim() ? (JSON.parse(texto) as { acao?: unknown; papeis?: unknown } | null) : null } catch { obj = null }
-  if (!obj || (obj.acao !== 'retirar' && obj.acao !== 'devolver')) return null
+  if (!obj || (obj.acao !== 'retirar' && obj.acao !== 'devolver' && obj.acao !== 'encerrar' && obj.acao !== 'reativar')) return null
   const papeis = (Array.isArray(obj.papeis) ? (obj.papeis as { id?: unknown; nome?: unknown }[]) : []).map((p) => ({ id: String(p?.id ?? ''), nome: String(p?.nome ?? '') })).filter((p) => p.nome)
   return { acao: obj.acao, papeis }
 }
 
-/** Última entrada de acesso amplo da pessoa (histórico do mais novo ao mais velho), sem a retirada vazia (não tirou papel nenhum). Só ela pode ser devolvida, e só se for retirada. */
+/** Última entrada de acesso amplo da pessoa (histórico do mais novo ao mais velho), sem a retirada vazia (não tirou papel nenhum) e sem encerrar/reativar (o Devolver do servidor também os ignora). Só ela pode ser devolvida, e só se for retirada. */
 export const ultimaDoAmplo = (historico: Historico[], usuarioId: string): Historico | undefined =>
-  historico.find((h) => h.usuarioId === usuarioId && h.amplo && !(h.amplo.acao === 'retirar' && !h.amplo.papeis.length))
+  historico.find((h) => h.usuarioId === usuarioId && h.amplo && (h.amplo.acao === 'retirar' || h.amplo.acao === 'devolver') && !(h.amplo.acao === 'retirar' && !h.amplo.papeis.length))
 
 export function amploTexto(amplo: AmploHistorico): string {
   const nomes = amplo.papeis.map((p) => p.nome).join(', ')
-  return `Acesso amplo ${amplo.acao === 'retirar' ? 'retirado' : 'devolvido'}${nomes ? `: ${nomes}` : ''}`
+  const rotulo = { retirar: 'Acesso amplo retirado', devolver: 'Acesso amplo devolvido', encerrar: 'Encerrado', reativar: 'Reativado' }[amplo.acao]
+  return `${rotulo}${nomes ? `: ${nomes}` : ''}`
 }
 
 export const iguais = (a: PerfisPessoa, b: PerfisPessoa) => a.acessos === b.acessos && AREAS.every((area) => a.areas[area] === b.areas[area])
