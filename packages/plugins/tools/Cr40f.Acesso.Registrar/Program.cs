@@ -22,6 +22,8 @@ const string TipoReativar = "Cr40f.Acesso.Plugin.ReativarAcessoMotoristaPlugin";
 const string ApiReativar = "cr40f_ReativarAcessoMotorista";
 const string TipoDefinirPerfis = "Cr40f.Acesso.Plugin.DefinirPerfisPlugin";
 const string ApiDefinirPerfis = "cr40f_AcessoDefinirPerfis";
+const string TipoPrevia = "Cr40f.Acesso.Plugin.PreviaPlugin";
+const string ApiPrevia = "cr40f_AcessoPrevia";
 // Configuracao do App Motoristas (fase A): 4 Custom APIs sem configuracao no step (nao usam Entra nem segredo).
 const string TipoAppConfigEfetiva = "Cr40f.Acesso.Plugin.AppConfigEfetivaPlugin";
 const string TipoAppConfigRascunho = "Cr40f.Acesso.Plugin.AppConfigSalvarRascunhoPlugin";
@@ -67,6 +69,7 @@ var tipoCadastrar = UpsertPluginType(service, assemblyId, TipoCadastrar);
 var tipoEncerrar = UpsertPluginType(service, assemblyId, TipoEncerrar);
 var tipoReativar = UpsertPluginType(service, assemblyId, TipoReativar);
 var tipoDefinirPerfis = UpsertPluginType(service, assemblyId, TipoDefinirPerfis);
+var tipoPrevia = UpsertPluginType(service, assemblyId, TipoPrevia);
 var tipoAppConfigEfetiva = UpsertPluginType(service, assemblyId, TipoAppConfigEfetiva);
 var tipoAppConfigRascunho = UpsertPluginType(service, assemblyId, TipoAppConfigRascunho);
 var tipoAppConfigPublicar = UpsertPluginType(service, assemblyId, TipoAppConfigPublicar);
@@ -85,7 +88,10 @@ EnsureCustomApi(service, ApiReativar, "Acesso | Reativar acesso de motorista", "
     requestParams: new[] { ("FuncionarioId", 12, false) },
     responseProps: new[] { ("EmailMicrosoft", 10), ("SenhaTemporaria", 10), ("LinkApp", 10), ("Etapas", 10) });
 EnsureCustomApi(service, ApiDefinirPerfis, "Acesso | Definir perfis", "Atribui e retira os papeis Perfil - * e os perfis de coluna de uma pessoa; grava o historico.", solutionUniqueName,
-    requestParams: new[] { ("Usuario", 12, false), ("Perfis", 10, false) },
+    requestParams: new[] { ("Usuario", 12, false), ("Perfis", 10, false), ("RetirarAmplo", 0, true), ("DevolverAmplo", 0, true) },
+    responseProps: new[] { ("Resultado", 10) });
+EnsureCustomApi(service, ApiPrevia, "Acesso | Previa de perfis", "Mostra o que a pessoa deixa de ter com um pedido de perfis; nao grava nada.", solutionUniqueName,
+    requestParams: new[] { ("Usuario", 12, false), ("Perfis", 10, false), ("RetirarAmplo", 0, true), ("Tabelas", 10, true) },
     responseProps: new[] { ("Resultado", 10) });
 EnsureCustomApi(service, ApiAppConfigEfetiva, "Configuracao do App | Efetiva", "Configuracao efetiva do App Motoristas (modulos e funcoes ligados) de um motorista.", solutionUniqueName,
     requestParams: new[] { ("Funcionario", 12, true) },
@@ -103,6 +109,7 @@ EnsureApiStep(service, tipoCadastrar, ApiCadastrar, "Cr40f.Acesso: cadastrar ace
 EnsureApiStep(service, tipoEncerrar, ApiEncerrar, "Cr40f.Acesso: encerrar acesso", config, solutionUniqueName);
 EnsureApiStep(service, tipoReativar, ApiReativar, "Cr40f.Acesso: reativar acesso", config, solutionUniqueName);
 EnsureApiStep(service, tipoDefinirPerfis, ApiDefinirPerfis, "Cr40f.Acesso: definir perfis", "", solutionUniqueName);
+EnsureApiStep(service, tipoPrevia, ApiPrevia, "Cr40f.Acesso: previa de perfis", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigEfetiva, ApiAppConfigEfetiva, "Cr40f.Acesso: configuracao do App efetiva", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigRascunho, ApiAppConfigRascunho, "Cr40f.Acesso: configuracao do App salvar rascunho", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigPublicar, ApiAppConfigPublicar, "Cr40f.Acesso: configuracao do App publicar", "", solutionUniqueName);

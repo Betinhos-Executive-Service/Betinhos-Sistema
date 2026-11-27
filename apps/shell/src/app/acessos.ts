@@ -20,10 +20,13 @@ export const TODOS: Acessos = { admin: true, areas: { operacional: 'gestor', fin
 export const NENHUM: Acessos = { admin: false, areas: {}, acessos: false }
 
 const ADMINS = ['Administrador do Sistema', 'System Administrator']
+/** Papéis antigos que davam acesso amplo antes dos perfis; a tela os trata como o Administrador do Sistema na hora de retirar. */
+export const LEGADOS = ['Acesso-Betinhos-MDA', 'DEV - Usuário']
 const PAPEL_ACESSOS = 'Perfil - Administrador de acessos'
 
 export const nomeDoPapel = (area: Area, nivel: Nivel) => `Perfil - ${AREA_LABEL[area]} - ${NIVEL_LABEL[nivel]}`
 export const ehAdmin = (nomes: string[]) => nomes.some((n) => ADMINS.includes(n))
+export const ehAmplo = (nomes: string[]) => nomes.some((n) => ADMINS.includes(n) || LEGADOS.includes(n))
 
 /** Só os papéis `Perfil - ...`, sem o atalho do administrador (é o que a tela de Acessos mostra por pessoa). */
 export function perfisDosPapeis(nomes: string[]): { areas: PerfisDeArea; acessos: boolean } {

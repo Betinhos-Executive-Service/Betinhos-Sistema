@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { pessoaKeywordText, readPessoa, sortPessoas } from './lista'
 import type { Pessoa } from './types'
 
-const p = (nome: string, extra: Partial<Pessoa> = {}): Pessoa => ({ id: nome, nome, email: `${nome.toLowerCase()}@exemplo.test`, perfis: { areas: {}, acessos: false }, admin: false, alteradoEm: null, temFicha: false, ...extra })
+const p = (nome: string, extra: Partial<Pessoa> = {}): Pessoa => ({ id: nome, nome, email: `${nome.toLowerCase()}@exemplo.test`, perfis: { areas: {}, acessos: false }, admin: false, amplo: false, alteradoEm: null, temFicha: false, ...extra })
 
 describe('lista de acessos', () => {
   it('o filtro de última alteração usa o dia de São Paulo', () => {

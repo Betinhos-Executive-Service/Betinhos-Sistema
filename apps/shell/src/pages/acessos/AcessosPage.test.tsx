@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Host } from '../../host'
 import { AcessosProvider } from '../../app/AcessosProvider'
 import { AcessosPage } from './AcessosPage'
+import { salvar } from './testUtils'
 
 let falharReleitura = false
 vi.mock('./data/source', async (importOriginal) => {
@@ -59,7 +60,7 @@ describe('AcessosPage', () => {
     fireEvent.click((await row('Bruno Modelo')).querySelectorAll('[role="cell"]')[1])
     await screen.findByRole('dialog', { name: 'Bruno Modelo' })
     fireEvent.click(screen.getAllByRole('radio', { name: 'Gestor' })[1])
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await salvar('Salvar')
     await waitFor(async () => expect((await row('Bruno Modelo')).textContent).toContain('Financeiro · Gestor'))
     expect(screen.queryByRole('dialog', { name: 'Bruno Modelo' })).toBeNull()
   })
@@ -79,7 +80,7 @@ describe('AcessosPage', () => {
     await screen.findByRole('dialog', { name: 'Diego Teste' })
     fireEvent.click(screen.getAllByRole('radio', { name: 'Operador' })[1])
     falharReleitura = true
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await salvar('Salvar')
     await screen.findByText('A última atualização falhou')
     expect((await row('Diego Teste')).textContent).toContain('Financeiro · Operador')
   })

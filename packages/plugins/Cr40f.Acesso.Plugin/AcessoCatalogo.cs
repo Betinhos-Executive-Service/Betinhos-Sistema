@@ -27,6 +27,10 @@ public static class AcessoCatalogo
     /// <summary>Só pertence ao catálogo quem está na lista fixa; um "Perfil - Outro" criado à mão não.</summary>
     public static bool EhDoCatalogo(string nome) => Lista.Contains(nome);
     public static bool EhAdminDoSistema(IEnumerable<string> papeis) => papeis.Any(p => AdminDoSistema.Contains(p));
+    public static IReadOnlyList<string> NomesAdminDoSistema => AdminDoSistema;
+    /// <summary>Acesso amplo legado: o Administrador do Sistema e os papéis antigos.</summary>
+    public static IReadOnlyCollection<string> PapeisAmplos { get; } = new HashSet<string>(AdminDoSistema.Concat(new[] { "Acesso-Betinhos-MDA", "DEV - Usuário" }), StringComparer.Ordinal);
+    public static bool EhAmplo(string? nome) => nome != null && PapeisAmplos.Contains(nome);
 
     /// <summary>Papéis da pessoa, sem o Base (que o handler sempre acrescenta). Cada um tem um perfil de coluna
     /// com o mesmo nome, inclusive o Administrador de acessos (lê o e-mail Microsoft dos funcionários).</summary>
