@@ -36,7 +36,11 @@ public sealed class AdministrativoHandlerTests
 
     private Guid Usuario(params string[] papeis)
     {
-        var u = new Entity("systemuser", Guid.NewGuid()) { ["fullname"] = "Pessoa de Teste", ["isdisabled"] = false, ["businessunitid"] = new EntityReference("businessunit", _bu) };
+        var u = new Entity("systemuser", Guid.NewGuid())
+        {
+            ["fullname"] = "Pessoa de Teste", ["isdisabled"] = false, ["businessunitid"] = new EntityReference("businessunit", _bu),
+            ["accessmode"] = new OptionSetValue(0), ["azureactivedirectoryobjectid"] = Guid.NewGuid(),
+        };
         _svc.Com(u);
         foreach (var p in papeis) _svc.Com(new Entity("systemuserroles", Guid.NewGuid()) { ["systemuserid"] = u.Id, ["roleid"] = _papeis[p] });
         return u.Id;
@@ -81,7 +85,7 @@ public sealed class AdministrativoHandlerTests
         var alvo = Usuario(AcessoCatalogo.Base, FinOp);
         Coluna(alvo, FinOp);
         var equipe = Equipe(alvo, "Equipe Financeiro", new[] { FinGestor });
-        var padrao = Equipe(alvo, "Unidade raiz", new[] { AcessoCatalogo.Base }, padrao: true);
+        var padrao = Equipe(alvo, "Unidade raiz", new string[0], padrao: true);
         var semPapel = Equipe(alvo, "Equipe sem papel", new string[0]);
 
         var etapas = Encerrar(admin, alvo, "  PÉSSOA ");
@@ -117,7 +121,7 @@ public sealed class AdministrativoHandlerTests
 
         Assert.Contains(grupo, Equipes(alvo));
         Assert.Contains("Grupo do Entra: equipe de grupo do Entra", etapas);
-        Assert.Contains("{\"etapa\":\"conferencia\",\"estado\":\"erro\",\"detalhe\":\"usuário ainda habilitado\"}", etapas);
+        Assert.Contains("{\"etapa\":\"conferencia\",\"estado\":\"erro\",\"detalhe\":\"ainda recebe papel pela equipe Grupo do Entra (grupo do Entra: peça à TI); usuário ainda habilitado\"}", etapas);
         Assert.Empty(Lista(JsonLeve.Ler((string)Historico().Single()["cr40f_amplo"]), "equipes"));
     }
 
@@ -273,5 +277,173 @@ public sealed class AdministrativoHandlerTests
         definir.Executar(admin, alvo, "[]", devolverAmplo: true);
 
         Assert.Contains(_papeis[Antigo], Diretos(alvo));
+    }
+
+    private Entity Linha(Guid u) => _svc.Linhas("systemuser").Single(e => e.Id == u);
+    private static Dictionary<string, object?> Amplo(Entity linha) => JsonLeve.Ler((string)linha["cr40f_amplo"]);
+
+    [Fact]
+    public void Reativar_com_a_conta_ja_habilitada_e_NADA_A_REATIVAR()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base, FinOp);
+        Encerrar(admin, alvo);
+        Linha(alvo)["isdisabled"] = false; // o Entra reabilitou
+
+        Assert.Equal("NADA_A_REATIVAR", Codigo(() => Reativar(admin, alvo)));
+        Assert.Empty(Diretos(alvo));
+        Assert.Single(Historico());
+    }
+
+    [Fact]
+    public void Reativar_com_historico_do_plugin_depois_do_encerramento_e_NADA_A_REATIVAR()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base, FinOp);
+        Encerrar(admin, alvo);
+        // Linha comum do DefinirPerfis (cr40f_amplo vazio) gravada pelo plugin depois do encerramento.
+        _svc.Create(new Entity("cr40f_acessohistorico") { ["cr40f_usuario"] = new EntityReference("systemuser", alvo), ["cr40f_perfisantes"] = "[]", ["cr40f_perfisdepois"] = "[]" });
+
+        Assert.Equal("NADA_A_REATIVAR", Codigo(() => Reativar(admin, alvo)));
+        Assert.True(Bloqueado(alvo));
+        Assert.Empty(Diretos(alvo));
+    }
+
+    [Fact]
+    public void Administrador_de_acessos_direto_ou_por_equipe_so_o_Administrador_do_Sistema_encerra()
+    {
+        DoisAdmins();
+        var gestorDeAcessos = Usuario(AcessoCatalogo.AdminAcessos);
+        var direto = Usuario(AcessoCatalogo.Base, AcessoCatalogo.AdminAcessos);
+        var porEquipe = Usuario(AcessoCatalogo.Base);
+        Equipe(porEquipe, "Equipe de acessos", new[] { AcessoCatalogo.AdminAcessos });
+
+        Assert.Equal("SEM_PERMISSAO", Codigo(() => Encerrar(gestorDeAcessos, direto)));
+        Assert.Equal("SEM_PERMISSAO", Codigo(() => Encerrar(gestorDeAcessos, porEquipe)));
+        NadaMudou(direto, 2);
+        NadaMudou(porEquipe, 1);
+    }
+
+    [Fact]
+    public void Reativar_que_devolve_o_Administrador_de_acessos_exige_o_Administrador_do_Sistema()
+    {
+        var admin = DoisAdmins();
+        var gestorDeAcessos = Usuario(AcessoCatalogo.AdminAcessos);
+        var direto = Usuario(AcessoCatalogo.Base, AcessoCatalogo.AdminAcessos);
+        var porEquipe = Usuario(AcessoCatalogo.Base);
+        Equipe(porEquipe, "Equipe de acessos", new[] { AcessoCatalogo.AdminAcessos });
+        Encerrar(admin, direto); Encerrar(admin, porEquipe);
+
+        Assert.Equal("SEM_PERMISSAO", Codigo(() => Reativar(gestorDeAcessos, direto)));
+        Assert.Equal("SEM_PERMISSAO", Codigo(() => Reativar(gestorDeAcessos, porEquipe)));
+        Assert.True(Bloqueado(direto)); Assert.True(Bloqueado(porEquipe));
+        Reativar(admin, direto);
+        Assert.Contains(_papeis[AcessoCatalogo.AdminAcessos], Diretos(direto));
+    }
+
+    [Fact]
+    public void Conferencia_aponta_papel_que_ainda_vem_da_equipe_padrao()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base);
+        Equipe(alvo, "Unidade raiz", new[] { AcessoCatalogo.Base }, padrao: true);
+
+        var etapas = Encerrar(admin, alvo);
+
+        Assert.True(Bloqueado(alvo));
+        Assert.Contains("{\"etapa\":\"conferencia\",\"estado\":\"erro\",\"detalhe\":\"ainda recebe papel pela equipe Unidade raiz (equipe padrão da unidade de negócio)\"}", etapas);
+    }
+
+    [Fact]
+    public void Encerrar_e_reativar_recusam_conta_de_aplicacao_nao_interativa_ou_sem_Entra()
+    {
+        var admin = DoisAdmins();
+        var aplicacao = Usuario(AcessoCatalogo.Base); Linha(aplicacao)["applicationid"] = Guid.NewGuid();
+        var naoInterativa = Usuario(AcessoCatalogo.Base); Linha(naoInterativa)["accessmode"] = new OptionSetValue(4);
+        var semModo = Usuario(AcessoCatalogo.Base); Linha(semModo).Attributes.Remove("accessmode");
+        var semEntra = Usuario(AcessoCatalogo.Base); Linha(semEntra).Attributes.Remove("azureactivedirectoryobjectid");
+        var entraVazio = Usuario(AcessoCatalogo.Base); Linha(entraVazio)["azureactivedirectoryobjectid"] = Guid.Empty;
+
+        foreach (var alvo in new[] { aplicacao, naoInterativa, semModo, semEntra, entraVazio })
+        {
+            Assert.Equal("USUARIO_INVALIDO", Codigo(() => Encerrar(admin, alvo)));
+            Assert.Equal("USUARIO_INVALIDO", Codigo(() => Reativar(admin, alvo)));
+            NadaMudou(alvo, 1);
+        }
+    }
+
+    [Fact]
+    public void Reativar_pula_equipe_que_virou_do_Entra_ou_padrao()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base);
+        var entra = Equipe(alvo, "Equipe A", new[] { FinOp });
+        var padrao = Equipe(alvo, "Equipe B", new[] { FinGestor });
+        var comum = Equipe(alvo, "Equipe C", new[] { FinOp });
+        Encerrar(admin, alvo);
+        _svc.Linhas("team").Single(t => t.Id == entra)["teamtype"] = new OptionSetValue(2);
+        _svc.Linhas("team").Single(t => t.Id == padrao)["isdefault"] = true;
+
+        var etapas = Reativar(admin, alvo);
+
+        Assert.Equal(new[] { comum }, Equipes(alvo));
+        Assert.Contains("{\"etapa\":\"equipes\",\"estado\":\"pulada\",\"detalhe\":\"equipe Equipe A: grupo do Entra: peça à TI; não reposto\"}", etapas);
+        Assert.Contains("{\"etapa\":\"equipes\",\"estado\":\"pulada\",\"detalhe\":\"equipe Equipe B: equipe padrão da unidade de negócio; não reposto\"}", etapas);
+        Assert.Single(Lista(Amplo(Historico().Last()), "equipes"));
+    }
+
+    [Fact]
+    public void Reativar_pula_papel_de_outra_unidade_de_negocio()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base, FinOp);
+        Encerrar(admin, alvo);
+        Linha(alvo)["businessunitid"] = new EntityReference("businessunit", Guid.NewGuid()); // mudou de unidade depois
+
+        var etapas = Reativar(admin, alvo);
+
+        Assert.False(Bloqueado(alvo));
+        Assert.Empty(Diretos(alvo));
+        Assert.Contains("{\"etapa\":\"papeis\",\"estado\":\"pulada\",\"detalhe\":\"papel " + FinOp + ": é de outra unidade de negócio; não reposto\"}", etapas);
+    }
+
+    [Fact]
+    public void Encerrar_com_historico_grande_grava_so_os_ids_e_o_reativar_le()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base);
+        var equipes = Enumerable.Range(0, 30).Select(i => Equipe(alvo, "Equipe " + i + " " + new string('x', 140), new[] { FinOp })).ToList();
+
+        Encerrar(admin, alvo);
+
+        var json = (string)Historico().Single()["cr40f_amplo"];
+        Assert.True(json.Length <= CicloAdministrativo.LimiteAmplo);
+        Assert.DoesNotContain("\"nome\"", json);
+        Assert.Equal(30, Lista(JsonLeve.Ler(json), "equipes").Count);
+        Assert.Empty(Equipes(alvo));
+
+        Reativar(admin, alvo);
+        Assert.Equal(equipes.OrderBy(x => x), Equipes(alvo).OrderBy(x => x));
+        Assert.Contains(_papeis[AcessoCatalogo.Base], Diretos(alvo));
+    }
+
+    [Fact]
+    public void Encerrar_com_historico_grande_demais_e_HISTORICO_GRANDE()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base);
+        for (var i = 0; i < 90; i++) Equipe(alvo, "E" + i, new[] { FinOp });
+
+        Assert.Equal("HISTORICO_GRANDE", Codigo(() => Encerrar(admin, alvo)));
+        Assert.Equal(90, Equipes(alvo).Count);
+        Assert.Empty(_svc.Executados.OfType<Microsoft.Crm.Sdk.Messages.RemoveMembersTeamRequest>());
+        NadaMudou(alvo, 1);
+    }
+
+    [Fact]
+    public void Historico_ilegivel_do_plugin_e_HISTORICO_ILEGIVEL()
+    {
+        var admin = DoisAdmins(); var alvo = Usuario(AcessoCatalogo.Base, FinOp);
+        Encerrar(admin, alvo);
+        // Um reativar ilegível depois do encerramento não pode deixar o encerramento valer de novo.
+        _svc.Create(new Entity("cr40f_acessohistorico") { ["cr40f_usuario"] = new EntityReference("systemuser", alvo), ["cr40f_amplo"] = "{\"acao\":\"reativar\",\"papeis\":[" });
+
+        Assert.Equal("HISTORICO_ILEGIVEL", Codigo(() => Reativar(admin, alvo)));
+        Assert.Equal("HISTORICO_ILEGIVEL", Codigo(() => Encerrar(admin, alvo)));
+        Assert.True(Bloqueado(alvo));
+        Assert.Empty(Diretos(alvo));
     }
 }

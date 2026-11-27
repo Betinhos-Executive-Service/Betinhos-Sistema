@@ -23,10 +23,10 @@ public sealed class EncerrarAdministrativoHandler
             if (chamador == usuario) throw new AcessoException("PROPRIO_ACESSO", "Ninguém encerra o próprio acesso.");
             var alvo = CicloAdministrativo.Alvo(_sistema, usuario);
             var bloqueado = alvo.GetAttributeValue<bool>("isdisabled");
-            if (bloqueado && CicloAdministrativo.Acao(CicloAdministrativo.UltimoCiclo(_sistema, usuario)) == CicloAdministrativo.Encerrar)
+            if (bloqueado && CicloAdministrativo.Acao(CicloAdministrativo.UltimoCiclo(_sistema, usuario).Registro) == CicloAdministrativo.Encerrar)
                 throw new AcessoException("JA_ENCERRADO", "O acesso desta pessoa já está encerrado.");
-            if (!admin && PapeisDoUsuario.Nomes(_sistema, usuario).Any(AcessoCatalogo.EhAmplo))
-                throw new AcessoException("SEM_PERMISSAO", "Esta pessoa tem o acesso amplo: só o Administrador do Sistema encerra.");
+            if (!admin && PapeisDoUsuario.Nomes(_sistema, usuario).Any(CicloAdministrativo.SoAdminDoSistema))
+                throw new AcessoException("SEM_PERMISSAO", "Esta pessoa tem o acesso amplo ou o perfil Administrador de acessos: só o Administrador do Sistema encerra.");
 
             var papeis = PapeisDoUsuario.IdsDiretos(_sistema, usuario).Distinct()
                 .Select(id => (Id: id, Nome: PapeisDoUsuario.NomeDoPapel(_sistema, id))).ToList();
@@ -53,6 +53,7 @@ public sealed class EncerrarAdministrativoHandler
                 if (CicloAdministrativo.EhEquipeDoEntra(equipe)) { etapas.Pulada("equipes", nome + ": equipe de grupo do Entra; tire a pessoa do grupo no Entra"); continue; }
                 equipes.Add((id, nome));
             }
+            var amplo = CicloAdministrativo.Amplo(CicloAdministrativo.Encerrar, papeis, colunas, equipes);
 
             // Custom API síncrona: qualquer falha daqui em diante desfaz tudo (transação do Dataverse).
             if (papeis.Count > 0)
@@ -74,20 +75,21 @@ public sealed class EncerrarAdministrativoHandler
             if (equipes.Count > 0) etapas.Feita("equipes", equipes.Count + " retirada(s)");
             else etapas.Pulada("equipes", "sem equipe com papel");
 
-            CicloAdministrativo.Historico(_sistema, alvo, chamador, antes, "[]", CicloAdministrativo.Json(CicloAdministrativo.Encerrar, papeis, colunas, equipes));
+            CicloAdministrativo.Historico(_sistema, alvo, chamador, antes, "[]", amplo);
             etapas.Feita("historico", "gravado");
 
             if (bloqueado) etapas.Pulada("bloqueio", "já bloqueado");
             else { new UsuarioDataverseRepository(_sistema).Bloquear(usuario); etapas.Feita("bloqueio", "bloqueado no Dataverse"); }
 
-            Conferir(etapas, usuario, equipes.Select(e => e.Id).ToList());
+            Conferir(etapas, usuario);
             return etapas;
         }
         catch (AcessoException erro) { erro.Data["Etapas"] = etapas.ToJson(); throw; }
     }
 
-    /// <summary>Relê. O que sobrou vira a etapa "conferencia" em erro, sem exceção (exceção desfaria o encerramento inteiro).</summary>
-    private void Conferir(Etapas etapas, Guid usuario, List<Guid> equipes)
+    /// <summary>Relê. O que sobrou vira a etapa "conferencia" em erro, sem exceção (exceção desfaria o encerramento inteiro).
+    /// Equipes: todas as que ainda dão papel, inclusive as que o encerrar não mexe (Entra e padrão).</summary>
+    private void Conferir(Etapas etapas, Guid usuario)
     {
         var faltas = new List<string>();
         try
@@ -96,8 +98,13 @@ public sealed class EncerrarAdministrativoHandler
             if (papeis.Count > 0) faltas.Add("papéis diretos: " + string.Join(", ", papeis.Select(id => PapeisDoUsuario.NomeDoPapel(_sistema, id) ?? id.ToString())));
             var colunas = PapeisDoUsuario.Ids(_sistema, "systemuserprofiles", "systemuserid", usuario, "fieldsecurityprofileid");
             if (colunas.Count > 0) faltas.Add("perfis de coluna: " + string.Join(", ", colunas.Select(id => CicloAdministrativo.NomeDe(_sistema, "fieldsecurityprofile", id) ?? id.ToString())));
-            var ficou = PapeisDoUsuario.Ids(_sistema, "teammembership", "systemuserid", usuario, "teamid").Where(equipes.Contains).ToList();
-            if (ficou.Count > 0) faltas.Add("equipes: " + string.Join(", ", ficou.Select(id => CicloAdministrativo.Equipe(_sistema, id)?.GetAttributeValue<string>("name") ?? id.ToString())));
+            foreach (var id in PapeisDoUsuario.Ids(_sistema, "teammembership", "systemuserid", usuario, "teamid").Distinct())
+            {
+                if (PapeisDoUsuario.Ids(_sistema, "teamroles", "teamid", id, "roleid").Count == 0) continue;
+                var equipe = CicloAdministrativo.Equipe(_sistema, id);
+                var motivo = equipe == null ? null : CicloAdministrativo.MotivoEquipeIntocavel(equipe);
+                faltas.Add("ainda recebe papel pela equipe " + (equipe?.GetAttributeValue<string>("name") ?? id.ToString()) + (motivo == null ? "" : " (" + motivo + ")"));
+            }
             if (!CicloAdministrativo.Alvo(_sistema, usuario).GetAttributeValue<bool>("isdisabled")) faltas.Add("usuário ainda habilitado");
         }
         catch (Exception erro) { faltas = new List<string> { "não foi possível conferir (" + erro.Message + ")" }; }
