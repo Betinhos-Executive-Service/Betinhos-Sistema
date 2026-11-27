@@ -1,0 +1,18 @@
+/* Faixa "Vendo como <nome>" do AppShell: fica no topo do conteúdo, empurra a tela e não cobre nada. */
+.ver-como {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bt-space-2, 8px) var(--bt-space-3, 12px);
+  padding: var(--bt-space-2, 8px) var(--bt-space-3, 12px);
+  margin-bottom: var(--bt-space-3, 12px);
+  background: var(--bt-color-warning-soft);
+  color: var(--bt-color-text-primary, inherit);
+  border: 1px solid var(--bt-color-warning);
+  border-radius: var(--bt-radius-md);
+}
+.ver-como__texto { min-width: 0; overflow-wrap: anywhere; }

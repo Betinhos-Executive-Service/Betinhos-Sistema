@@ -34,7 +34,7 @@
 | 4 | Shell (ficha): Encerrar com diálogo e confirmação, estado encerrado e Reativar, botão travado para amplo | 2 | cenários 6, 8 e 11 | vitest + print no mock | Sonnet | passou (mock): 251 testes em acessos+funcionarios, tsc limpo; prints `prints/ficha-*.png`. Mock: ficha m9 (Joana) é a encerrada, com id próprio (colidia com o de Carlos). Incertos: a lista "o que perde" não traz equipes (o bloco não as lê); 403 de recurso externo no console do mock |
 | 5 | Revisão de segurança (Opus) do diff 1 a 4, qualidade, verificar-acessos atualizada, PR 1 → develop (base #777) | 1 a 4 | — | code-review high + ux-audit Fluxo | Opus | passou (local): revisão Opus com 2 importantes e 9 menores corrigidos (cba17b72 plugin, d1648c37 shell), qualidade 023f8212, verificação bf6ea657 (277 testes do plugin, 263 do shell, tsc limpo, mock 1280/375). Segurança: superfície tocada (Custom API sem privilégio próprio), revisada |
 | 6 | Prova no DEV depois do merge (Deploy registra as APIs): encerrar e reativar um usuário de teste e conferir papéis, equipes, bloqueio e histórico | 5 | cenários 7, 9 e 10 reais | saída sem ids | — (sessão principal, card antes) | |
-| 7 | Ver como (PR 2): override no `AcessosProvider`, banner no AppShell, botão na ficha | 5 | cenários 12 a 14 | vitest + print | Sonnet | |
+| 7 | Ver como (PR 2): override no `AcessosProvider`, banner no AppShell, botão na ficha | 5 | cenários 12 a 14 | vitest + print | Sonnet | feito (vitest): `VerComo.test.tsx` 6 testes, 580 no total em app+acessos+funcionarios+nav, tsc limpo; falta print e prova no DEV |
 
 ## Pendências e fora de escopo
 - Revisão periódica de uso: fora (decisão de 27/11/2026)

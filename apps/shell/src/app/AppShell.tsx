@@ -9,6 +9,7 @@ import { menuVisivel } from '../nav/acessosMenu'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
 import { hrefFor, patchHashQuery, readHashQuery } from '../nav/useHashRoute'
 import { acessosDe, useAcessos } from './AcessosProvider'
+import './verComo.css'
 import { useInstallPrompt } from './useInstallPrompt'
 import { TEMAS, useTema, type Tema } from './tema'
 
@@ -193,6 +194,15 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, oc
       )}
       version={BUILD}
     >
+      {acesso.verComo ? (
+        <div className="ver-como" role="status" aria-labelledby="ver-como-texto" onKeyDown={(event) => { if (event.key === 'Escape') acesso.sairVerComo?.() }}>
+          <span className="ver-como__texto">
+            <strong id="ver-como-texto">Vendo como {acesso.verComo.nome}</strong>
+            {acesso.verComo.amplo ? <span> · tem acesso amplo: vê todas as telas</span> : null}
+          </span>
+          <Button variant="secondary" onClick={acesso.sairVerComo}>Sair</Button>
+        </div>
+      ) : null}
       {acesso.status === 'erro' || (acesso.status === 'pronto' && acesso.parcial) ? (
         <Alert tone="warning" title="Não foi possível carregar seus acessos" action={<Button variant="secondary" onClick={acesso.recarregar}>Tentar de novo</Button>}>
           {acesso.status === 'erro' ? 'O menu mostra só as telas liberadas para todos.' : 'Parte dos acessos que vêm das suas equipes não carregou; o menu pode estar incompleto.'}

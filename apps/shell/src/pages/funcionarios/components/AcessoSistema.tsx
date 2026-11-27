@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button } from '@betinhos/ui'
 import { acessosDe, useAcessos } from '../../../app/AcessosProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
-import { temAlgum } from '../../../app/acessos'
+import { TODOS, temAlgum, type Acessos } from '../../../app/acessos'
 import { HistoricoLista, fmtQuando } from '../../acessos/components/HistoricoLista'
 import { PerfisEditor, usePerfisEditor } from '../../acessos/components/PerfisEditor'
 import type { Source as AcessosSource } from '../../acessos/data/source'
@@ -144,7 +144,8 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
 type Acao = { onFeito: () => Promise<void>; onNota: (n: Nota | null) => void }
 
 function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }: { pessoa: Pessoa; dados: Dados; source: AcessosSource; onGravado: (perfis: PerfisPessoa) => Promise<void>; onEstado?: (estado: EstadoPerfis) => void } & Acao) {
-  const viewerAdmin = acessosDe(useAcessos()).admin
+  const contexto = useAcessos()
+  const viewerAdmin = acessosDe(contexto).admin
   const [encerrando, setEncerrando] = useState(false)
   const botaoRef = useRef<HTMLButtonElement>(null)
   const amplo = pessoa.amplo || pessoa.admin
@@ -156,6 +157,11 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
   const daPessoa = dados.historico.filter((h) => h.usuarioId === pessoa.id)
   const perfis = rotulos(pessoa.perfis)
   const perdas = [perfis.length ? `Perfis: ${perfis.join(', ')}` : 'Nenhum perfil de área', ...(amplo ? ['Acesso amplo (Administrador do Sistema ou papel antigo)'] : []), 'O perfil básico e as equipes que dão acesso ao sistema']
+
+  const verComo = () => {
+    const simulado: Acessos = amplo && !editor.retirarAmplo ? TODOS : { admin: false, areas: editor.rascunho.areas, acessos: editor.rascunho.acessos }
+    contexto.entrarVerComo?.({ nome: pessoa.nome, pessoaId: pessoa.id, acessos: simulado, amplo: simulado.admin, voltarPara: window.location.hash, edicao: editor.edicao })
+  }
 
   const confirmar = async (confirmacao: string) => {
     try {
@@ -180,6 +186,9 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
           <Button variant="secondary" disabled={!alterado || salvando} onClick={editor.descartar}>Descartar</Button>
         </div>
       )}
+      <div className="cluster">
+        <Button variant="secondary" disabled={salvando} onClick={verComo}>Ver como esta pessoa</Button>
+      </div>
       {pessoa.id === dados.euId ? null : (
         <div className="cluster">
           <Button ref={botaoRef} variant="danger" disabled={travado} aria-describedby={travado ? 'encerrar-motivo' : undefined} onClick={() => { onNota(null); setEncerrando(true) }}>Encerrar acesso ao sistema…</Button>
