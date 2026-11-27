@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Host } from '../../../host'
-import { MOCK_EU, createSource } from './source'
+import { AcessoError } from '../../funcionarios/data/acesso'
+import { MOCK_EU, MOCK_ENCERRADA, createSource, montarEncerrados } from './source'
 
 afterEach(() => window.history.replaceState(null, '', '/'))
 
@@ -80,6 +81,120 @@ describe('fonte real', () => {
   })
 })
 
+describe('encerrar e reativar (fonte real)', () => {
+  const sistema = (resposta: (path: string) => unknown, pedidos: { path: string; body?: string }[] = []) => ({
+    mode: 'dataverse',
+    client: { getAll: async () => [], request: async (path: string, init?: { body?: string }) => { pedidos.push({ path, body: init?.body }); return resposta(path) } },
+  }) as unknown as Host
+
+  it('chama as Custom APIs e devolve as etapas', async () => {
+    const pedidos: { path: string; body?: string }[] = []
+    const source = createSource(sistema(() => ({ Etapas: '[{"etapa":"papeis","estado":"feita","detalhe":"2 retirado(s)"}]' }), pedidos))
+    expect(await source.encerrar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Bruno')).toEqual([{ etapa: 'papeis', estado: 'feita', detalhe: '2 retirado(s)' }])
+    await source.reativar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+    expect(pedidos.map((x) => [x.path, JSON.parse(x.body ?? '{}')])).toEqual([
+      ['cr40f_AcessoEncerrar', { Usuario: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', Confirmacao: 'Bruno' }],
+      ['cr40f_AcessoReativar', { Usuario: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }],
+    ])
+  })
+
+  it('recusa vira AcessoError com código, mensagem do servidor e etapas', async () => {
+    const source = createSource(sistema(() => { throw new Error('Error: SEM_PERMISSAO: Esta pessoa tem o acesso amplo: só o Administrador do Sistema encerra. | etapas=[{"etapa":"confirmacao","estado":"erro","detalhe":"x"}]') }))
+    const erro = await source.encerrar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Bruno').catch((e) => e)
+    expect(erro).toBeInstanceOf(AcessoError)
+    expect(erro).toMatchObject({ codigo: 'SEM_PERMISSAO', message: 'Esta pessoa tem o acesso amplo: só o Administrador do Sistema encerra.', etapas: [{ etapa: 'confirmacao', estado: 'erro', detalhe: 'x' }] })
+    const outra = await createSource(sistema(() => { throw new Error('NADA_A_REATIVAR: Não há encerramento de acesso a reativar para esta pessoa.') })).reativar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb').catch((e) => e)
+    expect(outra).toMatchObject({ codigo: 'NADA_A_REATIVAR', etapas: [] })
+  })
+
+  it('montarEncerrados: só conta bloqueada cujo último histórico é encerrar, com data e quem fez', () => {
+    const encerrar = '{"acao":"encerrar","papeis":[{"id":"p","nome":"Perfil - Base"}],"perfisColuna":[],"equipes":[]}'
+    const desativados = [
+      { systemuserid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', fullname: 'Bruno Modelo', internalemailaddress: 'bruno@exemplo.test' },
+      { systemuserid: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', fullname: 'Carla Amostra', internalemailaddress: 'carla@exemplo.test' },
+      { systemuserid: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', fullname: 'Diego Teste', internalemailaddress: 'diego@exemplo.test' },
+    ]
+    const ativos = [{ systemuserid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', fullname: 'Ana Exemplo' }]
+    const h = (usuario: string, amplo: string | null, createdon: string) => ({ _cr40f_usuario_value: usuario, _cr40f_alteradopor_value: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', cr40f_amplo: amplo, createdon })
+    const historico = [
+      h('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', encerrar, '2026-11-25T12:00:00Z'),
+      h('cccccccc-cccc-4ccc-8ccc-cccccccccccc', null, '2026-11-24T12:00:00Z'), // bloqueada, mas o último registro não é encerrar
+      h('cccccccc-cccc-4ccc-8ccc-cccccccccccc', encerrar, '2026-11-20T12:00:00Z'),
+      // Diego sem histórico: bloqueada por outro motivo
+    ]
+    expect(montarEncerrados(desativados, ativos, historico)).toEqual([{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nome: 'Bruno Modelo', email: 'bruno@exemplo.test', encerradoEm: new Date('2026-11-25T12:00:00Z'), encerradoPor: 'Ana Exemplo', fichaId: null, ciclo: { acao: 'encerrar', papeis: [{ id: 'p', nome: 'Perfil - Base' }], perfisColuna: [], equipes: [] }, antes: { areas: {}, acessos: false } }])
+  })
+
+  it('montarEncerrados: linha posterior de qualquer tipo invalida, mesmo vinda fora de ordem', () => {
+    const encerrar = '{"acao":"encerrar","papeis":[],"perfisColuna":[],"equipes":[]}'
+    const u = [{ systemuserid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', fullname: 'Bruno Modelo', internalemailaddress: 'bruno@exemplo.test' }]
+    const h = (amplo: string | null, createdon: string) => ({ _cr40f_usuario_value: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', cr40f_amplo: amplo, createdon })
+    // A API devolveu o encerramento primeiro, mas há uma troca de perfis depois dele.
+    expect(montarEncerrados(u, [], [h(encerrar, '2026-11-20T12:00:00Z'), h(null, '2026-11-24T12:00:00Z')])).toEqual([])
+    expect(montarEncerrados(u, [], [h('{"acao":"reativar","papeis":[]}', '2026-11-24T12:00:00Z'), h(encerrar, '2026-11-20T12:00:00Z')])).toEqual([])
+  })
+
+  it('montarEncerrados aceita itens sem nome (JSON grande) e guarda as equipes', () => {
+    const u = [{ systemuserid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', fullname: 'Bruno Modelo', internalemailaddress: 'bruno@exemplo.test' }]
+    const amplo = '{"acao":"encerrar","papeis":[{"id":"p1"}],"perfisColuna":[],"equipes":[{"id":"e1"},{"id":"e2","nome":"Frota"}]}'
+    const [e] = montarEncerrados(u, [], [{ _cr40f_usuario_value: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', cr40f_amplo: amplo, createdon: '2026-11-20T12:00:00Z' }])
+    expect(e.ciclo?.papeis).toEqual([{ id: 'p1', nome: '' }])
+    expect(e.ciclo?.equipes).toEqual([{ id: 'e1', nome: '' }, { id: 'e2', nome: 'Frota' }])
+  })
+
+  it('HISTORICO_GRANDE e HISTORICO_ILEGIVEL viram texto humano', async () => {
+    const fonte = createSource({ mode: 'dataverse', client: { getAll: async () => [], request: async () => { throw new Error('HISTORICO_GRANDE: Esta pessoa tem papéis demais (4100 de 4000 caracteres); nada foi alterado.') } } } as unknown as Host)
+    expect(await fonte.encerrar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Bruno').catch((e) => e)).toMatchObject({ codigo: 'HISTORICO_GRANDE', message: expect.stringContaining('fale com o administrador do sistema') })
+    const ilegivel = createSource({ mode: 'dataverse', client: { getAll: async () => [], request: async () => { throw new Error('HISTORICO_ILEGIVEL: registro ilegível.') } } } as unknown as Host)
+    expect(await ilegivel.reativar('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb').catch((e) => e)).toMatchObject({ codigo: 'HISTORICO_ILEGIVEL', message: expect.stringContaining('ilegível') })
+  })
+
+  it('encerrados filtra o histórico no servidor, lê só as contas dessas pessoas e não toca em `load`', async () => {
+    const caminhos: string[] = []
+    const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const host = {
+      mode: 'dataverse',
+      client: {
+        getAll: async (p: string) => {
+          caminhos.push(decodeURIComponent(p))
+          if (p.startsWith('cr40f_acessohistoricos') && !p.includes('%24orderby') && !p.includes('$orderby')) return [{ _cr40f_usuario_value: id }]
+          if (p.startsWith('systemusers') && decodeURIComponent(p).includes('isdisabled eq true')) return [{ systemuserid: id, fullname: 'Bruno Modelo', internalemailaddress: 'bruno@exemplo.test' }]
+          return []
+        },
+        request: async () => ({}),
+      },
+    } as unknown as Host
+    expect(await createSource(host).encerrados()).toEqual([])
+    expect(caminhos[0]).toContain(`contains(cr40f_amplo,'"acao":"encerrar"')`)
+    expect(caminhos.some((c) => c.startsWith('systemusers') && c.includes('isdisabled eq true') && c.includes(`systemuserid eq ${id}`))).toBe(true)
+    expect(caminhos.some((c) => c.startsWith('cr40f_acessohistoricos') && c.includes(`_cr40f_usuario_value eq ${id}`))).toBe(true)
+    expect(caminhos.some((c) => c.includes('isdisabled eq false'))).toBe(false)
+  })
+
+  it('encerramento(email) lê só a conta bloqueada e o histórico daquela pessoa', async () => {
+    const caminhos: string[] = []
+    const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const host = {
+      mode: 'dataverse',
+      client: {
+        getAll: async (p: string) => {
+          const c = decodeURIComponent(p)
+          caminhos.push(c)
+          if (c.startsWith('systemusers') && c.includes('isdisabled eq true')) return [{ systemuserid: id, fullname: 'Bruno Modelo', internalemailaddress: "o'bruno@exemplo.test" }]
+          if (c.startsWith('cr40f_acessohistoricos')) return [{ _cr40f_usuario_value: id, _cr40f_alteradopor_value: id, cr40f_amplo: '{"acao":"encerrar","papeis":[]}', createdon: '2026-11-20T12:00:00Z' }]
+          return []
+        },
+        request: async () => ({}),
+      },
+    } as unknown as Host
+    const e = await createSource(host).encerramento("o'bruno@exemplo.test")
+    expect(e).toMatchObject({ id, nome: 'Bruno Modelo', encerradoPor: 'Bruno Modelo' })
+    expect(caminhos[0]).toContain("internalemailaddress eq 'o''bruno@exemplo.test'")
+    expect(caminhos.length).toBeLessThanOrEqual(4)
+    expect(caminhos.some((c) => c.includes('isdisabled eq false') || c.includes('cr40f_acessohistoricos?$select=_cr40f_usuario_value&'))).toBe(false)
+  })
+})
+
 describe('fonte mock', () => {
   const mock = () => createSource({ mode: 'mock' } as Host)
 
@@ -99,5 +214,35 @@ describe('fonte mock', () => {
     const source = mock()
     const alvo = (await source.load()).pessoas.find((x) => x.nome === 'Bruno Modelo')!
     await expect(source.definir(alvo.id, { areas: { frota: 'gestor' }, acessos: false })).rejects.toThrow('PERFIL_INDISPONIVEL: Perfil ainda não publicado neste ambiente: Perfil - Frota - Gestor.')
+  })
+
+  it('encerrar tira a pessoa da lista, entra em encerrados e no histórico; reativar desfaz', async () => {
+    const source = mock()
+    const alvo = (await source.load()).pessoas.find((x) => x.nome === 'Bruno Modelo')!
+    expect((await source.encerrados()).map((e) => e.id)).toEqual([MOCK_ENCERRADA.id])
+    const etapas = await source.encerrar(alvo.id, ' bruno ')
+    expect(etapas.some((e) => e.etapa === 'bloqueio' && e.estado === 'feita')).toBe(true)
+    const depois = await source.load()
+    expect(depois.pessoas.some((x) => x.id === alvo.id)).toBe(false)
+    expect(depois.historico[0]).toMatchObject({ usuario: 'Bruno Modelo', amplo: { acao: 'encerrar' } })
+    expect((await source.encerrados())[0]).toMatchObject({ id: alvo.id, encerradoPor: 'Ana Exemplo' })
+    await expect(source.encerrar(alvo.id, 'Bruno')).rejects.toMatchObject({ codigo: 'JA_ENCERRADO' })
+    await source.reativar(alvo.id)
+    const volta = await source.load()
+    expect(volta.pessoas.find((x) => x.id === alvo.id)?.perfis.areas).toEqual({ financeiro: 'operador' })
+    expect(volta.historico[0].amplo?.acao).toBe('reativar')
+    expect((await source.encerrados()).map((e) => e.id)).toEqual([MOCK_ENCERRADA.id])
+    await expect(source.reativar(alvo.id)).rejects.toMatchObject({ codigo: 'NADA_A_REATIVAR' })
+  })
+
+  it('encerrar recusa o próprio acesso, confirmação errada e ?falha=salvar', async () => {
+    const source = mock()
+    const alvo = (await source.load()).pessoas.find((x) => x.nome === 'Bruno Modelo')!
+    await expect(source.encerrar(MOCK_EU, 'Ana')).rejects.toMatchObject({ codigo: 'PROPRIO_ACESSO' })
+    await expect(source.encerrar(alvo.id, 'Carlos')).rejects.toMatchObject({ codigo: 'CONFIRMACAO_INVALIDA' })
+    window.history.replaceState(null, '', '/?falha=salvar')
+    await expect(source.encerrar(alvo.id, 'Bruno')).rejects.toMatchObject({ codigo: 'SEM_PERMISSAO' })
+    await expect(source.reativar(MOCK_ENCERRADA.id)).rejects.toMatchObject({ codigo: 'SEM_PERMISSAO' })
+    expect((await source.load()).pessoas.some((x) => x.id === alvo.id)).toBe(true)
   })
 })

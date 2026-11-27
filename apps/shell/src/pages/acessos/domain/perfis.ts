@@ -1,5 +1,5 @@
-import { AREAS, AREA_LABEL, ehArea, NIVEL_LABEL, PERFIL_LABEL, nomeDoPapel, type Nivel, type Perfil, type PerfisDeArea } from '../../../app/acessos'
-import type { AmploHistorico, ErroApi, Historico, ItemPedido, PerfisPessoa } from './types'
+import { AREAS, AREA_LABEL, ehArea, exigeAdminDoSistema, NIVEL_LABEL, PERFIL_LABEL, nomeDoPapel, type Nivel, type Perfil, type PerfisDeArea } from '../../../app/acessos'
+import type { AmploHistorico, ErroApi, Historico, ItemAmplo, ItemPedido, PerfisPessoa } from './types'
 
 /** JSON do pedido (e do histórico): áreas na ordem fixa, Administrador de acessos no fim. Lista vazia = só o Base. */
 export function paraPedido(p: PerfisPessoa): ItemPedido[] {
@@ -22,20 +22,35 @@ export function doPedido(texto: unknown): PerfisPessoa {
 
 /** Lê `cr40f_amplo`; texto vazio ou inválido = sem retirada nem devolução. */
 export function doAmplo(texto: unknown): AmploHistorico | null {
-  let obj: { acao?: unknown; papeis?: unknown } | null
-  try { obj = typeof texto === 'string' && texto.trim() ? (JSON.parse(texto) as { acao?: unknown; papeis?: unknown } | null) : null } catch { obj = null }
-  if (!obj || (obj.acao !== 'retirar' && obj.acao !== 'devolver')) return null
-  const papeis = (Array.isArray(obj.papeis) ? (obj.papeis as { id?: unknown; nome?: unknown }[]) : []).map((p) => ({ id: String(p?.id ?? ''), nome: String(p?.nome ?? '') })).filter((p) => p.nome)
-  return { acao: obj.acao, papeis }
+  type Bruto = { acao?: unknown; papeis?: unknown; perfisColuna?: unknown; equipes?: unknown }
+  let obj: Bruto | null
+  try { obj = typeof texto === 'string' && texto.trim() ? (JSON.parse(texto) as Bruto | null) : null } catch { obj = null }
+  if (!obj || (obj.acao !== 'retirar' && obj.acao !== 'devolver' && obj.acao !== 'encerrar' && obj.acao !== 'reativar')) return null
+  // Acima de 4000 caracteres o plugin grava só o id: o item fica, sem nome.
+  const itens = (v: unknown): ItemAmplo[] => (Array.isArray(v) ? (v as { id?: unknown; nome?: unknown }[]) : []).map((p) => ({ id: String(p?.id ?? ''), nome: String(p?.nome ?? '') })).filter((p) => p.nome || p.id)
+  const ciclo = obj.acao === 'encerrar' || obj.acao === 'reativar'
+  return { acao: obj.acao, papeis: itens(obj.papeis), ...(ciclo ? { perfisColuna: itens(obj.perfisColuna), equipes: itens(obj.equipes) } : {}) }
 }
 
-/** Última entrada de acesso amplo da pessoa (histórico do mais novo ao mais velho), sem a retirada vazia (não tirou papel nenhum). Só ela pode ser devolvida, e só se for retirada. */
+/** Nome para mostrar de um item do JSON; sem nome (JSON grande) o texto avisa em vez de sumir. */
+export const nomeDoItem = (item: ItemAmplo) => item.nome || 'item sem nome'
+
+/** O encerramento tirou algo que só o Administrador do Sistema devolve: papel amplo ou Administrador de acessos (direto ou pelos perfis de antes) ou equipe com um desses papéis. Item sem nome (JSON grande) não conta aqui: o servidor recusa se for o caso. */
+export function cicloExigeAdmin(ciclo: AmploHistorico | null | undefined, antes: PerfisPessoa | undefined, equipesRestritas: string[] = []): boolean {
+  if (!ciclo) return false
+  if (antes?.acessos) return true
+  if (ciclo.papeis.some((p) => p.nome && exigeAdminDoSistema([p.nome]))) return true
+  return (ciclo.equipes ?? []).some((e) => equipesRestritas.includes(e.id.toLowerCase()))
+}
+
+/** Última entrada de acesso amplo da pessoa (histórico do mais novo ao mais velho), sem a retirada vazia (não tirou papel nenhum) e sem encerrar/reativar (o Devolver do servidor também os ignora). Só ela pode ser devolvida, e só se for retirada. */
 export const ultimaDoAmplo = (historico: Historico[], usuarioId: string): Historico | undefined =>
-  historico.find((h) => h.usuarioId === usuarioId && h.amplo && !(h.amplo.acao === 'retirar' && !h.amplo.papeis.length))
+  historico.find((h) => h.usuarioId === usuarioId && h.amplo && (h.amplo.acao === 'devolver' || (h.amplo.acao === 'retirar' && h.amplo.papeis.length > 0)))
 
 export function amploTexto(amplo: AmploHistorico): string {
-  const nomes = amplo.papeis.map((p) => p.nome).join(', ')
-  return `Acesso amplo ${amplo.acao === 'retirar' ? 'retirado' : 'devolvido'}${nomes ? `: ${nomes}` : ''}`
+  const nomes = amplo.papeis.map(nomeDoItem).join(', ')
+  const rotulo = { retirar: 'Acesso amplo retirado', devolver: 'Acesso amplo devolvido', encerrar: 'Encerrado', reativar: 'Reativado' }[amplo.acao]
+  return `${rotulo}${nomes ? `: ${nomes}` : ''}`
 }
 
 export const iguais = (a: PerfisPessoa, b: PerfisPessoa) => a.acessos === b.acessos && AREAS.every((area) => a.areas[area] === b.areas[area])

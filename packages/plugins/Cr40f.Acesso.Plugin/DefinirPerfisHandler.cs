@@ -61,7 +61,7 @@ public sealed class DefinirPerfisHandler
         if (papeis.Count == 0) return null;
         var refs = new EntityReferenceCollection(papeis.Select(p => new EntityReference("role", p.Id)).ToList());
         _sistema.Disassociate("systemuser", usuario, new Relationship("systemuserroles_association"), refs);
-        if (papeis.Any(p => AcessoCatalogo.EhAdminDoSistema(new[] { p.Nome! })) && AdminsDiretos() < 2)
+        if (papeis.Any(p => AcessoCatalogo.EhAdminDoSistema(new[] { p.Nome! })) && AdminsDiretos(_sistema) < 2)
         {
             _sistema.Associate("systemuser", usuario, new Relationship("systemuserroles_association"), refs);
             throw new AcessoException("ULTIMO_ADMIN", "Sobrariam menos de 2 pessoas com Administrador do Sistema direto.");
@@ -71,7 +71,7 @@ public sealed class DefinirPerfisHandler
 
     /// <summary>Repõe os papéis amplos da última retirada da pessoa que ainda existem e ela não tem.
     /// Só vale linha que o próprio plugin gravou (createdby = conta do plugin): o histórico aceita criação por outras contas e uma linha forjada daria qualquer papel.
-    /// Retirada sem papéis (gravada antes de o Retirar parar de registrá-la) é pulada.</summary>
+    /// Retirada sem papéis (gravada antes de o Retirar parar de registrá-la) é pulada, e encerrar/reativar de administrativo são ignorados.</summary>
     private string Devolver(Guid usuario)
     {
         var plugin = ((WhoAmIResponse)_sistema.Execute(new WhoAmIRequest())).UserId;
@@ -85,6 +85,8 @@ public sealed class DefinirPerfisHandler
             .Where(e => e.GetAttributeValue<EntityReference>("createdby")?.Id == plugin && !string.IsNullOrEmpty(e.GetAttributeValue<string>("cr40f_amplo")))
             .OrderByDescending(e => e.GetAttributeValue<DateTime?>("createdon") ?? DateTime.MinValue)
             .Select(e => { try { return JsonLeve.Ler(e.GetAttributeValue<string>("cr40f_amplo")); } catch (Exception) { return null; } })
+            // Encerrar e reativar (administrativo) também gravam cr40f_amplo, mas não são do acesso amplo: ficam fora.
+            .Where(r => CicloAdministrativo.Acao(r) is not (CicloAdministrativo.Encerrar or CicloAdministrativo.Reativar))
             .FirstOrDefault(r => r != null && !(Equals(r.TryGetValue("acao", out var x) ? x : null, "retirar") && Papeis(r).Count == 0));
         if (registro == null || !Equals(registro.TryGetValue("acao", out var a) ? a : null, "retirar"))
             throw new AcessoException("NADA_A_DEVOLVER", "Não há retirada de acesso amplo a devolver para esta pessoa.");
@@ -103,22 +105,23 @@ public sealed class DefinirPerfisHandler
         return Amplo("devolver", repor);
     }
 
-    private int AdminsDiretos()
+    /// <summary>Pessoas habilitadas com Administrador do Sistema direto (o encerrar de administrativo usa a mesma conta).</summary>
+    internal static int AdminsDiretos(IOrganizationService sistema)
     {
         var pessoas = new HashSet<Guid>();
         foreach (var nome in AcessoCatalogo.NomesAdminDoSistema)
         {
             var q = new QueryExpression("role") { ColumnSet = new ColumnSet("name") };
             q.Criteria.AddCondition("name", ConditionOperator.Equal, nome);
-            foreach (var papel in AcessoUniverso.Todos(_sistema, q))
-                pessoas.UnionWith(PapeisDoUsuario.Ids(_sistema, "systemuserroles", "roleid", papel.Id, "systemuserid"));
+            foreach (var papel in AcessoUniverso.Todos(sistema, q))
+                pessoas.UnionWith(PapeisDoUsuario.Ids(sistema, "systemuserroles", "roleid", papel.Id, "systemuserid"));
         }
         // Mesmo filtro do administrativos() do corte: ativa, accessmode 0 (leitura-gravação), não aplicação.
         return pessoas.Count(id =>
         {
             var q = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("isdisabled", "accessmode", "applicationid") };
             q.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, id);
-            var u = _sistema.RetrieveMultiple(q).Entities.FirstOrDefault();
+            var u = sistema.RetrieveMultiple(q).Entities.FirstOrDefault();
             return u != null && !u.GetAttributeValue<bool>("isdisabled") && (u.GetAttributeValue<OptionSetValue>("accessmode")?.Value ?? 0) == 0
                 && u.GetAttributeValue<Guid?>("applicationid") == null;
         });

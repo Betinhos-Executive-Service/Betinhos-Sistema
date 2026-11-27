@@ -27,6 +27,8 @@ const PAPEL_ACESSOS = 'Perfil - Administrador de acessos'
 export const nomeDoPapel = (area: Area, nivel: Nivel) => `Perfil - ${AREA_LABEL[area]} - ${NIVEL_LABEL[nivel]}`
 export const ehAdmin = (nomes: string[]) => nomes.some((n) => ADMINS.includes(n))
 export const ehAmplo = (nomes: string[]) => nomes.some((n) => ADMINS.includes(n) || LEGADOS.includes(n))
+/** Papel amplo ou Administrador de acessos: só o Administrador do Sistema encerra, reativa ou tira (mesma regra do plugin). */
+export const exigeAdminDoSistema = (nomes: string[]) => ehAmplo(nomes) || nomes.includes(PAPEL_ACESSOS)
 
 /** Só os papéis `Perfil - ...`, sem o atalho do administrador (é o que a tela de Acessos mostra por pessoa). */
 export function perfisDosPapeis(nomes: string[]): { areas: PerfisDeArea; acessos: boolean } {

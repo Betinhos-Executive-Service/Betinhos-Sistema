@@ -145,6 +145,11 @@ public sealed class FakeService : IOrganizationService
         // SetState de systemuser: estado 1 = desabilitado.
         if (!IgnorarExecute && request is Microsoft.Crm.Sdk.Messages.SetStateRequest { EntityMoniker.LogicalName: "systemuser" } estado)
             _tabelas["systemuser"].Single(e => e.Id == estado.EntityMoniker.Id)["isdisabled"] = estado.State.Value == 1;
+        // Membros de equipe: linhas de teammembership (systemuserid, teamid).
+        if (request is Microsoft.Crm.Sdk.Messages.AddMembersTeamRequest entrar)
+            foreach (var membro in entrar.MemberIds) Com(new Entity("teammembership", Guid.NewGuid()) { ["systemuserid"] = membro, ["teamid"] = entrar.TeamId });
+        if (request is Microsoft.Crm.Sdk.Messages.RemoveMembersTeamRequest sair && _tabelas.TryGetValue("teammembership", out var membros))
+            membros.RemoveAll(e => e.GetAttributeValue<Guid>("teamid") == sair.TeamId && sair.MemberIds.Contains(e.GetAttributeValue<Guid>("systemuserid")));
         if (request is RetrieveMetadataChangesRequest metadata) return Metadata(metadata);
         if (request is Microsoft.Crm.Sdk.Messages.WhoAmIRequest)
         {

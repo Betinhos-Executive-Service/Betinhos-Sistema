@@ -22,7 +22,14 @@ export interface AcessoSource {
   reativar(funcionarioId: string): Promise<ReativacaoResultado>
 }
 
+/** Recusas novas do ciclo de encerrar e reativar (administrativo): o texto do servidor traz contagens e jargão. */
+export const MENSAGENS_DO_CICLO: Record<string, string> = {
+  HISTORICO_GRANDE: 'Histórico grande demais para gravar; fale com o administrador do sistema. Nada foi alterado.',
+  HISTORICO_ILEGIVEL: 'O histórico de acesso desta pessoa tem um registro ilegível; fale com o administrador do sistema para corrigi-lo antes de encerrar ou reativar.',
+}
+
 export const MENSAGENS: Record<string, string> = {
+  ...MENSAGENS_DO_CICLO,
   NOME_INVALIDO: 'Informe nome e sobrenome.',
   CELULAR_INVALIDO: 'Informe um celular com DDD (11 dígitos).',
   EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO: 'Esse e-mail já pertence a outro funcionário. Ajuste o prefixo.',
@@ -53,6 +60,13 @@ export const ETAPAS_FEITAS: Record<Fluxo, Record<string, string>> = {
   cadastro: { usuario: 'Conta criada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', funcionario: 'Vinculado à ficha' },
   reativar: { usuario: 'Conta encontrada', conta: 'Conta desbloqueada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', senha: 'Senha nova gerada' },
   encerrar: { licenca: 'Licença removida', conta: 'Conta bloqueada', grupo: 'Retirado do grupo de motoristas', bloqueio: 'Bloqueado no Dataverse', conferencia: 'Acesso conferido' },
+}
+
+const ETAPA_DO_CICLO: Record<string, string> = { confirmacao: 'Confirmação', papeis: 'Papéis', perfisColuna: 'Perfis de coluna', equipes: 'Equipes', historico: 'Histórico', bloqueio: 'Bloqueio da conta', desbloqueio: 'Desbloqueio da conta', conferencia: 'Conferência final' }
+/** Só o que a pessoa precisa ler do encerrar/reativar de administrativo: etapas em erro e puladas que pedem ação (equipe do Entra ou padrão, item que não existe mais). "não tinha" e afins somem. */
+export function etapasRelevantes(etapas: Etapa[]): { erro: boolean; linhas: string[] } {
+  const relevantes = etapas.filter((e) => e.estado === 'erro' || (e.estado === 'pulada' && /Entra|padrão|não existe mais|não reposto/.test(e.detalhe)))
+  return { erro: relevantes.some((e) => e.estado === 'erro'), linhas: relevantes.map((e) => (e.estado === 'erro' ? `${ETAPA_DO_CICLO[e.etapa] ?? e.etapa}: ${e.detalhe}` : e.detalhe.charAt(0).toUpperCase() + e.detalhe.slice(1))) }
 }
 
 export const ESTADO_ETAPA: Record<Etapa['estado'], string> = { feita: '', pulada: 'já estava pronto', pendente: 'em andamento', erro: 'não concluído' }
@@ -118,7 +132,7 @@ export function whatsappComMensagem(celular: string, texto: string) {
   return href ? `${href}?text=${encodeURIComponent(texto)}` : null
 }
 
-function parseEtapas(json: string): Etapa[] {
+export function parseEtapas(json: string): Etapa[] {
   try { return JSON.parse(json) as Etapa[] } catch { return [] }
 }
 

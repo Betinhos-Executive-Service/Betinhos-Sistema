@@ -418,6 +418,7 @@
   .acesso-progresso__dica, .acesso-dica { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
   .acesso-aba { display: grid; gap: var(--bt-space-4); }
   .acesso-bloco { display: grid; gap: var(--bt-space-3); }
+  .acesso-bloco:focus { outline: none; }
   /* O legend dos grupos da ficha flutua a 100%; no editor de perfis isso empurra as opções para fora do bloco. */
   .acesso-bloco .ac-ficha legend { float: none; width: auto; margin: 0; }
   .acesso-bloco__titulo { margin: 0; font-size: var(--bt-font-size-14); font-weight: 600; color: var(--bt-color-text-primary); }
