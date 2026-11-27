@@ -3,7 +3,7 @@ import { aguardandoAprovacao, situacaoDoPedido, celularValido, chaveNome, emailV
 
 const T0 = Date.parse('2026-11-01T12:00:00Z')
 const pedido = (passageiros: Parameters<typeof normalizarPedido>[0]['passageiros']) =>
-  normalizarPedido({ passageiros, origem: 'A', destino: 'B', saida: '2026-11-03T10:00:00Z' })
+  normalizarPedido({ passageiros, origem: 'A', destino: 'B', saida: '2026-11-03T10:00:00Z', tipoVeiculo: 202410001 })
 
 describe('endereço padrão do passageiro', () => {
   it('normalizarPedido apara e limita; ausente continua ausente; vazio continua vazio (limpar)', () => {
@@ -71,11 +71,11 @@ describe('data, hora e veículo', () => {
     expect(validarPedido({ ...pedido(ok), saida: '2026-10-01T10:00:00Z' }, T0).saida).toMatch(/daqui para a frente/)
     expect(validarPedido({ ...pedido(ok), saida: '2028-01-01T10:00:00Z' }, T0).saida).toMatch(/um ano/)
   })
-  it('tipo de veículo fora da lista é recusado; sem valor, fica sem preferência', () => {
+  it('tipo de veículo fora da lista é recusado; sem valor, é obrigatório', () => {
     const ok = [{ nome: 'Ana', email: 'a@b.co' }]
     expect(validarPedido({ ...pedido(ok), tipoVeiculo: 202410003 }, T0)).toEqual({})
     expect(validarPedido({ ...pedido(ok), tipoVeiculo: 5 }, T0).tipoVeiculo).toMatch(/inválido/)
-    expect(validarPedido(pedido(ok), T0)).toEqual({})
+    expect(validarPedido({ ...pedido(ok), tipoVeiculo: undefined }, T0).tipoVeiculo).toBe('Escolha o tipo de veículo.')
   })
 })
 

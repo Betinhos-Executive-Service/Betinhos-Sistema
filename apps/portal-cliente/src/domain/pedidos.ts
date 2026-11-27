@@ -122,7 +122,8 @@ export function validarPedido(p: NovoPedido, agoraMs: number, prazos?: Prazos): 
     const antecedencia = erroAntecedencia(saida, agoraMs, prazos)
     if (antecedencia) e.saida = antecedencia
   }
-  if (p.tipoVeiculo !== undefined && !TIPOS_VEICULO.some((t) => t.valor === p.tipoVeiculo)) e.tipoVeiculo = 'Tipo de veículo inválido.'
+  if (p.tipoVeiculo === undefined) e.tipoVeiculo = 'Escolha o tipo de veículo.'
+  else if (!TIPOS_VEICULO.some((t) => t.valor === p.tipoVeiculo)) e.tipoVeiculo = 'Tipo de veículo inválido.'
   if ((p.observacao ?? '').length > MAX_TEXTO) e.observacao = `A observação tem no máximo ${MAX_TEXTO} caracteres.`
   return e
 }

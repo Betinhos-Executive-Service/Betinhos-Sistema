@@ -108,9 +108,9 @@ describe('pedidos', () => {
   const T0 = Date.parse('2026-11-01T12:00:00Z')
   const ana = { nome: ' Ana ', telefone: '(12) 99999-0001' }
   const bia = { nome: 'Bia', email: 'bia@exemplo.com' }
-  const base = normalizarPedido({ passageiros: [ana, { nome: '' }, bia], origem: ' Pinda ', destino: 'GRU', saida: '2026-11-03T10:00:00Z', observacao: ' ' })
+  const base = normalizarPedido({ passageiros: [ana, { nome: '' }, bia], origem: ' Pinda ', destino: 'GRU', saida: '2026-11-03T10:00:00Z', observacao: ' ', tipoVeiculo: 202410001 })
   it('normaliza e valida campo a campo', () => {
-    expect(base).toEqual({ passageiros: [{ nome: 'Ana', telefone: '(12) 99999-0001' }, bia], origem: 'Pinda', destino: 'GRU', saida: '2026-11-03T10:00:00Z' })
+    expect(base).toEqual({ passageiros: [{ nome: 'Ana', telefone: '(12) 99999-0001' }, bia], origem: 'Pinda', destino: 'GRU', saida: '2026-11-03T10:00:00Z', tipoVeiculo: 202410001 })
     expect(validarPedido(base, T0)).toEqual({})
     expect(validarPedido({ ...base, passageiros: [], origem: '', destino: '' }, T0)).toEqual({
       passageiros: 'Informe pelo menos um passageiro.', origem: 'Informe o endereço de saída.', destino: 'Informe o destino.',

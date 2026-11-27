@@ -1,6 +1,6 @@
 /** Prazos do portal por cliente. Espelha `apps/portal-cliente/src/domain/prazos.ts` (textos e padrões); o shell não importa o app do portal. */
-export const PADRAO_ANTECEDENCIA_H = 24
-export const PADRAO_CANCELAR_H = 12
+export const PADRAO_ANTECEDENCIA_H = 4
+export const PADRAO_CANCELAR_H = 2
 export const MAX_PRAZO_H = 720
 export const MAX_CONTATO = 100
 

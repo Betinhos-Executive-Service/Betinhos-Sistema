@@ -57,9 +57,9 @@ description: "Verifica o portal do cliente (apps/portal-cliente, React multi-cli
 - Teste: `cd apps/portal-cliente && pnpm exec vitest run --maxWorkers=2 src` e `pnpm exec tsc --noEmit`.
 
 ## Prazos por cliente (25/11/2026)
-- Regra pura em `src/domain/prazos.ts` (Worker, front e mock): 24 h para pedir e 12 h para cancelar quando a coluna está vazia, 0 = sem antecedência (pedir) ou até a hora da saída (cancelar; saída já passada não cancela), contato de até 100 caracteres. A sessão traz `prazos`; sem ele vale o padrão.
+- Regra pura em `src/domain/prazos.ts` (Worker, front e mock): 4 h para pedir e 2 h para cancelar quando a coluna está vazia (eram 24 h / 12 h até 27/11/2026), 0 = sem antecedência (pedir) ou até a hora da saída (cancelar; saída já passada não cancela), contato de até 100 caracteres. A sessão traz `prazos`; sem ele vale o padrão.
 - Pedir mostra "Pedidos com pelo menos N h de antecedência." no passo Quando e, fora do prazo, o erro com o contato ("Fale com a Betinhos: ..."). Painel do pedido (`data-testid="regra-cancelar"`) mostra a regra; fora do prazo, em execução, concluído ou cancelado não há botão Cancelar e a nota dá o motivo e o contato. Cancelam-se Solicitado (inclui aguardando aprovação), Confirmado e Programado.
-- Mock: Latasa com 24 h, 12 h e contato `(12) 99999-0000 (WhatsApp)`; pedido RV-48299 (confirmado, sai em 5 h) nunca tem Cancelar. Datas de teste a partir de +48 h (o mínimo é 24 h).
+- Mock: Latasa com 24 h e 12 h configurados (exercita a regra por cliente, não o padrão) e contato `(12) 99999-0000 (WhatsApp)`; pedido RV-48299 (confirmado, sai em 1 h) nunca tem Cancelar. Datas de teste a partir de +48 h (o mínimo é 24 h).
 
 ## Endereço padrão do passageiro no Pedir (25/11/2026)
 - Em `pnpm --dir apps/portal-cliente dev` (Latasa, `compras@latasa.com.br`, código 123456): escolher Hiroshi Tanaka e Carla Menezes e continuar → Saída "Hotel Mercure, São José dos Campos" e Destino "Latasa Reciclagem, Pindamonhangaba" (padrão do 1º passageiro que tem). Ao focar Saída, o grupo "Do passageiro" lista o padrão da Carla antes de "Recentes" e "Sugestões". Texto digitado nunca é sobrescrito; tirar um passageiro não desfaz o preenchimento; "Repetir pedido" mantém o trajeto antigo.

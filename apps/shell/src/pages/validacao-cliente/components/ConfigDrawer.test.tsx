@@ -56,11 +56,11 @@ describe('ConfigDrawer', () => {
   it('prazos: placeholders do padrão, prévia ao vivo e gravação das horas e do contato', async () => {
     const { source } = abrir(EMBRAER)
     const ant = within(drawer()).getByLabelText(/Antecedência mínima/) as HTMLInputElement
-    expect(ant.placeholder).toBe('24 h (padrão)')
-    expect((within(drawer()).getByLabelText(/Prazo para cancelar/) as HTMLInputElement).placeholder).toBe('12 h (padrão)')
+    expect(ant.placeholder).toBe('4 h (padrão)')
+    expect((within(drawer()).getByLabelText(/Prazo para cancelar/) as HTMLInputElement).placeholder).toBe('2 h (padrão)')
     const previa = () => within(drawer()).getByTestId('previa-prazos').textContent ?? ''
-    expect(previa()).toContain('Pedidos com pelo menos 24 h de antecedência.')
-    expect(previa()).toContain('Você cancela até 12 h antes da saída.')
+    expect(previa()).toContain('Pedidos com pelo menos 4 h de antecedência.')
+    expect(previa()).toContain('Você cancela até 2 h antes da saída.')
     expect(previa()).toContain('Fale com a Betinhos.')
     fireEvent.change(ant, { target: { value: '48' } })
     fireEvent.change(within(drawer()).getByLabelText(/Prazo para cancelar/), { target: { value: '0' } })
