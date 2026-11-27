@@ -115,7 +115,7 @@
 .projects-pausa-field small { font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
 
 /* Propriedades no topo do detalhe: rótulo à esquerda, valor à direita (Coluna só leitura, Prazo). */
-.pj-props { display: grid; gap: var(--bt-space-1); margin: 0; padding-bottom: var(--bt-space-3); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.pj-props { position: relative; display: grid; gap: var(--bt-space-1); margin: 0; padding-bottom: var(--bt-space-3); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
 .pj-props__linha { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: start; gap: var(--bt-space-2); }
 .pj-props dt { padding-top: 7px; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
 .pj-props dd { display: grid; justify-items: start; gap: var(--bt-space-1); min-width: 0; margin: 0; }
@@ -129,7 +129,6 @@
 
 /* Botão do prazo e o seletor ancorado abaixo dele. */
 /* O seletor se ancora na lista de propriedades (largura do corpo), não no botão: cabe em 390 px. */
-.pj-props { position: relative; }
 .pj-prazo-campo { max-width: 100%; }
 .pj-prop-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; padding: 0 var(--bt-space-2); border: var(--bt-border-width-default) solid transparent; border-radius: var(--bt-radius-sm);
   background: transparent; font: inherit; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); cursor: pointer; transition: background 140ms, border-color 140ms; }
@@ -138,16 +137,38 @@
 .pj-prop-btn.is-vazio { color: var(--bt-color-text-secondary); }
 .pj-prop-btn.is-perto { color: var(--bt-color-amber-800); }
 .pj-prop-btn.is-atrasado { color: var(--bt-color-danger); }
-.pj-prop-btn__seta { flex: none; opacity: .6; }
+.pj-prop-btn__seta { flex: none; opacity: .6; transition: transform 160ms ease-out; }
 .pj-prop-btn:hover:not(:disabled), .pj-prop-btn[aria-expanded="true"] { border-color: var(--bt-color-border); background: var(--bt-color-surface-soft); }
 .pj-prop-btn:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .pj-prop-btn:disabled { cursor: not-allowed; opacity: .6; }
 .pj-prazo-pop { position: absolute; z-index: 5; top: calc(100% + 4px); left: 80px; width: min(340px, calc(100% - 80px)); box-sizing: border-box; padding: var(--bt-space-3);
-  border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md, var(--bt-radius-sm)); background: var(--bt-color-surface);
-  box-shadow: 0 12px 32px rgba(0, 26, 61, .16); transform-origin: top left; animation: pj-pop 140ms ease-out; }
+  border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface);
+  box-shadow: var(--bt-shadow-popover); transform-origin: top left; animation: pj-pop 140ms ease-out; }
 .pj-prazo-pop .pj-prazo__painel { padding: 0; border: 0; }
 @keyframes pj-pop { from { opacity: 0; transform: scale(.97) translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .pj-prazo-pop { animation: none; } }
 
-/* Descrição cresce com o texto (até um limite, depois rola). Seletor mais forte que `.bt-control--textarea .bt-control__input` do DS. */
-.pj-desc.bt-control--textarea .bt-control__input { field-sizing: content; min-height: 64px; max-height: 320px; resize: none; }
+/* Descrição cresce com o texto (até um limite, depois rola). Seletor mais forte que `.bt-control--textarea .bt-control__input` do DS.
+   Sem field-sizing (navegador antigo) a caixa continua redimensionável, como no DS. */
+.pj-desc.bt-control--textarea .bt-control__input { min-height: 64px; max-height: 320px; }
+@supports (field-sizing: content) { .pj-desc.bt-control--textarea .bt-control__input { field-sizing: content; resize: none; } }
+
+/* Movimento do detalhe: curto, ease-out, só transform e opacity; desliga com reduced-motion. */
+.pj-gal > div { min-width: 0; }
+.pj-check li label { transition: color 160ms ease-out; }
+.pj-check li.is-novo, .pj-gal > .is-novo, .pj-audios > .is-novo { animation: pj-entra 180ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes pj-entra { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.pj-prop-btn[aria-expanded="true"] .pj-prop-btn__seta { transform: rotate(180deg); }
+.pj-anexo .pj-anexo__thumb { transition: transform 160ms ease-out, border-color 160ms ease-out; }
+@media (hover: hover) and (pointer: fine) { .pj-anexo:hover .pj-anexo__thumb { transform: translateY(-1px); border-color: var(--bt-color-border-strong); } }
+.pj-anexo:active .pj-anexo__thumb { transform: scale(.97); }
+.pj-sujo { margin-right: auto; align-self: center; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.pj-sujo__txt { animation: pj-aparece 160ms ease-out; }
+.pj-sujo kbd { font: inherit; font-size: var(--bt-font-size-11); padding: 0 4px; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-xs); }
+@keyframes pj-aparece { from { opacity: 0; } }
+@media (max-width: 480px) { .pj-sujo__atalho { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .pj-check li label, .pj-prop-btn__seta, .pj-anexo .pj-anexo__thumb { transition: none; }
+  .pj-check li.is-novo, .pj-gal > .is-novo, .pj-audios > .is-novo, .pj-sujo__txt { animation: none; }
+  .pj-anexo:hover .pj-anexo__thumb, .pj-anexo:active .pj-anexo__thumb { transform: none; }
+}

@@ -96,6 +96,20 @@ describe('Projetos no Planner: detalhe do cartão', () => {
     await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_name: 'Documentos da frota' }))
   })
 
+  it('Ctrl+S salva e o rodapé avisa alteração não salva', async () => {
+    const updateProjeto = vi.fn(async () => undefined)
+    stubSource(() => ({ updateProjeto }))
+    const p = await abrir('PRJ-2')
+    expect(within(p).queryByText('Alterações não salvas')).toBeNull()
+    fireEvent.keyDown(document, { key: 's', ctrlKey: true })
+    expect(updateProjeto).not.toHaveBeenCalled()
+    const titulo = within(p).getByRole('textbox', { name: /^Título/ })
+    fireEvent.change(titulo, { target: { value: 'Documentos da frota' } })
+    expect(within(p).getByText('Alterações não salvas')).toBeTruthy()
+    fireEvent.keyDown(titulo, { key: 's', ctrlKey: true })
+    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_name: 'Documentos da frota' }))
+  })
+
   it('título vazio não salva', async () => {
     const updateProjeto = vi.fn(async () => undefined)
     stubSource(() => ({ updateProjeto }))

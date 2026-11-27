@@ -18,6 +18,8 @@ import "../projetos/projetos.css";
 
 const ACCEPT = "image/*,video/*,audio/*,application/pdf";
 const NOME_MAX = 200;
+// Rótulo do atalho de salvar: ⌘ no Mac, Ctrl no resto (o atalho aceita os dois).
+const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘" : "Ctrl";
 
 type Props = {
   projeto: Projeto | null;
@@ -49,6 +51,8 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   const [envios, setEnvios] = useState(0);
   const [avisos, setAvisos] = useState<string[]>([]);
   const [descartar, setDescartar] = useState(false);
+  // Item recém-adicionado entra com animação; só ele, para não piscar a lista inteira.
+  const [novoIndex, setNovoIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const tituloRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +68,9 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   });
   const arquivos = anexos.filter(({ anexo }) => !ehAudio(anexo.tipo));
   const audios = anexos.filter(({ anexo }) => ehAudio(anexo.tipo));
+  // Anexos que já estavam ao abrir não animam; os que sobem depois entram com destaque.
+  const [iniciais] = useState(() => new Set(anexos.map(({ anexo }) => anexo.id)));
+  const novoAnexo = (id: string) => (iniciais.has(id) ? undefined : "is-novo");
 
   function fechar() {
     if (ocupado) { toast({ tone: "info", message: "Aguarde o envio terminar." }); return; }
@@ -74,6 +81,7 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
   function adicionarItem() {
     const texto = novoItem.trim();
     if (!texto) return;
+    setNovoIndex(itens.length);
     setItens((lista) => [...lista, { texto, feito: false }]);
     setNovoItem("");
   }
@@ -145,6 +153,23 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
     return () => document.removeEventListener("paste", onPaste);
   }, []);
 
+  // Ctrl/Cmd + S (ou + Enter) salva de qualquer ponto do painel, inclusive do título no cabeçalho.
+  const salvarRef = useRef<() => void>(() => {});
+  salvarRef.current = () => {
+    if (!sujo || descartar) return;
+    if (enviando) { toast({ tone: "info", message: "Aguarde o envio terminar para salvar." }); return; }
+    void salvar();
+  };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || (event.key.toLowerCase() !== "s" && event.key !== "Enter")) return;
+      event.preventDefault();
+      salvarRef.current();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   // O <dialog> põe o foco no primeiro campo (o título) e ele abriria com cara de edição: o foco vai para o X.
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -170,6 +195,8 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
         </>}
         footer={
           <div className="projects-drawer-foot">
+            {/* Região viva sempre montada: o leitor de tela só anuncia o que muda dentro dela. */}
+            <span className="pj-sujo" role="status">{sujo && !salvando && <span className="pj-sujo__txt">Alterações não salvas<span className="pj-sujo__atalho"> · <kbd>{MOD}</kbd> + <kbd>S</kbd></span></span>}</span>
             <Button variant="secondary" onClick={fechar} disabled={ocupado}>Fechar</Button>
             <Button type="submit" form="pj-detalhe" loading={salvando} disabled={!sujo || enviando}>Salvar</Button>
           </div>
@@ -208,11 +235,11 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
             )}
             <ul className="pj-check">
               {itens.map((item, index) => (
-                <li key={`${index}-${item.texto}`} className={item.feito ? "is-feito" : undefined}>
+                <li key={`${index}-${item.texto}`} className={[item.feito && "is-feito", index === novoIndex && "is-novo"].filter(Boolean).join(" ") || undefined}>
                   <Checkbox label={item.texto} checked={item.feito} disabled={salvando}
                     onChange={() => setItens((lista) => lista.map((it, i) => (i === index ? { ...it, feito: !it.feito } : it)))} />
                   <button type="button" className="pj-check__rm" disabled={salvando} aria-label={`Remover ${item.texto}`}
-                    onClick={() => setItens((lista) => lista.filter((_, i) => i !== index))}><X size={14} /></button>
+                    onClick={() => { setNovoIndex(-1); setItens((lista) => lista.filter((_, i) => i !== index)); }}><X size={14} /></button>
                 </li>
               ))}
               <li className="pj-check__novo">
@@ -236,13 +263,13 @@ function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved
             </div>
             {arquivos.length > 0 && (
               <div className="pj-gal">
-                {arquivos.map(({ anexo }) => <AnexoMiniatura key={anexo.id} anexo={anexo} source={source} />)}
+                {arquivos.map(({ anexo }) => <div key={anexo.id} className={novoAnexo(anexo.id)}><AnexoMiniatura anexo={anexo} source={source} /></div>)}
               </div>
             )}
             {audios.length > 0 && (
               <ul className="pj-audios">
                 {audios.map(({ anexo, transcricao }) => (
-                  <li key={anexo.id}>
+                  <li key={anexo.id} className={novoAnexo(anexo.id)}>
                     <AnexoAudio anexo={anexo} source={source} />
                     {transcricao && <p className="pj-brief__transcricao">{transcricao}</p>}
                   </li>
