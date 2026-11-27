@@ -22,7 +22,6 @@ export interface AcessoSource {
   reativar(funcionarioId: string): Promise<ReativacaoResultado>
 }
 
-
 /** Recusas novas do ciclo de encerrar e reativar (administrativo): o texto do servidor traz contagens e jargão. */
 export const MENSAGENS_DO_CICLO: Record<string, string> = {
   HISTORICO_GRANDE: 'Histórico grande demais para gravar; fale com o administrador do sistema. Nada foi alterado.',

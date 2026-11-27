@@ -1,10 +1,11 @@
-import { cleanId, odataString, type Row } from '@betinhos/dataverse'
+import { chunk, cleanId, odataString, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { LEGADOS, ehAdmin, ehAmplo, exigeAdminDoSistema, perfisDosPapeis } from '../../../app/acessos'
 import { latenciaMock } from '../../../app/latenciaMock'
 import { mockFalhaCarga, param } from '../../../app/mockVolume'
 import { doAmplo, doPedido, erroDaApi, iguais, paraPedido, ultimaDoAmplo } from '../domain/perfis'
 import { lerPrevia, lerUso, type Previa, type Uso } from '../domain/previa'
+import { normalizeSearch } from '../../funcionarios/data/format'
 import { AcessoError, MENSAGENS_DO_CICLO, parseAcessoError, parseEtapas, type Etapa } from '../../funcionarios/data/acesso'
 import type { Dados, Encerrado, Historico, PerfisPessoa, Pessoa } from '../domain/types'
 import { MOCK_CARLOS, previaDeExemplo, usoDeExemplo } from './mockPrevia'
@@ -45,7 +46,6 @@ const HISTORICO = `cr40f_acessohistoricos?$select=cr40f_acessohistoricoid,_cr40f
 // "Encerrados": só as linhas de encerramento do histórico (o JSON do plugin não tem espaços), depois as contas bloqueadas dessas pessoas e o histórico inteiro delas.
 const SO_ENCERRAMENTOS = `cr40f_acessohistoricos?$select=_cr40f_usuario_value&$filter=${encodeURIComponent(`contains(cr40f_amplo,'"acao":"encerrar"')`)}`
 const PEDACO = 15
-const pedacos = <T,>(itens: T[]) => Array.from({ length: Math.ceil(itens.length / PEDACO) }, (_, i) => itens.slice(i * PEDACO, (i + 1) * PEDACO))
 const filtroOr = (campo: string, valores: string[], aspas = false) => encodeURIComponent(`(${valores.map((v) => (aspas ? `${campo} eq '${odataString(v)}'` : `${campo} eq ${v}`)).join(' or ')})`)
 
 const minusculo = (v: unknown) => str(v).toLowerCase()
@@ -126,17 +126,16 @@ type Cliente = { getAll: (caminho: string) => Promise<Row[]> }
 async function lerEncerrados(client: Cliente, bloqueados: Row[]): Promise<Encerrado[]> {
   if (!bloqueados.length) return []
   const ids = bloqueados.map((u) => cleanId(str(u.systemuserid)))
-  const historico = (await Promise.all(pedacos(ids).map((p) => client.getAll(`${HISTORICO}&$filter=${filtroOr('_cr40f_usuario_value', p)}`)))).flat()
-  const autores = [...new Set(historico.map((h) => cleanId(str(h._cr40f_alteradopor_value))).filter((id) => id && !ids.includes(id)))]
   const emails = [...new Set(bloqueados.map((u) => str(u.internalemailaddress)).filter(Boolean))]
-  const [nomes, fichas] = await Promise.all([
-    Promise.all(pedacos(autores).map((p) => client.getAll(`systemusers?$select=fullname,systemuserid&$filter=${filtroOr('systemuserid', p)}`))).then((r) => r.flat()),
-    Promise.all(pedacos(emails).map((p) => client.getAll(`cr40f_funcionarioses?$select=cr40f_emailmicrosoft,cr40f_funcionariosid&$filter=${filtroOr('cr40f_emailmicrosoft', p, true)}`))).then((r) => r.flat()).catch(() => [] as Row[]),
-  ])
+  const todos = async (itens: string[], consulta: (pedaco: string[]) => string) => (await Promise.all(chunk(itens, PEDACO).map((p) => client.getAll(consulta(p))))).flat()
+  const lerHistorico = todos(ids, (p) => `${HISTORICO}&$filter=${filtroOr('_cr40f_usuario_value', p)}`)
+  const lerFichas = todos(emails, (p) => `cr40f_funcionarioses?$select=cr40f_emailmicrosoft,cr40f_funcionariosid&$filter=${filtroOr('cr40f_emailmicrosoft', p, true)}`).catch(() => [] as Row[])
+  const historico = await lerHistorico
+  const autores = [...new Set(historico.map((h) => cleanId(str(h._cr40f_alteradopor_value))).filter((id) => id && !ids.includes(id)))]
+  const nomes = await todos(autores, (p) => `systemusers?$select=fullname,systemuserid&$filter=${filtroOr('systemuserid', p)}`)
+  const fichas = await lerFichas
   return montarEncerrados(bloqueados, nomes, historico, fichas)
 }
-
-const comparavel = (v: string) => v.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase()
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
@@ -196,7 +195,7 @@ function createMockSource(): Source {
       const pessoa = pessoas.find((p) => p.id === usuarioId)
       if (!pessoa) throw new AcessoError('USUARIO_INVALIDO', 'Usuário não encontrado ou de aplicação.', [])
       if (param('falha') === 'salvar') throw new AcessoError('SEM_PERMISSAO', 'Falha simulada: sem permissão para encerrar.', [])
-      if (comparavel(pessoa.nome.split(/\s+/)[0]) !== comparavel(confirmacao)) throw new AcessoError('CONFIRMACAO_INVALIDA', 'Digite o primeiro nome da pessoa para confirmar.', [{ etapa: 'confirmacao', estado: 'erro', detalhe: 'não confere' }])
+      if (normalizeSearch(pessoa.nome.split(/\s+/)[0]) !== normalizeSearch(confirmacao.trim())) throw new AcessoError('CONFIRMACAO_INVALIDA', 'Digite o primeiro nome da pessoa para confirmar.', [{ etapa: 'confirmacao', estado: 'erro', detalhe: 'não confere' }])
       const quando = new Date()
       historico.unshift({ id: `h-novo-${++seq}`, usuarioId, usuario: pessoa.nome, alteradoPor: 'Ana Exemplo', antes: pessoa.perfis, depois: { areas: {}, acessos: false }, quando, amplo: { acao: 'encerrar', papeis: [{ id: 'papel-base', nome: 'Perfil - Base' }] } })
       pessoas.splice(pessoas.indexOf(pessoa), 1)
@@ -278,7 +277,7 @@ export function createSource(host: Host): Source {
     async encerrados() {
       const linhas = await client.getAll(SO_ENCERRAMENTOS)
       const ids = [...new Set(linhas.map((l) => cleanId(str(l._cr40f_usuario_value))).filter(Boolean))]
-      const bloqueados = (await Promise.all(pedacos(ids).map((p) => client.getAll(`systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent('isdisabled eq true and applicationid eq null and ')}${filtroOr('systemuserid', p)}`)))).flat()
+      const bloqueados = (await Promise.all(chunk(ids, PEDACO).map((p) => client.getAll(`systemusers?$select=fullname,internalemailaddress,systemuserid&$filter=${encodeURIComponent('isdisabled eq true and applicationid eq null and ')}${filtroOr('systemuserid', p)}`)))).flat()
       return lerEncerrados(client, bloqueados)
     },
     async encerramento(email) {

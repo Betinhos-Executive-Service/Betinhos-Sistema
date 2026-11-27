@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, EmptyState, buttonClassName, SearchBox, StatusBadge, useShellHeader, type TableColumn } from '@betinhos/ui'
 import { ArrowLeft, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../../host'
@@ -13,9 +13,22 @@ import { createSource } from '../data/source'
 import { CHIPS_MATRIZ, contagens, destinoDaLinha, destinoDoEncerrado, ehChip, filtrarEncerrados, filtrarLinhas, linhasDaMatriz, textoEncerrado, type LinhaMatriz } from '../domain/matriz'
 import type { Dados, Encerrado } from '../domain/types'
 
+const SEM_ENCERRADOS: Encerrado[] = []
 const ir = (href: string | null) => { if (href) location.hash = href }
 const Nivel = ({ valor }: { valor: string }) => (valor === '—' ? <span className="ac-vazio">—</span> : <StatusBadge tone={valor === 'Gestor' ? 'info' : 'neutral'}>{valor}</StatusBadge>)
 const Tem = ({ tem }: { tem: boolean }) => (tem ? <StatusBadge tone="warning">Tem</StatusBadge> : <span className="ac-vazio">—</span>)
+
+const COLUNAS: TableColumn<LinhaMatriz>[] = [
+  { key: 'nome', header: 'Pessoa', label: 'Pessoa', defaultWidth: 240, width: 'minmax(180px, 1.4fr)', cell: (l) => <span className="ac-pessoa"><strong>{l.nome || 'Sem nome'}</strong><span className="ac-card__meta">{l.email}</span></span> },
+  ...AREAS.map((a): TableColumn<LinhaMatriz> => ({ key: a, header: AREA_LABEL[a], label: AREA_LABEL[a], defaultWidth: 120, width: 'minmax(96px, .6fr)', cell: (l) => <Nivel valor={l.areas[a]} /> })),
+  { key: 'acessos', header: 'Admin acessos', label: 'Admin acessos', defaultWidth: 130, width: 'minmax(110px, .6fr)', cell: (l) => <Tem tem={l.adminAcessos} /> },
+  { key: 'amplo', header: 'Amplo', label: 'Amplo', defaultWidth: 100, width: 'minmax(80px, .5fr)', cell: (l) => <Tem tem={l.amplo} /> },
+]
+const COLUNAS_ENCERRADOS: TableColumn<Encerrado>[] = [
+  { key: 'nome', header: 'Pessoa', label: 'Pessoa', defaultWidth: 260, width: 'minmax(180px, 1.2fr)', cell: (e) => <span className="ac-pessoa"><strong>{e.nome || 'Sem nome'}</strong><span className="ac-card__meta">{e.email}</span></span> },
+  { key: 'quando', header: 'Encerramento', label: 'Encerramento', defaultWidth: 320, width: 'minmax(220px, 1.6fr)', cell: (e) => textoEncerrado(e) },
+  { key: 'ficha', header: 'Ficha', label: 'Ficha', defaultWidth: 120, width: 'minmax(90px, .5fr)', cell: (e) => (e.fichaId ? 'Abrir ficha' : <span className="ac-vazio">Sem ficha</span>) },
+]
 
 /** Visão `#/acessos?visao=papel`: quem tem cada perfil, numa matriz pessoa × área. */
 export function MatrizPapel({ host }: { host: Host }) {
@@ -25,9 +38,14 @@ export function MatrizPapel({ host }: { host: Host }) {
   const cs = useProgressiveData<Dados>({ cache: listCache(host), key: 'acessos', load })
   const [encerrados, setEncerrados] = useState<Encerrado[] | null>(null)
   const [erroEncerrados, setErroEncerrados] = useState<string | null>(null)
+  const leitura = useRef(0)
   const carregarEncerrados = useCallback(() => {
+    const minha = ++leitura.current
     setErroEncerrados(null)
-    source.encerrados().then(setEncerrados, (e: unknown) => setErroEncerrados(e instanceof Error ? e.message : 'Falha ao ler os encerrados.'))
+    source.encerrados().then(
+      (r) => { if (minha === leitura.current) setEncerrados(r) },
+      (e: unknown) => { if (minha === leitura.current) setErroEncerrados(e instanceof Error ? e.message : 'Falha ao ler os encerrados.') },
+    )
   }, [source])
   useEffect(carregarEncerrados, [carregarEncerrados])
 
@@ -37,7 +55,7 @@ export function MatrizPapel({ host }: { host: Host }) {
   const size = mobile ? 'touch' : 'default'
   const ready = cs.data != null
   const linhas = useMemo(() => linhasDaMatriz(cs.data?.pessoas ?? []), [cs.data])
-  const lista = useMemo(() => encerrados ?? [], [encerrados])
+  const lista = encerrados ?? SEM_ENCERRADOS
   const n = useMemo(() => contagens(linhas, lista), [linhas, lista])
   const visiveis = useMemo(() => filtrarLinhas(linhas, chip, busca), [linhas, chip, busca])
   const encerradosVisiveis = useMemo(() => filtrarEncerrados(lista, busca), [lista, busca])
@@ -46,25 +64,13 @@ export function MatrizPapel({ host }: { host: Host }) {
   const limpar = () => { setBusca(''); setChip('todos') }
   const vazio = <EmptyState align="start" icon={<SearchX size={36} />} title="Ninguém com este filtro" action={<Button variant="secondary" onClick={limpar}>Limpar filtros</Button>} />
 
-  const colunas: TableColumn<LinhaMatriz>[] = [
-    { key: 'nome', header: 'Pessoa', label: 'Pessoa', defaultWidth: 240, width: 'minmax(180px, 1.4fr)', cell: (l) => <span className="ac-pessoa"><strong>{l.nome || 'Sem nome'}</strong><span className="ac-card__meta">{l.email}</span></span> },
-    ...AREAS.map((a): TableColumn<LinhaMatriz> => ({ key: a, header: AREA_LABEL[a], label: AREA_LABEL[a], defaultWidth: 120, width: 'minmax(96px, .6fr)', cell: (l) => <Nivel valor={l.areas[a]} /> })),
-    { key: 'acessos', header: 'Admin acessos', label: 'Admin acessos', defaultWidth: 130, width: 'minmax(110px, .6fr)', cell: (l) => <Tem tem={l.adminAcessos} /> },
-    { key: 'amplo', header: 'Amplo', label: 'Amplo', defaultWidth: 100, width: 'minmax(80px, .5fr)', cell: (l) => <Tem tem={l.amplo} /> },
-  ]
-  const colunasEncerrados: TableColumn<Encerrado>[] = [
-    { key: 'nome', header: 'Pessoa', label: 'Pessoa', defaultWidth: 260, width: 'minmax(180px, 1.2fr)', cell: (e) => <span className="ac-pessoa"><strong>{e.nome || 'Sem nome'}</strong><span className="ac-card__meta">{e.email}</span></span> },
-    { key: 'quando', header: 'Encerramento', label: 'Encerramento', defaultWidth: 320, width: 'minmax(220px, 1.6fr)', cell: (e) => textoEncerrado(e) },
-    { key: 'ficha', header: 'Ficha', label: 'Ficha', defaultWidth: 120, width: 'minmax(90px, .5fr)', cell: (e) => (e.fichaId ? 'Abrir ficha' : <span className="ac-vazio">Sem ficha</span>) },
-  ]
-
   let corpo
   if (cs.error && !ready) {
     corpo = <Alert tone="danger" title="Não foi possível carregar os acessos" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{cs.error}</Alert>
   } else if (chip === 'encerrados') {
     if (erroEncerrados) corpo = <Alert tone="danger" title="Não foi possível carregar os encerrados" action={<Button variant="secondary" onClick={carregarEncerrados}>Tentar de novo</Button>}>{erroEncerrados}</Alert>
     else if (mobile) {
-      corpo = encerradosVisiveis.length ? (
+      corpo = encerrados == null ? null : encerradosVisiveis.length ? (
         <ul className="ac-cards" aria-label="Encerrados">
           {encerradosVisiveis.map((e) => (
             <li key={e.id} className="ac-card">
@@ -77,7 +83,7 @@ export function MatrizPapel({ host }: { host: Host }) {
           ))}
         </ul>
       ) : <div className="surface">{vazio}</div>
-    } else corpo = <ListTable className="ac-table" columns={colunasEncerrados} rows={encerradosVisiveis} rowKey={(e) => e.id} loading={encerrados == null} loadingLabel="Carregando encerrados" onRowClick={(e) => ir(destinoDoEncerrado(e))} empty={vazio} />
+    } else corpo = <ListTable className="ac-table" columns={COLUNAS_ENCERRADOS} rows={encerradosVisiveis} rowKey={(e) => e.id} loading={encerrados == null} loadingLabel="Carregando encerrados" onRowClick={(e) => ir(destinoDoEncerrado(e))} empty={vazio} />
   } else if (mobile) {
     corpo = !ready ? null : visiveis.length ? (
       <ul className="ac-cards" aria-label="Pessoas">
@@ -98,7 +104,7 @@ export function MatrizPapel({ host }: { host: Host }) {
       </ul>
     ) : <div className="surface">{vazio}</div>
   } else {
-    corpo = <ListTable className="ac-table" columns={colunas} rows={visiveis} rowKey={(l) => l.id} loading={!ready} loadingLabel="Carregando pessoas" onRowClick={(l) => ir(destinoDaLinha(l))} empty={vazio} footer={<span className="ac-num">{visiveis.length} de {linhas.length}</span>} />
+    corpo = <ListTable className="ac-table" columns={COLUNAS} rows={visiveis} rowKey={(l) => l.id} loading={!ready} loadingLabel="Carregando pessoas" onRowClick={(l) => ir(destinoDaLinha(l))} empty={vazio} footer={<span className="ac-num">{visiveis.length} de {linhas.length}</span>} />
   }
 
   return (
@@ -112,7 +118,7 @@ export function MatrizPapel({ host }: { host: Host }) {
       <div className="ac-filtros" role="group" aria-label="Filtro por situação">
         {CHIPS_MATRIZ.map((c) => (
           <button key={c.key} type="button" className="ac-filtro" aria-pressed={chip === c.key} onClick={() => setChip(c.key === 'todos' ? '' : c.key)}>
-            {c.label}<strong>{ready || c.key === 'encerrados' ? n[c.key] : '…'}</strong>
+            {c.label}<strong>{(c.key === 'encerrados' ? encerrados != null : ready) ? n[c.key] : '…'}</strong>
           </button>
         ))}
       </div>

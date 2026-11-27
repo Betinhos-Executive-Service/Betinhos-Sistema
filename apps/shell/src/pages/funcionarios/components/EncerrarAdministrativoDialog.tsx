@@ -24,7 +24,6 @@ export function EncerrarAdministrativoDialog({ open, nome, perdas, onClose, onCo
   const primeiro = nome.trim().split(/\s+/)[0] ?? ''
   const confere = primeiro.length > 0 && simples(texto) === simples(primeiro)
 
-
   const fechar = () => {
     if (enviando) return
     if (texto.trim()) setDescartando(true)
@@ -46,7 +45,7 @@ export function EncerrarAdministrativoDialog({ open, nome, perdas, onClose, onCo
           <Button variant="secondary" onClick={fechar} disabled={enviando}>Cancelar</Button>
           <Button variant="danger" loading={enviando} disabled={!confere || enviando} onClick={() => void confirmar()}>Encerrar acesso</Button>
         </>}>
-        <p>{primeiro || nome} perde tudo isto e a conta no sistema é bloqueada:</p>
+        <p>{primeiro} perde tudo isto e a conta no sistema é bloqueada:</p>
         <ul>{perdas.map((p) => <li key={p}>{p}</li>)}</ul>
         <Field label={`Digite o primeiro nome (${primeiro}) para confirmar`} error={erro ?? undefined}>
           <Input value={texto} onChange={(e) => setTexto(e.target.value)} disabled={enviando} autoComplete="off" autoFocus />

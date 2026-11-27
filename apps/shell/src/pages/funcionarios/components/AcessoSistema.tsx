@@ -33,6 +33,11 @@ const notaDasEtapas = (titulo: string, etapas: Etapa[]): Nota | null => {
   return linhas.length ? { tom: erro ? 'danger' : 'warning', titulo, linhas } : null
 }
 
+const notaDaRecusa = (titulo: string, reason: unknown): Nota => {
+  const e = parseAcessoError(reason)
+  return { tom: 'danger', titulo, linhas: [e.message, ...etapasRelevantes(e.etapas).linhas.filter((l) => !e.message.includes(l))] }
+}
+
 /** Bloco "Acesso ao sistema" da aba Acesso: perfis da pessoa, só para quem administra acessos. Sem fonte ou sem permissão não renderiza nem lê nada. */
 export function AcessoSistema({ email, source, onEstado }: Props) {
   const acessos = acessosDe(useAcessos())
@@ -153,7 +158,7 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
       const e = parseAcessoError(reason)
       if (e.codigo === 'CONFIRMACAO_INVALIDA') throw reason
       setEncerrando(false)
-      onNota({ tom: 'danger', titulo: 'Não foi possível encerrar o acesso', linhas: [e.message, ...etapasRelevantes(e.etapas).linhas.filter((l) => !e.message.includes(l))] })
+      onNota(notaDaRecusa('Não foi possível encerrar o acesso', reason))
     }
   }
 
@@ -200,8 +205,7 @@ function EncerradoView({ encerrado, dados, source, onFeito, onNota }: { encerrad
       onNota(notaDasEtapas('Reativado, mas nem tudo voltou. Confira:', etapas))
       await onFeito()
     } catch (reason) {
-      const e = parseAcessoError(reason)
-      onNota({ tom: 'danger', titulo: 'Não foi possível reativar o acesso', linhas: [e.message, ...etapasRelevantes(e.etapas).linhas.filter((l) => !e.message.includes(l))] })
+      onNota(notaDaRecusa('Não foi possível reativar o acesso', reason))
     } finally {
       setReativando(false)
     }

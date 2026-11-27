@@ -1,4 +1,5 @@
 import { AREAS, NIVEL_LABEL, type Area } from '../../../app/acessos'
+import { normalizeSearch } from '../../funcionarios/data/format'
 import { hrefFor } from '../../../nav/useHashRoute'
 import type { Encerrado, Pessoa } from './types'
 
@@ -32,22 +33,24 @@ export function linhasDaMatriz(pessoas: Pessoa[]): LinhaMatriz[] {
   })
 }
 
+const DO_CHIP: Record<'todos' | 'amplo' | 'base', (l: LinhaMatriz) => boolean> = { todos: () => true, amplo: (l) => l.amplo, base: (l) => l.soBase }
+
 export function contagens(linhas: LinhaMatriz[], encerrados: Encerrado[]): Record<ChipMatriz, number> {
-  return { todos: linhas.length, amplo: linhas.filter((l) => l.amplo).length, base: linhas.filter((l) => l.soBase).length, encerrados: encerrados.length }
+  const conta = (chip: keyof typeof DO_CHIP) => linhas.filter(DO_CHIP[chip]).length
+  return { todos: conta('todos'), amplo: conta('amplo'), base: conta('base'), encerrados: encerrados.length }
 }
 
-const norm = (v: string) => v.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 /** Todas as palavras da busca precisam aparecer no nome ou no e-mail. */
 export function bate(texto: { nome: string; email: string }, busca: string) {
-  const palavras = norm(busca).split(/\s+/).filter(Boolean)
+  const palavras = normalizeSearch(busca).split(/\s+/).filter(Boolean)
   if (!palavras.length) return true
-  const alvo = norm(`${texto.nome} ${texto.email}`)
+  const alvo = normalizeSearch(`${texto.nome} ${texto.email}`)
   return palavras.every((p) => alvo.includes(p))
 }
 
 export function filtrarLinhas(linhas: LinhaMatriz[], chip: ChipMatriz, busca: string): LinhaMatriz[] {
-  const porChip = chip === 'amplo' ? linhas.filter((l) => l.amplo) : chip === 'base' ? linhas.filter((l) => l.soBase) : linhas
-  return porChip.filter((l) => bate(l, busca))
+  const doChip = chip === 'encerrados' ? DO_CHIP.todos : DO_CHIP[chip]
+  return linhas.filter((l) => doChip(l) && bate(l, busca))
 }
 export const filtrarEncerrados = (lista: Encerrado[], busca: string) => lista.filter((e) => bate(e, busca))
 

@@ -1,5 +1,4 @@
-import { AREAS, AREA_LABEL, ehArea, NIVEL_LABEL, PERFIL_LABEL, nomeDoPapel, type Nivel, type Perfil, type PerfisDeArea } from '../../../app/acessos'
-import { exigeAdminDoSistema } from '../../../app/acessos'
+import { AREAS, AREA_LABEL, ehArea, exigeAdminDoSistema, NIVEL_LABEL, PERFIL_LABEL, nomeDoPapel, type Nivel, type Perfil, type PerfisDeArea } from '../../../app/acessos'
 import type { AmploHistorico, ErroApi, Historico, ItemAmplo, ItemPedido, PerfisPessoa } from './types'
 
 /** JSON do pedido (e do histórico): áreas na ordem fixa, Administrador de acessos no fim. Lista vazia = só o Base. */
@@ -46,7 +45,7 @@ export function cicloExigeAdmin(ciclo: AmploHistorico | null | undefined, antes:
 
 /** Última entrada de acesso amplo da pessoa (histórico do mais novo ao mais velho), sem a retirada vazia (não tirou papel nenhum) e sem encerrar/reativar (o Devolver do servidor também os ignora). Só ela pode ser devolvida, e só se for retirada. */
 export const ultimaDoAmplo = (historico: Historico[], usuarioId: string): Historico | undefined =>
-  historico.find((h) => h.usuarioId === usuarioId && h.amplo && (h.amplo.acao === 'retirar' || h.amplo.acao === 'devolver') && !(h.amplo.acao === 'retirar' && !h.amplo.papeis.length))
+  historico.find((h) => h.usuarioId === usuarioId && h.amplo && (h.amplo.acao === 'devolver' || (h.amplo.acao === 'retirar' && h.amplo.papeis.length > 0)))
 
 export function amploTexto(amplo: AmploHistorico): string {
   const nomes = amplo.papeis.map(nomeDoItem).join(', ')
