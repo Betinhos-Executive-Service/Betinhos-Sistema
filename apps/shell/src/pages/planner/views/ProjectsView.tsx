@@ -1,7 +1,7 @@
 // Projetos no Planner: quadro dos projetos (cr40f_projeto) por situação; clique no cartão abre o detalhe.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Dialog, StatusBadge, Textarea, ToastProvider, useToast } from "@betinhos/ui";
-import { CalendarClock, CircleCheck, Film, Image as ImageIcon, Lightbulb, ListChecks, Mic, PauseCircle, Plus, RefreshCw, Wrench, Eye } from "lucide-react";
+import { CalendarClock, Film, Image as ImageIcon, ListChecks, Mic, PauseCircle, Plus, RefreshCw } from "lucide-react";
 import PageHeader from '../components/PageHeader';
 import { NewProjectDrawer, type CreatedProject } from '../components/NewProjectDrawer';
 import { ProjectDetailDrawer } from '../components/ProjectDetailDrawer';
@@ -11,22 +11,12 @@ import { useQueryId } from '../../../nav/queryState';
 import { createSource, reasonText } from '../projetos/data/source';
 import { useProjetos } from '../projetos/useProjetos';
 import { STATUS } from '../projetos/domain/choices';
+import { COLUMN_STYLE, labelOf } from '../projetos/components/colunas';
 import { progresso } from '../projetos/domain/checklist';
 import { codigoEtapa1 } from '../projetos/domain/regras';
 import { faltaPrazo, hojeIso, rotuloPrazo, situacaoPrazo } from '../projetos/domain/prazo';
-import { corDaTag, tagsEmUso } from '../projetos/domain/tags';
 import type { Perfil } from '../projetos/domain/types';
-import { BOARD_COLUMNS, attachmentKind, cardsByStatus, filterByTag, projectCards, type ProjectCard } from '../domain/projectsBoard';
-
-const COLUMN_STYLE: Record<number, { key: string; icon: any; hint: string }> = {
-  [STATUS.ideia]: { key: "idea", icon: Lightbulb, hint: "Anotada, ainda sem forma" },
-  [STATUS.andamento]: { key: "build", icon: Wrench, hint: "Em construção" },
-  [STATUS.validacao]: { key: "review", icon: Eye, hint: "Pronta para conferir" },
-  [STATUS.concluida]: { key: "live", icon: CircleCheck, hint: "Entregue e em uso" },
-  [STATUS.pausada]: { key: "paused", icon: PauseCircle, hint: "Parada por enquanto" },
-};
-// Ordem do fluxo para avançar e voltar; Pausado fica fora da sequência.
-const labelOf = (status: number) => BOARD_COLUMNS.find((c) => c.value === status)?.label ?? "Ideia";
+import { BOARD_COLUMNS, attachmentKind, cardsByStatus, projectCards, type ProjectCard } from '../domain/projectsBoard';
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -88,7 +78,6 @@ function Board({ host }: { host?: Host }) {
   const [movingId, setMovingId] = useState("");
   const [freshId, setFreshId] = useState("");
   const [announcement, setAnnouncement] = useState("");
-  const [filtroTag, setFiltroTag] = useState("");
   const [pausar, setPausar] = useState<ProjectCard | null>(null);
   const [motivo, setMotivo] = useState("");
 
@@ -100,12 +89,9 @@ function Board({ host }: { host?: Host }) {
   }, [freshId]);
 
   const cards = useMemo(() => projectCards(data.projetos, data.etapas, data.atualizacoes), [data.projetos, data.etapas, data.atualizacoes]);
-  const tags = useMemo(() => tagsEmUso(data.projetos.map((p) => p.tags)), [data.projetos]);
-  const tagAtiva = tags.includes(filtroTag) ? filtroTag : "";
-  const columns = useMemo(() => cardsByStatus(filterByTag(cards, tagAtiva)), [cards, tagAtiva]);
+  const columns = useMemo(() => cardsByStatus(cards), [cards]);
   const hoje = hojeIso();
-  // O filtro entra na chave: mostrar/esconder cartões muda as posições e o FLIP precisa medir de novo.
-  const flipRef = useFlip(`${tagAtiva}#${cards.map((c) => `${c.projeto.id}:${c.status}`).join("|")}`);
+  const flipRef = useFlip(cards.map((c) => `${c.projeto.id}:${c.status}`).join("|"));
 
   /** Pausado grava o motivo (opcional) junto; sair de Pausado limpa o motivo. */
   async function move(card: ProjectCard, novo: number, motivoPausa = "") {
@@ -185,16 +171,6 @@ function Board({ host }: { host?: Host }) {
         </div>
       )}
 
-      {tags.length > 0 && (
-        <div className="projects-filter" role="group" aria-label="Filtrar por tag">
-          <button type="button" className={`projects-filter-chip${tagAtiva ? "" : " is-active"}`} aria-pressed={!tagAtiva} onClick={() => setFiltroTag("")}>Todas</button>
-          {tags.map((t) => (
-            <button key={t} type="button" className={`projects-filter-chip pj-tag--${corDaTag(t)}${tagAtiva === t ? " is-active" : ""}`} aria-pressed={tagAtiva === t}
-              onClick={() => setFiltroTag(tagAtiva === t ? "" : t)}>{t}</button>
-          ))}
-        </div>
-      )}
-
       <div className="projects-board" aria-busy={!data.loaded}>
         {BOARD_COLUMNS.map((column, columnIndex) => {
           const style = COLUMN_STYLE[column.value];
@@ -244,11 +220,6 @@ function Board({ host }: { host?: Host }) {
                       <h3><button type="button" className="projects-card-open" onClick={() => setOpenId(id)}>{card.projeto.nome}</button></h3>
                       {card.projeto.briefing && <p>{card.projeto.briefing}</p>}
                       {motivoPausa && <p className="projects-card-pausa" title={motivoPausa}><PauseCircle size={13} aria-hidden="true" /><span><span className="sr-only">Motivo da pausa: </span>{motivoPausa}</span></p>}
-                      {card.projeto.tags.length > 0 && (
-                        <ul className="projects-card-tags" aria-label="Tags">
-                          {card.projeto.tags.map((t) => <li key={t} className={`pj-tag pj-tag--${corDaTag(t)}`}>{t}</li>)}
-                        </ul>
-                      )}
                       <footer className="projects-card-foot">
                         {prazo && (
                           <span className={`projects-card-prazo is-${situacao}`} title={`Prazo: ${rotuloPrazo(prazo, hoje)}${card.status === STATUS.concluida ? "" : ` · ${faltaPrazo(prazo, hoje)}`}`}>
@@ -272,7 +243,7 @@ function Board({ host }: { host?: Host }) {
 
       {data.loaded && (
         <ProjectDetailDrawer projeto={data.projetos.find((p) => p.id === openId) ?? null} atualizacoes={data.atualizacoes}
-          tagsEmUso={tags} perfil={perfil} source={source} onClose={() => setOpenId(null)} onSaved={data.upsert} onAtualizacao={data.addAtualizacao} />
+          card={cards.find((c) => c.projeto.id === openId) ?? null} perfil={perfil} source={source} onClose={() => setOpenId(null)} onSaved={data.upsert} onAtualizacao={data.addAtualizacao} />
       )}
       <Dialog open={!!pausar} onClose={() => setPausar(null)} title={`Pausar “${pausar?.projeto.nome ?? ""}”`}
         actions={<>

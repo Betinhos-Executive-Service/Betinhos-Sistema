@@ -31,13 +31,6 @@ export function projectCards(projetos: Projeto[], etapas: Etapa[], atualizacoes:
   }).sort((a, b) => compararPrazo(a.projeto.prazo, b.projeto.prazo) || b.ultimaData.localeCompare(a.ultimaData) || b.projeto.codigo.localeCompare(a.projeto.codigo, 'pt-BR', { numeric: true }))
 }
 
-/** Cartões que têm a tag (maiúsculas não contam); '' = todos. */
-export function filterByTag(cards: ProjectCard[], tag: string): ProjectCard[] {
-  if (!tag) return cards
-  const t = tag.toLocaleLowerCase('pt-BR')
-  return cards.filter((c) => c.projeto.tags.some((x) => x.toLocaleLowerCase('pt-BR') === t))
-}
-
 export function cardsByStatus(cards: ProjectCard[]): Map<number, ProjectCard[]> {
   const map = new Map<number, ProjectCard[]>(BOARD_COLUMNS.map((c) => [c.value, []]))
   for (const card of cards) (map.get(card.status) ?? map.get(STATUS.ideia)!).push(card)

@@ -1,4 +1,4 @@
-/* Projetos: detalhe do projeto no Planner (título, descrição, checklist e anexos). Só tokens do Design System. */
+/* Projetos: detalhe do projeto no Planner (coluna, prazo, título, descrição, checklist e anexos). Só tokens do Design System. */
 .pj-num { font-variant-numeric: tabular-nums; }
 .pj-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .pj-spin { animation: pj-spin 1s linear infinite; }
@@ -49,42 +49,11 @@
 
 /* Arquivos em grade de miniaturas; áudios numa lista abaixo, cada um com a transcrição. */
 .pj-gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--bt-space-2); }
-.pj-audios { display: grid; margin: 0; padding: 0; list-style: none; }
-.pj-audios li { display: grid; gap: var(--bt-space-1); padding: var(--bt-space-2) 0; border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
-.pj-audios li:first-child { border-top: 0; }
 .pj-anexo { display: grid; gap: var(--bt-space-1); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-sm); }
 .pj-anexo:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .pj-anexo__thumb { display: grid; place-items: center; width: 100%; height: 64px; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-soft); color: var(--bt-color-text-secondary); }
 .pj-anexo__thumb img { width: 100%; height: 100%; object-fit: cover; }
 .pj-anexo__nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
-.pj-audio { display: grid; gap: var(--bt-space-2); }
-.pj-audio__player { width: 100%; max-width: 360px; height: 36px; }
-.pj-brief__transcricao { margin: 0; font-size: var(--bt-font-size-12); font-style: italic; color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
-
-/* Tags: cor fixa por nome (corDaTag), mesma no quadro, no filtro e no detalhe. */
-.pj-tag { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-height: 22px; padding: 0 var(--bt-space-2); border-radius: var(--bt-radius-full);
-  font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  background: var(--pj-tag-bg, var(--bt-color-surface-neutral)); color: var(--pj-tag-fg, var(--bt-color-text-secondary)); }
-.pj-tag--0 { --pj-tag-bg: var(--bt-color-blue-100); --pj-tag-fg: var(--bt-color-blue-600); }
-.pj-tag--1 { --pj-tag-bg: var(--bt-color-green-100); --pj-tag-fg: var(--bt-color-green-700); }
-.pj-tag--2 { --pj-tag-bg: var(--bt-color-purple-100); --pj-tag-fg: var(--bt-color-purple-700); }
-.pj-tag--3 { --pj-tag-bg: var(--bt-color-orange-100); --pj-tag-fg: var(--bt-color-orange-700); }
-.pj-tag--4 { --pj-tag-bg: var(--bt-color-amber-100); --pj-tag-fg: var(--bt-color-amber-800); }
-.pj-tag--5 { --pj-tag-bg: var(--bt-color-surface-neutral); --pj-tag-fg: var(--bt-color-slate-700); }
-.pj-tag button { display: grid; place-items: center; width: 18px; height: 18px; margin-right: -4px; padding: 0; border: 0; border-radius: var(--bt-radius-full); background: none; color: inherit; cursor: pointer; opacity: .7; }
-.pj-tag button:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
-.pj-tag button:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 1px; opacity: 1; }
-.pj-opcional { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-tertiary); }
-
-.pj-tags { display: grid; gap: var(--bt-space-2); }
-.pj-tags__campo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); min-height: 40px; padding: var(--bt-space-1) var(--bt-space-2);
-  border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background: var(--bt-color-surface); cursor: text; }
-.pj-tags__campo:focus-within { border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
-.pj-tags__campo input { flex: 1 1 120px; min-width: 0; height: 28px; border: 0; outline: 0; background: none; font: inherit; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); }
-.pj-tags__campo input:focus, .pj-tags__campo input:focus-visible { outline: 0; box-shadow: none; border: 0; }
-.pj-tags__sug { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
-.pj-tag--sug { border: 1px dashed currentColor; cursor: pointer; font-family: inherit; }
-.pj-tag--sug:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 1px; }
 
 /* Prazo (variante B): abas, painel e resultado. */
 .pj-prazo { display: grid; gap: var(--bt-space-2); }
@@ -127,16 +96,7 @@
 .pj-prazo__limpar:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { .pj-prazo__painel button, .pj-prazo__abas button { transition: none; } }
 
-/* Quadro: filtro por tag, tags, prazo e motivo da pausa no cartão. */
-.projects-filter { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
-.projects-filter-chip { min-height: 30px; padding: 0 var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-full);
-  background: var(--bt-color-surface); font: inherit; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--pj-tag-fg, var(--bt-color-text-secondary)); cursor: pointer;
-  transition: background 140ms, border-color 140ms, transform 140ms; }
-.projects-filter-chip.is-active { border-color: var(--pj-tag-fg, var(--bt-color-brand)); background: var(--pj-tag-bg, var(--bt-color-brand)); color: var(--pj-tag-fg, var(--bt-color-on-solid)); }
-.projects-filter-chip:active { transform: scale(.97); }
-.projects-filter-chip:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 2px; }
-.projects-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.projects-card-tags .pj-tag { min-height: 20px; font-size: 11px; }
+/* Quadro: prazo e motivo da pausa no cartão. */
 .projects-card .projects-card-pausa { display: flex; gap: 6px; align-items: flex-start; padding: 6px 8px; border-radius: var(--bt-radius-sm); background: var(--bt-color-surface-soft); color: var(--bt-color-text-secondary); -webkit-line-clamp: unset; }
 .projects-card-pausa svg { flex: none; margin-top: 2px; }
 .projects-card-pausa > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-width: 0; }
@@ -147,3 +107,91 @@
 .projects-card-prazo.is-atrasado { background: var(--bt-color-danger-soft); color: var(--bt-color-danger); }
 .projects-pausa-field { display: grid; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
 .projects-pausa-field small { font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
+
+/* Propriedades no topo do detalhe: rótulo à esquerda, valor à direita (Coluna só leitura, Prazo). */
+.pj-props { position: relative; display: grid; gap: var(--bt-space-1); margin: 0; padding-bottom: var(--bt-space-3); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.pj-props__linha { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: start; gap: var(--bt-space-2); }
+.pj-props dt { padding-top: 7px; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.pj-props dd { display: grid; justify-items: start; gap: var(--bt-space-1); min-width: 0; margin: 0; }
+.pj-props__nota { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.pj-coluna { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; margin-top: 3px; padding: 0 var(--bt-space-2); border-radius: var(--bt-radius-full);
+  background: var(--pj-col-bg, var(--bt-color-surface-soft)); color: var(--pj-col-fg, var(--bt-color-text-primary)); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); }
+.pj-coluna.is-build { --pj-col-bg: var(--bt-color-action-soft); --pj-col-fg: var(--bt-color-action); }
+.pj-coluna.is-review { --pj-col-bg: var(--bt-color-warning-soft); --pj-col-fg: var(--bt-color-amber-800); }
+.pj-coluna.is-live { --pj-col-bg: var(--bt-color-success-soft); --pj-col-fg: var(--bt-color-success); }
+.pj-coluna.is-paused { --pj-col-fg: var(--bt-color-text-secondary); }
+
+/* Botão do prazo e o seletor ancorado abaixo dele. */
+/* O seletor se ancora na lista de propriedades (largura do corpo), não no botão: cabe em 390 px. */
+.pj-prazo-campo { max-width: 100%; }
+.pj-prop-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; padding: 0 var(--bt-space-2); border: var(--bt-border-width-default) solid transparent; border-radius: var(--bt-radius-sm);
+  background: transparent; font: inherit; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); cursor: pointer; transition: background 140ms, border-color 140ms; }
+.pj-prop-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-prop-btn b { font-weight: var(--bt-font-weight-semibold); }
+.pj-prop-btn.is-vazio { color: var(--bt-color-text-secondary); }
+.pj-prop-btn.is-perto { color: var(--bt-color-amber-800); }
+.pj-prop-btn.is-atrasado { color: var(--bt-color-danger); }
+.pj-prop-btn__seta { flex: none; opacity: .6; transition: transform 160ms ease-out; }
+.pj-prop-btn:hover:not(:disabled), .pj-prop-btn[aria-expanded="true"] { border-color: var(--bt-color-border); background: var(--bt-color-surface-soft); }
+.pj-prop-btn:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.pj-prop-btn:disabled { cursor: not-allowed; opacity: .6; }
+.pj-prazo-pop { position: absolute; z-index: 5; top: calc(100% + 4px); left: 80px; width: min(340px, calc(100% - 80px)); box-sizing: border-box; padding: var(--bt-space-3);
+  border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface);
+  box-shadow: var(--bt-shadow-popover); transform-origin: top left; animation: pj-pop 140ms ease-out; }
+.pj-prazo-pop .pj-prazo__painel { padding: 0; border: 0; }
+@keyframes pj-pop { from { opacity: 0; transform: scale(.97) translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .pj-prazo-pop { animation: none; } }
+
+/* Descrição cresce com o texto (até um limite, depois rola). Seletor mais forte que `.bt-control--textarea .bt-control__input` do DS.
+   Sem field-sizing (navegador antigo) a caixa continua redimensionável, como no DS. */
+.pj-desc.bt-control--textarea .bt-control__input { min-height: 64px; max-height: 320px; }
+@supports (field-sizing: content) { .pj-desc.bt-control--textarea .bt-control__input { field-sizing: content; resize: none; } }
+
+/* Movimento do detalhe: curto, ease-out, só transform e opacity; desliga com reduced-motion. */
+.pj-gal > div { min-width: 0; }
+.pj-check li label { transition: color 160ms ease-out; }
+.pj-check li.is-novo, .pj-gal > .is-novo, .pj-audios > .is-novo { animation: pj-entra 180ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes pj-entra { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.pj-prop-btn[aria-expanded="true"] .pj-prop-btn__seta { transform: rotate(180deg); }
+.pj-anexo .pj-anexo__thumb { transition: transform 160ms ease-out, border-color 160ms ease-out; }
+@media (hover: hover) and (pointer: fine) { .pj-anexo:hover .pj-anexo__thumb { transform: translateY(-1px); border-color: var(--bt-color-border-strong); } }
+.pj-anexo:active .pj-anexo__thumb { transform: scale(.97); }
+.pj-sujo { margin-right: auto; align-self: center; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.pj-sujo__txt { animation: pj-aparece 160ms ease-out; }
+.pj-sujo kbd { font: inherit; font-size: var(--bt-font-size-11); padding: 0 4px; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-xs); }
+@keyframes pj-aparece { from { opacity: 0; } }
+@media (max-width: 480px) { .pj-sujo__atalho { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .pj-check li label, .pj-prop-btn__seta, .pj-anexo .pj-anexo__thumb { transition: none; }
+  .pj-check li.is-novo, .pj-gal > .is-novo, .pj-audios > .is-novo, .pj-sujo__txt { animation: none; }
+  .pj-anexo:hover .pj-anexo__thumb, .pj-anexo:active .pj-anexo__thumb { transform: none; }
+}
+
+/* Áudios: cartão com play, nome e a transcrição dentro. */
+.pj-audios { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.pj-audios li { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-3) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); }
+.pj-audio { display: grid; gap: var(--bt-space-1); min-width: 0; }
+.pj-audio__player { width: 100%; height: 36px; }
+.pj-audio__ouvir { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; padding: 0; border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pj-audio__ouvir[aria-disabled="true"] { cursor: progress; }
+.pj-audio__ouvir:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.pj-audio__play { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: var(--bt-radius-full); background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); transition: transform 140ms ease-out, background-color 140ms ease-out; }
+@media (hover: hover) and (pointer: fine) { .pj-audio__ouvir:hover .pj-audio__play { background: var(--bt-color-border); } }
+.pj-audio__ouvir:active:not([aria-disabled="true"]) .pj-audio__play { transform: scale(.94); }
+.pj-audio__info { display: grid; min-width: 0; }
+.pj-audio__info strong, .pj-audio__nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); }
+.pj-audio__info small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.pj-transcricao { margin: 0; padding-top: var(--bt-space-2); border-top: var(--bt-border-width-default) solid var(--bt-color-border); font-size: var(--bt-font-size-13); line-height: 1.5; color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.pj-transcricao__lbl { display: block; margin-bottom: 2px; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-semibold); letter-spacing: .04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.pj-transcricao.is-pendente { display: flex; align-items: center; gap: 6px; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+
+/* Zona de soltar: também abre o seletor de arquivos. */
+.pj-drop { display: flex; align-items: center; gap: var(--bt-space-3); width: 100%; padding: var(--bt-space-3); border: var(--bt-border-width-default) dashed var(--bt-color-border-strong); border-radius: var(--bt-radius-md); background: transparent; color: var(--bt-color-text-secondary); font: inherit; text-align: left; cursor: pointer; transition: background-color 140ms ease-out, border-color 140ms ease-out; }
+.pj-drop > span { display: grid; gap: 2px; min-width: 0; }
+.pj-drop strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+.pj-drop small { font-size: var(--bt-font-size-12); }
+@media (hover: hover) and (pointer: fine) { .pj-drop:hover:not([aria-disabled="true"]) { background: var(--bt-color-surface-soft); border-color: var(--bt-color-text-secondary); } }
+.pj-drop.is-arrastando { background: var(--bt-color-surface-soft); border-color: var(--bt-focus-border); }
+.pj-drop:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
+.pj-drop[aria-disabled="true"] { opacity: .6; cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .pj-audio__play, .pj-drop { transition: none; } .pj-audio__ouvir:active:not([aria-disabled="true"]) .pj-audio__play { transform: none; } }

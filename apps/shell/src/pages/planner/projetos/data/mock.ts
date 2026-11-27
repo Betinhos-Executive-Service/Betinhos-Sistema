@@ -9,11 +9,11 @@ const xid = (n: number) => `dddddddd-0000-4000-8000-${String(n).padStart(12, '0'
 /** Projetos de exemplo, genéricos e fictícios. */
 export function createMockProjetos(): Projeto[] {
   return [
-    { id: pid(1), codigo: 'PRJ-1', nome: 'Painel de indicadores', briefing: 'Quero ver num lugar só os números do mês: serviços feitos, cancelados e o faturamento por cliente.', checklist: [{ texto: 'Serviços feitos e cancelados', feito: true }, { texto: 'Faturamento por cliente', feito: true }, { texto: 'Filtro por período', feito: false }], tags: ['Financeiro', 'Dashboard'], prazo: { tipo: 'semana', fim: '2026-12-06' } },
-    { id: pid(2), codigo: 'PRJ-2', nome: 'Cadastro de documentos', briefing: 'Guardar os documentos de cada veículo com a data de vencimento.', checklist: [{ texto: 'Tela de cadastro', feito: true }, { texto: 'Alerta de vencimento', feito: false }], tags: ['Frota'], prazo: { tipo: 'dia', fim: '2026-11-27' } },
-    { id: pid(3), codigo: 'PRJ-3', nome: 'Aviso de vencimento', briefing: 'O aviso chega por e-mail 30 dias antes do vencimento.', checklist: [], tags: ['Frota', 'E-mail'], prazo: { tipo: 'mes', fim: '2026-11-30' } },
-    { id: pid(4), codigo: 'PRJ-4', nome: 'Relatório mensal automático', briefing: 'Gravei um áudio explicando o relatório que preciso.', checklist: [], tags: [], prazo: { tipo: 'mes', fim: '2026-12-31' } },
-    { id: pid(5), codigo: 'PRJ-5', nome: 'Revisão do fluxo de aprovação', briefing: '', checklist: [{ texto: 'Definir quem aprova cada valor', feito: false }], tags: ['Financeiro'], prazo: { tipo: 'dia', fim: '2026-11-20' } },
+    { id: pid(1), codigo: 'PRJ-1', nome: 'Painel de indicadores', briefing: 'Quero ver num lugar só os números do mês: serviços feitos, cancelados e o faturamento por cliente.', checklist: [{ texto: 'Serviços feitos e cancelados', feito: true }, { texto: 'Faturamento por cliente', feito: true }, { texto: 'Filtro por período', feito: false }], prazo: { tipo: 'semana', fim: '2026-12-06' } },
+    { id: pid(2), codigo: 'PRJ-2', nome: 'Cadastro de documentos', briefing: 'Guardar os documentos de cada veículo com a data de vencimento.', checklist: [{ texto: 'Tela de cadastro', feito: true }, { texto: 'Alerta de vencimento', feito: false }], prazo: { tipo: 'dia', fim: '2026-11-27' } },
+    { id: pid(3), codigo: 'PRJ-3', nome: 'Aviso de vencimento', briefing: 'O aviso chega por e-mail 30 dias antes do vencimento.', checklist: [], prazo: { tipo: 'mes', fim: '2026-11-30' } },
+    { id: pid(4), codigo: 'PRJ-4', nome: 'Relatório mensal automático', briefing: 'Gravei um áudio explicando o relatório que preciso.', checklist: [], prazo: { tipo: 'mes', fim: '2026-12-31' } },
+    { id: pid(5), codigo: 'PRJ-5', nome: 'Revisão do fluxo de aprovação', briefing: '', checklist: [{ texto: 'Definir quem aprova cada valor', feito: false }], prazo: { tipo: 'dia', fim: '2026-11-20' } },
   ]
 }
 

@@ -28,8 +28,6 @@ export type Projeto = {
   /** Descrição (coluna `cr40f_briefing`). */
   briefing: string
   checklist: ChecklistItem[]
-  /** Tags livres (`cr40f_tags`). */
-  tags: string[]
   /** Prazo opcional (`cr40f_prazo` + `cr40f_prazotipo`). */
   prazo: Prazo | null
 }
