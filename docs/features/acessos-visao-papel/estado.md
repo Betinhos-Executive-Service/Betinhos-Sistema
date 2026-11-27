@@ -1,8 +1,8 @@
 # Acessos: visão por papel, ver como e saída de administrativo
 
 - Nível: 2 (várias telas e um caminho novo de encerrar acesso; sem schema novo; saída com revisão Opus de segurança)
-- Etapa: 7 de 7 Entregar (PR 1)
-- Próximo passo: QA e merge do #777 e do PR 1 · com você; depois tarefa 6 (prova no DEV, card antes)
+- Etapa: 5 de 7 Construir (PR 2, Ver como); PR 1 mergeado (#780) e provado no DEV em 27/11/2026
+- Próximo passo: tarefa 7, Ver como (PR 2) · sozinho
 - Branch e PR: feat/acessos-visao-papel (base feat/acessos-o-que-perde, PR #777) · ainda não
 - Protótipo: A (matriz pessoa × área, filtros: ainda com o amplo, só o Base, encerrados) e ficha com banner "Vendo como", Encerrar com confirmação pelo primeiro nome e Reativar com os perfis anteriores; B descartada
 - Go: 27/11/2026 09:26 por Renan (clique no card)
@@ -33,7 +33,7 @@
 | 3 | Shell (matriz): `#/acessos?visao=papel`, botão "Acessos por papel" em Funcionários, chips e busca, clique para a ficha ou a gaveta | 2 | cenários 1 a 5 | vitest + print no mock (1280 e 375) | Sonnet | passou (mock): 242 testes em acessos+funcionarios, tsc limpo; prints em `prints/matriz-*.png`. Incertos: ficha de encerrado só abre se o funcionário existir (sem ficha a linha não clica); Administrador do Sistema aparece como Gestor em todas as áreas |
 | 4 | Shell (ficha): Encerrar com diálogo e confirmação, estado encerrado e Reativar, botão travado para amplo | 2 | cenários 6, 8 e 11 | vitest + print no mock | Sonnet | passou (mock): 251 testes em acessos+funcionarios, tsc limpo; prints `prints/ficha-*.png`. Mock: ficha m9 (Joana) é a encerrada, com id próprio (colidia com o de Carlos). Incertos: a lista "o que perde" não traz equipes (o bloco não as lê); 403 de recurso externo no console do mock |
 | 5 | Revisão de segurança (Opus) do diff 1 a 4, qualidade, verificar-acessos atualizada, PR 1 → develop (base #777) | 1 a 4 | — | code-review high + ux-audit Fluxo | Opus | passou (local): revisão Opus com 2 importantes e 9 menores corrigidos (cba17b72 plugin, d1648c37 shell), qualidade 023f8212, verificação bf6ea657 (277 testes do plugin, 263 do shell, tsc limpo, mock 1280/375). Segurança: superfície tocada (Custom API sem privilégio próprio), revisada |
-| 6 | Prova no DEV depois do merge (Deploy registra as APIs): encerrar e reativar um usuário de teste e conferir papéis, equipes, bloqueio e histórico | 5 | cenários 7, 9 e 10 reais | saída sem ids | — (sessão principal, card antes) | |
+| 6 | Prova no DEV depois do merge (Deploy registra as APIs): encerrar e reativar um usuário de teste e conferir papéis, equipes, bloqueio e histórico | 5 | cenários 7, 9 e 10 reais | saída sem ids | — (sessão principal, card antes) | passou (DEV, 27/11/2026, Deploy b48dbcbb): usuário de teste com Base + Financeiro Operador → encerrar tirou 2 papéis e 1 perfil de coluna, bloqueou, gravou `acao:encerrar` e a conferência deu "acesso retirado"; reativar repôs os 2 papéis e o perfil e desbloqueou; recusas sem efeito: CONFIRMACAO_INVALIDA, SEM_PERMISSAO (impersonação de Base), JA_ENCERRADO, NADA_A_REATIVAR (2x). Usuário voltou ao só Base. Não provados no DEV: PROPRIO_ACESSO, ULTIMO_ADMIN e equipe com papel (testes unitários) |
 | 7 | Ver como (PR 2): override no `AcessosProvider`, banner no AppShell, botão na ficha | 5 | cenários 12 a 14 | vitest + print | Sonnet | |
 
 ## Pendências e fora de escopo
