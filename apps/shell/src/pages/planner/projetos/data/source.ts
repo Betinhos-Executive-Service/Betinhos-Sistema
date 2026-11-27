@@ -4,7 +4,6 @@ import { latenciaMock } from '../../../../app/latenciaMock'
 import { STATUS } from '../domain/choices'
 import { lerChecklist } from '../domain/checklist'
 import { lerPrazo } from '../domain/prazo'
-import { lerTags } from '../domain/tags'
 import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from '../domain/types'
 import { createMockArquivos, createMockAtualizacoes, createMockEtapas, createMockProjetos } from './mock'
 import {
@@ -76,8 +75,7 @@ function createMockSource(): Source {
     },
     async createProjeto(c) {
       await wait(400)
-      const p: Projeto = { id: next('bbbbbbbb'), codigo: `PRJ-${++codigo}`, nome: s(c.cr40f_name), briefing: s(c.cr40f_briefing), checklist: lerChecklist(c.cr40f_checklist),
-        tags: lerTags(c.cr40f_tags), prazo: lerPrazo(c.cr40f_prazo, c.cr40f_prazotipo) }
+      const p: Projeto = { id: next('bbbbbbbb'), codigo: `PRJ-${++codigo}`, nome: s(c.cr40f_name), briefing: s(c.cr40f_briefing), checklist: lerChecklist(c.cr40f_checklist), prazo: lerPrazo(c.cr40f_prazo, c.cr40f_prazotipo) }
       projetos = [...projetos, p]
       return { id: p.id, codigo: p.codigo }
     },

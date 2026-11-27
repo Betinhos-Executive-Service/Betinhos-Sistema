@@ -7,7 +7,6 @@ import { gravarChecklist, lerChecklist, progresso } from './domain/checklist'
 import { codigoEtapa1, etapaDoProjeto } from './domain/regras'
 import type { Etapa } from './domain/types'
 import { compararPrazo, faltaPrazo, gravarPrazo, lerPrazo, prazoMes, prazoSemana, rotuloPrazo, semanasDoMes, situacaoPrazo } from './domain/prazo'
-import { addTag, corDaTag, gravarTags, lerTags, tagsEmUso } from './domain/tags'
 
 const et = (over: Partial<Etapa>): Etapa => ({ id: 'e1', projetoId: 'p', numero: 1, codigo: 'PRJ-1.1', nome: 'E', status: STATUS.ideia, prazo: null, andamento: 0, linkPr: '', publicadoProd: null, motivoPausa: '', ...over })
 
@@ -61,9 +60,9 @@ describe('consultas, payloads e mapeamento do Dataverse', () => {
   it('projeto lê título, descrição e checklist', () => {
     expect(projetosPath('cr40f_projetos')).toContain('cr40f_checklist')
     expect(mapProjeto({ cr40f_projetoid: 'P1', cr40f_codigo: 'PRJ-1', cr40f_name: 'X', cr40f_briefing: 'd', cr40f_checklist: '[{"texto":"A","feito":true}]' }))
-      .toEqual({ id: 'p1', codigo: 'PRJ-1', nome: 'X', briefing: 'd', checklist: [{ texto: 'A', feito: true }], tags: [], prazo: null })
-    expect(mapProjeto({ cr40f_projetoid: 'P1', cr40f_tags: 'Frota, frota ,App', cr40f_prazo: '2026-12-13T00:00:00Z', cr40f_prazotipo: 100000001 }))
-      .toMatchObject({ tags: ['Frota', 'App'], prazo: { tipo: 'semana', fim: '2026-12-13' } })
+      .toEqual({ id: 'p1', codigo: 'PRJ-1', nome: 'X', briefing: 'd', checklist: [{ texto: 'A', feito: true }], prazo: null })
+    expect(mapProjeto({ cr40f_projetoid: 'P1', cr40f_prazo: '2026-12-13T00:00:00Z', cr40f_prazotipo: 100000001 }))
+      .toMatchObject({ prazo: { tipo: 'semana', fim: '2026-12-13' } })
     expect(mapEtapa({ cr40f_projetoetapaid: 'E1', cr40f_motivopausa: ' Esperando ' }).motivoPausa).toBe('Esperando')
   })
   it('atualizações, etapas e payloads', () => {
@@ -118,17 +117,3 @@ describe('prazo', () => {
   })
 })
 
-describe('tags', () => {
-  it('sem repetir (maiúsculas não contam), sem vírgula e lista vazia limpa a coluna', () => {
-    expect(lerTags(' Frota ,frota, App  Motoristas,, ')).toEqual(['Frota', 'App Motoristas'])
-    expect(addTag(['Frota'], 'FROTA')).toEqual(['Frota'])
-    expect(addTag([], '  ')).toEqual([])
-    expect(gravarTags(['A', 'B'])).toBe('A, B')
-    expect(gravarTags([])).toBeNull()
-  })
-  it('cor fixa por nome e tags em uso das mais usadas para as menos', () => {
-    expect(corDaTag('Frota')).toBe(corDaTag('frota'))
-    expect(corDaTag('Frota')).toBeGreaterThanOrEqual(0)
-    expect(tagsEmUso([['Frota', 'App'], ['frota'], ['Banco']])).toEqual(['Frota', 'App', 'Banco'])
-  })
-})

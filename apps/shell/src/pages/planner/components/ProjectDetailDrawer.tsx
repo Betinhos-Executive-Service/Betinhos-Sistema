@@ -1,20 +1,19 @@
-// Detalhe do projeto no Planner: título, descrição e checklist (Salvar) e anexos com áudio (enviados na hora).
+// Detalhe do projeto no Planner: coluna (só leitura) e prazo no topo; título, descrição e checklist (Salvar) e anexos com áudio (enviados na hora).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Checkbox, Dialog, Drawer, Field, Textarea, useToast } from "@betinhos/ui";
+import { Alert, Button, Checkbox, Dialog, Drawer, Textarea, useToast } from "@betinhos/ui";
 import { Paperclip, Plus, X } from "lucide-react";
 import { AudioRecorder } from "./AudioRecorder";
 import type { Row } from "@betinhos/dataverse";
 import { reasonText, type Source } from "../projetos/data/source";
 import { AnexoAudio, AnexoMiniatura } from "../projetos/components/AnexoMiniatura";
 import { ehAudio } from "../projetos/domain/anexos";
-import { autorDoPerfil } from "../projetos/domain/choices";
 import { MAX_ITEM, gravarChecklist, progresso, type ChecklistItem } from "../projetos/domain/checklist";
 import type { Atualizacao, Perfil, Projeto } from "../projetos/domain/types";
 import { gravarPrazo, mesmoPrazo, type Prazo } from "../projetos/domain/prazo";
-import { addTag, gravarTags, mesmasTags } from "../projetos/domain/tags";
-import { PrazoPicker } from "../projetos/components/PrazoPicker";
-import { TagsInput } from "../projetos/components/TagsInput";
-import { acceptFiles, namePastedFile } from "../domain/projectsBoard";
+import { STATUS, autorDoPerfil } from "../projetos/domain/choices";
+import { PrazoCampo } from "../projetos/components/PrazoCampo";
+import { COLUMN_STYLE, labelOf } from "../projetos/components/colunas";
+import { acceptFiles, namePastedFile, type ProjectCard } from "../domain/projectsBoard";
 import "../projetos/projetos.css";
 
 const ACCEPT = "image/*,video/*,audio/*,application/pdf";
@@ -23,8 +22,8 @@ const NOME_MAX = 200;
 type Props = {
   projeto: Projeto | null;
   atualizacoes: Atualizacao[];
-  /** Tags já usadas nos projetos, para sugerir. */
-  tagsEmUso: string[];
+  /** Cartão do projeto no quadro: coluna atual e motivo da pausa. */
+  card: ProjectCard | null;
   perfil: Perfil;
   source: Source;
   onClose: () => void;
@@ -36,14 +35,12 @@ export function ProjectDetailDrawer({ projeto, ...rest }: Props) {
   return projeto ? <Detalhe key={projeto.id} projeto={projeto} {...rest} /> : <Drawer open={false} onClose={rest.onClose} title="Projeto">{null}</Drawer>;
 }
 
-function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, onSaved, onAtualizacao }: Props & { projeto: Projeto }) {
+function Detalhe({ projeto, atualizacoes, card, perfil, source, onClose, onSaved, onAtualizacao }: Props & { projeto: Projeto }) {
   const toast = useToast();
   const [nome, setNome] = useState(projeto.nome);
   const [descricao, setDescricao] = useState(projeto.briefing);
   const [itens, setItens] = useState<ChecklistItem[]>(projeto.checklist);
   const [novoItem, setNovoItem] = useState("");
-  const [tags, setTags] = useState<string[]>(projeto.tags);
-  const [novaTag, setNovaTag] = useState("");
   const [prazo, setPrazo] = useState<Prazo | null>(projeto.prazo);
   const [nomeErro, setNomeErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -53,11 +50,12 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
   const [avisos, setAvisos] = useState<string[]>([]);
   const [descartar, setDescartar] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const tituloRef = useRef<HTMLInputElement>(null);
 
   const enviando = envios > 0;
   const ocupado = salvando || enviando;
   const sujo = nome.trim() !== projeto.nome || descricao.trim() !== projeto.briefing.trim() || gravarChecklist(itens) !== gravarChecklist(projeto.checklist) || Boolean(novoItem.trim())
-    || Boolean(novaTag.trim()) || !mesmasTags(tags, projeto.tags) || !mesmoPrazo(prazo, projeto.prazo);
+    || !mesmoPrazo(prazo, projeto.prazo);
   const doProjeto = useMemo(() => atualizacoes.filter((a) => a.projetoId === projeto.id).sort((a, b) => b.data.localeCompare(a.data)), [atualizacoes, projeto.id]);
   // A transcrição é da atualização: aparece só sob o primeiro áudio dela.
   const anexos = doProjeto.flatMap((a) => {
@@ -88,7 +86,6 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
     setNomeErro("");
     // Item digitado e não adicionado entra junto, para não se perder.
     const lista = novoItem.trim() ? [...itens, { texto: novoItem.trim(), feito: false }] : itens;
-    const listaTags = addTag(tags, novaTag);
     const texto = descricao.trim();
     // Só as colunas que mudaram: não sobrescreve o que um agente gravou nas outras
     // nem apaga um checklist que a tela não soube ler.
@@ -96,7 +93,6 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
     if (titulo !== projeto.nome) changes.cr40f_name = titulo;
     if (texto !== projeto.briefing.trim()) changes.cr40f_briefing = texto || null;
     if (gravarChecklist(lista) !== gravarChecklist(projeto.checklist)) changes.cr40f_checklist = gravarChecklist(lista);
-    if (!mesmasTags(listaTags, projeto.tags)) changes.cr40f_tags = gravarTags(listaTags);
     if (!mesmoPrazo(prazo, projeto.prazo)) Object.assign(changes, gravarPrazo(prazo));
     setSalvando(true);
     try {
@@ -104,9 +100,7 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
       setErroSalvar("");
       setItens(lista);
       setNovoItem("");
-      setTags(listaTags);
-      setNovaTag("");
-      onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista, tags: listaTags, prazo });
+      onSaved({ ...projeto, nome: titulo, briefing: texto, checklist: lista, prazo });
       toast({ tone: "success", message: `${projeto.codigo} salvo.` });
     } catch (reason) {
       setErroSalvar(`Não foi possível salvar. ${reasonText(reason)}`);
@@ -151,14 +145,26 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
     return () => document.removeEventListener("paste", onPaste);
   }, []);
 
+  // O <dialog> põe o foco no primeiro campo (o título) e ele abriria com cara de edição: o foco vai para o X.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (document.activeElement === tituloRef.current) tituloRef.current?.closest("dialog")?.querySelector<HTMLElement>(".bt-drawer__close")?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   const feito = progresso(itens);
+  const status = card?.status ?? STATUS.ideia;
+  const coluna = COLUMN_STYLE[status] ?? COLUMN_STYLE[STATUS.ideia];
+  const ColunaIcon = coluna.icon;
+  const motivoPausa = status === STATUS.pausada ? card?.etapa?.motivoPausa ?? "" : "";
   return (
     <>
       <Drawer open onClose={fechar} size="wide" eyebrow={projeto.codigo}
         title={<>
           {/* Nome do painel para leitor de tela (o título visível é o campo editável). */}
           <span className="bt-sr-only">{projeto.codigo} · {projeto.nome}</span>
-          <input className="pj-titulo" form="pj-detalhe" value={nome} maxLength={NOME_MAX} disabled={salvando} aria-label="Título"
+          <input ref={tituloRef} className="pj-titulo" form="pj-detalhe" value={nome} maxLength={NOME_MAX} disabled={salvando} aria-label="Título"
             aria-invalid={nomeErro ? true : undefined} aria-describedby={nomeErro ? "pj-titulo-erro" : undefined}
             onChange={(event) => { setNome(event.target.value); if (nomeErro) setNomeErro(""); }} />
         </>}
@@ -173,18 +179,24 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
           onDrop={(event) => { if (!event.dataTransfer.files.length) return; event.preventDefault(); void anexar(Array.from(event.dataTransfer.files)); }}>
           {nomeErro && <p id="pj-titulo-erro" className="pj-erro" role="alert">{nomeErro}</p>}
           {erroSalvar && <Alert tone="danger" onDismiss={() => setErroSalvar("")}>{erroSalvar}</Alert>}
-          <Field label="Descrição">
-            <Textarea value={descricao} rows={3} disabled={salvando} onChange={(event) => setDescricao(event.target.value)} />
-          </Field>
+          <dl className="pj-props">
+            <div className="pj-props__linha">
+              <dt>Coluna</dt>
+              <dd>
+                <span className={`pj-coluna is-${coluna.key}`} title={coluna.hint}><ColunaIcon size={14} aria-hidden="true" />{labelOf(status)}</span>
+                {motivoPausa && <p className="pj-props__nota">{motivoPausa}</p>}
+              </dd>
+            </div>
+            <div className="pj-props__linha">
+              <dt>Prazo</dt>
+              <dd><PrazoCampo value={prazo} onChange={setPrazo} disabled={salvando} concluido={status === STATUS.concluida} /></dd>
+            </div>
+          </dl>
 
-          <section className="pj-bloco" aria-labelledby="pj-prazo">
-            <h3 id="pj-prazo" className="pj-lbl">Prazo <span className="pj-opcional">opcional</span></h3>
-            <PrazoPicker value={prazo} onChange={setPrazo} disabled={salvando} />
-          </section>
-
-          <section className="pj-bloco" aria-labelledby="pj-tags">
-            <h3 id="pj-tags" className="pj-lbl">Tags <span className="pj-opcional">opcional</span></h3>
-            <TagsInput value={tags} onChange={setTags} texto={novaTag} onTexto={setNovaTag} sugestoes={tagsEmUso} disabled={salvando} />
+          <section className="pj-bloco" aria-labelledby="pj-descricao">
+            <h3 id="pj-descricao" className="pj-lbl">Descrição</h3>
+            <Textarea className="pj-desc" aria-labelledby="pj-descricao" value={descricao} rows={2} disabled={salvando} placeholder="O que é, para quem e por quê."
+              onChange={(event) => setDescricao(event.target.value)} />
           </section>
 
           <section className="pj-bloco" aria-labelledby="pj-checklist">
@@ -254,7 +266,7 @@ function Detalhe({ projeto, atualizacoes, tagsEmUso, perfil, source, onClose, on
           <Button variant="secondary" onClick={() => setDescartar(false)}>Continuar editando</Button>
           <Button variant="danger" onClick={() => { setDescartar(false); onClose(); }}>Descartar</Button>
         </>}>
-        As alterações deste projeto (título, descrição, prazo, tags ou checklist) ainda não foram salvas.
+        As alterações deste projeto (título, descrição, prazo ou checklist) ainda não foram salvas.
       </Dialog>
     </>
   );

@@ -215,37 +215,35 @@ describe('Projetos no Planner: detalhe do cartão', () => {
     await waitFor(() => expect(updateEtapa).toHaveBeenCalledWith(expect.any(String), { cr40f_status: 100000000, cr40f_motivopausa: null }))
   })
 
-  it('filtro por tag mostra só os cartões da tag', async () => {
+  it('quadro sem tags: sem filtro no topo nem tag no cartão', async () => {
     render(<ProjectsView host={{ mode: 'mock' }} />)
-    await screen.findByRole('button', { name: nomeDe('PRJ-1') })
-    fireEvent.click(within(screen.getByRole('group', { name: 'Filtrar por tag' })).getByRole('button', { name: 'Frota' }))
-    await waitFor(() => expect(screen.queryByRole('button', { name: nomeDe('PRJ-1') })).toBeNull())
-    expect(screen.getByRole('button', { name: nomeDe('PRJ-2') })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Todas' }))
-    expect(await screen.findByRole('button', { name: nomeDe('PRJ-1') })).toBeTruthy()
+    const cartao = (await screen.findByRole('button', { name: nomeDe('PRJ-1') })).closest('article')!
+    expect(screen.queryByRole('group', { name: 'Filtrar por tag' })).toBeNull()
+    expect(within(cartao).queryByRole('list', { name: 'Tags' })).toBeNull()
   })
 
-  it('detalhe grava prazo (semana) e tags só com as colunas mudadas', async () => {
+  it('detalhe mostra a coluna e o prazo recolhido; escolher a semana fecha o seletor e grava só o prazo', async () => {
     const updateProjeto = vi.fn(async () => undefined)
     stubSource(() => ({ updateProjeto }))
     const p = await abrir('PRJ-4')
+    expect(within(p).getByText('Ideia', { selector: '.pj-coluna' })).toBeTruthy()
+    expect(within(p).queryByRole('tab', { name: 'Semana' })).toBeNull()
+    expect(within(p).queryByRole('textbox', { name: 'Nova tag' })).toBeNull()
+    const prazo = within(p).getByRole('button', { expanded: false, name: /2026/ })
+    fireEvent.click(prazo)
+    fireEvent.keyDown(within(p).getByRole('group', { name: 'Escolher prazo' }), { key: 'Escape' })
+    expect(within(p).queryByRole('group', { name: 'Escolher prazo' })).toBeNull()
+    fireEvent.click(prazo)
     fireEvent.click(within(p).getByRole('tab', { name: 'Semana' }))
     fireEvent.click(within(p).getByRole('button', { name: /Semana 3/ }))
-    const tag = within(p).getByRole('textbox', { name: 'Nova tag' })
-    fireEvent.change(tag, { target: { value: 'Relatórios' } }); fireEvent.keyDown(tag, { key: 'Enter' })
-    fireEvent.focus(tag); fireEvent.click(within(within(p).getByRole('group', { name: 'Tags já usadas' })).getByRole('button', { name: '+ Frota' }))
+    expect(within(p).queryByRole('group', { name: 'Escolher prazo' })).toBeNull()
     fireEvent.click(within(p).getByRole('button', { name: 'Salvar' }))
-    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_tags: 'Relatórios, Frota', cr40f_prazo: '2026-12-20', cr40f_prazotipo: 100000001 }))
+    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_prazo: '2026-12-20', cr40f_prazotipo: 100000001 }))
   })
 
-  it('tag digitada sem Enter pede descartar ao fechar e entra no Salvar', async () => {
-    const updateProjeto = vi.fn(async () => undefined)
-    stubSource(() => ({ updateProjeto }))
-    const p = await abrir('PRJ-4')
-    fireEvent.change(within(p).getByRole('textbox', { name: 'Nova tag' }), { target: { value: 'Urgente' } })
-    fireEvent.click(within(p).getByRole('button', { name: 'Fechar painel' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Continuar editando' }))
-    fireEvent.click(within(await painel('PRJ-4')).getByRole('button', { name: 'Salvar' }))
-    await waitFor(() => expect(updateProjeto).toHaveBeenCalledWith(expect.any(String), { cr40f_tags: 'Urgente' }))
+  it('detalhe de projeto pausado mostra a coluna Pausado com o motivo', async () => {
+    const p = await abrir('PRJ-5')
+    expect(within(p).getByText('Pausado', { selector: '.pj-coluna' })).toBeTruthy()
+    expect(within(p).getByText(/Esperando o financeiro/)).toBeTruthy()
   })
 })

@@ -10,9 +10,9 @@ const ABAS: { tipo: PrazoTipo; label: string }[] = [{ tipo: "mes", label: "Mês"
 const SEMANA = ["S", "T", "Q", "Q", "S", "S", "D"];
 const NOME_DIA = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
 
-type Props = { value: Prazo | null; onChange: (p: Prazo | null) => void; disabled?: boolean; hoje?: string };
+type Props = { value: Prazo | null; onChange: (p: Prazo | null) => void; disabled?: boolean; hoje?: string; concluido?: boolean };
 
-export function PrazoPicker({ value, onChange, disabled, hoje = hojeIso() }: Props) {
+export function PrazoPicker({ value, onChange, disabled, hoje = hojeIso(), concluido }: Props) {
   const base = (value?.fim ?? hoje).split("-").map(Number);
   const [aba, setAba] = useState<PrazoTipo>(value?.tipo ?? "mes");
   const [ano, setAno] = useState(base[0]);
@@ -87,9 +87,9 @@ export function PrazoPicker({ value, onChange, disabled, hoje = hojeIso() }: Pro
         )}
       </div>
 
-      <div className={`pj-prazo__res${value ? ` is-${situacaoPrazo(value, hoje)}` : ""}`} aria-live="polite">
+      <div className={`pj-prazo__res${value && !concluido ? ` is-${situacaoPrazo(value, hoje)}` : ""}`} aria-live="polite">
         {value
-          ? <><span><b>{rotuloPrazo(value, hoje)}</b> · {faltaPrazo(value, hoje)}</span>
+          ? <><span><b>{rotuloPrazo(value, hoje)}</b>{!concluido && <> · {faltaPrazo(value, hoje)}</>}</span>
             <button type="button" className="pj-prazo__limpar" disabled={disabled} onClick={() => onChange(null)}><X size={14} aria-hidden="true" /> Limpar</button></>
           : <span className="pj-muted">Sem prazo. Escolha um mês, uma semana ou um dia.</span>}
       </div>
