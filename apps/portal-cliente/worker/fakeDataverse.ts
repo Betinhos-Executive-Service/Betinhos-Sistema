@@ -110,13 +110,13 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = '')
     const aspas = (t: string) => t.replace(/''/g, "'")
     const contem = /contains\(cr40f_nomedopassageiro,'((?:[^']|'')*)'\)/.exec(filtro)?.[1]
     const igual = /cr40f_nomedopassageiro eq '((?:[^']|'')*)'/.exec(filtro)?.[1]
-    const emailPessoa = /cr40f_email eq '([^']*)'/.exec(filtro)?.[1]
+    const emailPessoa = /cr40f_email eq '((?:[^']|'')*)'/.exec(filtro)?.[1]
     const nome = (r: Registro) => String(r.cr40f_nomedopassageiro ?? '').toLowerCase()
     return linhas
       .filter((r) => r._cr40f_cliente_value === cliente && r.statecode !== 1 && (!id || r.cr40f_bancodedadosid === id))
       .filter((r) => contem === undefined || nome(r).includes(aspas(contem).toLowerCase()))
       .filter((r) => igual === undefined || nome(r) === aspas(igual).toLowerCase())
-      .filter((r) => emailPessoa === undefined || String(r.cr40f_email ?? '').toLowerCase() === emailPessoa)
+      .filter((r) => emailPessoa === undefined || String(r.cr40f_email ?? '').toLowerCase() === aspas(emailPessoa).toLowerCase())
       .sort((a, b) => nome(a).localeCompare(nome(b)))
       .slice(0, top)
   }

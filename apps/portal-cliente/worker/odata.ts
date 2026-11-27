@@ -114,7 +114,7 @@ export const pessoasComNome = (clienteId: string, nome: string, campos = PESSOA_
 
 /** Pessoa ativa do cliente com este e-mail (o solicitante do pedido). */
 export const pessoaComEmail = (clienteId: string, email: string) =>
-  `${SET.pessoa}?$select=cr40f_bancodedadosid&$top=1&$filter=${encodeURIComponent(`${doCliente(clienteId)} and statecode eq 0 and cr40f_email eq ${texto(email)}`)}`
+  `${SET.pessoa}?$select=cr40f_bancodedadosid,cr40f_nomedopassageiro&$top=10&$orderby=createdon asc&$filter=${encodeURIComponent(`${doCliente(clienteId)} and statecode eq 0 and cr40f_email eq ${texto(email)}`)}`
 
 /** POST da pessoa: o `$select` define o que volta no `return=representation`. */
 export const criarPessoa = () => `${SET.pessoa}?$select=${PESSOA_CAMPOS.join(',')}`

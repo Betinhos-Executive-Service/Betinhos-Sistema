@@ -188,16 +188,18 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
 }
 
 /**
- * Solicitante (obrigatório no Formulário Geral) é a pessoa do cliente com o e-mail do login: passageiro do próprio pedido,
- * ficha existente ou, na primeira vez, uma ficha nova (decisão do Renan, 27/11/2026). Falha aqui não barra o pedido.
+ * Solicitante (obrigatório no Formulário Geral) é a pessoa do cliente com o e-mail do login (decisão do Renan, 27/11/2026):
+ * a de nome igual ao da sessão, senão a mais antiga que não seja passageiro deste pedido (quem pede para outro e põe o
+ * próprio e-mail no contato dele não vira o passageiro); sem nenhuma, ficha nova. Falha aqui não barra o pedido.
  */
 async function solicitanteDoPedido(c: Ctx, sessao: Sessao, pessoas: PassageiroPedido[]): Promise<string | undefined> {
   const email = sessao.email.trim().toLowerCase()
-  const noPedido = pessoas.find((p) => p.email?.trim().toLowerCase() === email)?.id
-  if (noPedido) return noPedido
+  const nome = sessao.nome.trim().toLowerCase()
   try {
-    const [existente] = await c.dv.lista(pessoaComEmail(sessao.cid, email))
-    if (existente) return str(existente, 'cr40f_bancodedadosid')
+    const fichas = await c.dv.lista(pessoaComEmail(sessao.cid, email))
+    const doPedido = new Set(pessoas.map((p) => p.id))
+    const ficha = fichas.find((f) => str(f, 'cr40f_nomedopassageiro').trim().toLowerCase() === nome) ?? fichas.find((f) => !doPedido.has(str(f, 'cr40f_bancodedadosid')))
+    if (ficha) return str(ficha, 'cr40f_bancodedadosid')
     const nova = await c.dv.criar(criarPessoa(), {
       cr40f_nomedopassageiro: sessao.nome || email,
       cr40f_email: email,
