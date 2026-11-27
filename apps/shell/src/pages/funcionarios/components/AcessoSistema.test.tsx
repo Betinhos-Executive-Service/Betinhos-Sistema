@@ -124,6 +124,15 @@ describe('AcessoSistema', () => {
       await waitFor(() => expect(screen.queryByLabelText(/Digite o primeiro nome/)).toBeNull())
     })
 
+    it('Esc dentro do diálogo não chega à gaveta da ficha', async () => {
+      const fora = vi.fn()
+      document.addEventListener('keydown', fora)
+      tela(ADMIN_ACESSOS, 'bruno@exemplo.test')
+      fireEvent.keyDown(await abrir(), { key: 'Escape' })
+      document.removeEventListener('keydown', fora)
+      expect(fora).not.toHaveBeenCalled()
+    })
+
     it('sucesso mostra o estado encerrado e o Reativar, que volta ao bloco normal', async () => {
       tela(ADMIN_ACESSOS, 'bruno@exemplo.test')
       fireEvent.change(await abrir(), { target: { value: 'Bruno' } })

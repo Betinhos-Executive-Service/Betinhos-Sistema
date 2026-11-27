@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button } from '@betinhos/ui'
 import { acessosDe, useAcessos } from '../../../app/AcessosProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
@@ -97,6 +97,13 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
     await carregar()
   }, [carregar, pessoaId])
   const encerrado = pessoa ? null : encerramento
+  // Encerrar ou reativar troca o corpo do bloco e o botão clicado some: o foco vai para o bloco, não para o <body>.
+  const blocoRef = useRef<HTMLElement>(null)
+  const estavaEncerrado = useRef(!!encerrado)
+  useEffect(() => {
+    if (estavaEncerrado.current !== !!encerrado) blocoRef.current?.focus()
+    estavaEncerrado.current = !!encerrado
+  }, [encerrado])
   const tentar = <Button variant="secondary" loading={relendo} onClick={() => void carregar()}>Tentar de novo</Button>
 
   let corpo
@@ -125,7 +132,8 @@ function Bloco({ email, source, onEstado }: Props & { source: AcessosSource }) {
   }
 
   return (
-    <section className="group acesso-bloco" aria-labelledby="acesso-sistema-titulo">
+    <section ref={blocoRef} tabIndex={-1} className="group acesso-bloco" aria-labelledby="acesso-sistema-titulo"
+      onKeyDown={(event) => { if (event.key === 'Escape' && (event.target as HTMLElement).closest('dialog')) event.stopPropagation() }}>
       <h3 id="acesso-sistema-titulo" className="acesso-bloco__titulo">Acesso ao sistema</h3>
       {nota ? <Alert tone={nota.tom} title={nota.titulo}><ul>{nota.linhas.map((l) => <li key={l}>{l}</li>)}</ul></Alert> : null}
       {corpo}
@@ -138,6 +146,7 @@ type Acao = { onFeito: () => Promise<void>; onNota: (n: Nota | null) => void }
 function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }: { pessoa: Pessoa; dados: Dados; source: AcessosSource; onGravado: (perfis: PerfisPessoa) => Promise<void>; onEstado?: (estado: EstadoPerfis) => void } & Acao) {
   const viewerAdmin = acessosDe(useAcessos()).admin
   const [encerrando, setEncerrando] = useState(false)
+  const botaoRef = useRef<HTMLButtonElement>(null)
   const amplo = pessoa.amplo || pessoa.admin
   const travado = (amplo || pessoa.perfis.acessos) && !viewerAdmin
   const editor = usePerfisEditor({ pessoa, euId: dados.euId, source, onGravado })
@@ -173,11 +182,11 @@ function Editor({ pessoa, dados, source, onGravado, onEstado, onFeito, onNota }:
       )}
       {pessoa.id === dados.euId ? null : (
         <div className="cluster">
-          <Button variant="danger" disabled={travado} aria-describedby={travado ? 'encerrar-motivo' : undefined} onClick={() => { onNota(null); setEncerrando(true) }}>Encerrar acesso ao sistema…</Button>
+          <Button ref={botaoRef} variant="danger" disabled={travado} aria-describedby={travado ? 'encerrar-motivo' : undefined} onClick={() => { onNota(null); setEncerrando(true) }}>Encerrar acesso ao sistema…</Button>
           {travado ? <span id="encerrar-motivo" className="muted">{MOTIVO_AMPLO}</span> : null}
         </div>
       )}
-      {encerrando ? <EncerrarAdministrativoDialog open nome={pessoa.nome} perdas={perdas} onClose={() => setEncerrando(false)} onConfirmar={confirmar} /> : null}
+      {encerrando ? <EncerrarAdministrativoDialog open nome={pessoa.nome} perdas={perdas} onClose={() => { setEncerrando(false); setTimeout(() => botaoRef.current?.focus(), 0) }} onConfirmar={confirmar} /> : null}
       <details className="ac-historico">
         <summary>Histórico de acessos ({daPessoa.length})</summary>
         <HistoricoLista itens={daPessoa} onDevolver={editor.podeDevolver ? editor.devolver : undefined} />
