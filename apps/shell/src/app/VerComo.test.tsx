@@ -67,12 +67,31 @@ describe('Ver como', () => {
     expect(menu('#/frota')).not.toBeNull()
   })
 
-  it('quem tem acesso amplo vê tudo e o banner avisa', async () => {
-    tela('carlos.teste@betinhos.onmicrosoft.com')
+  it('o Administrador do Sistema vê tudo e o banner avisa', async () => {
+    tela('ana@exemplo.test')
     await entrar()
     expect(screen.getByText(/tem acesso amplo/)).toBeTruthy()
+    expect(screen.getByText(/o que você gravar sai em seu nome/)).toBeTruthy()
     expect(menu('#/frota')).not.toBeNull()
     expect(menu('#/despesas-operacionais')).not.toBeNull()
+  })
+
+  it('papel antigo amplo fica com os perfis de área, como no menu real (lerPapeis)', async () => {
+    tela('carlos.teste@betinhos.onmicrosoft.com')
+    await entrar()
+    expect(screen.queryByText(/tem acesso amplo/)).toBeNull()
+    expect(menu('#/frota')).toBeNull()
+    expect(menu('#/despesas-operacionais')).toBeNull()
+  })
+
+  it('com alteração não salva na ficha o botão trava', async () => {
+    render(
+      <ToastProvider>
+        <AcessosProvider host={host}><AcessoSistema email="bruno@exemplo.test" source={createSource(host)} fichaPendente /></AcessosProvider>
+      </ToastProvider>,
+    )
+    expect((await screen.findByRole('button', { name: 'Ver como esta pessoa' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('Salve ou descarte as alterações da ficha antes.')).toBeTruthy()
   })
 
   it('Sair volta aos próprios acessos, à tela de origem e ao rascunho', async () => {

@@ -10,7 +10,7 @@ export type ValorAcessos = EstadoAcessos & {
   verComo?: VerComo | null
   entrarVerComo?: (simulacao: VerComo) => void
   sairVerComo?: () => void
-  /** Rascunho do editor de perfis guardado ao entrar no "Ver como"; vale até o editor da mesma pessoa remontar. */
+  /** Rascunho do editor de perfis guardado ao entrar no "Ver como"; o primeiro editor montado depois de sair o consome. */
   rascunhoPendente?: { pessoaId: string; edicao: unknown } | null
   limparRascunhoPendente?: () => void
 }
@@ -37,14 +37,14 @@ export function AcessosProvider({ host, children }: { host: Host; children: Reac
   }, [host, tentativa])
 
   const recarregar = useCallback(() => setTentativa((n) => n + 1), [])
+  // Guardado já na entrada: o Voltar do navegador pode remontar a ficha durante a simulação, e o editor ainda montado ao sair fica com ele.
   const entrarVerComo = useCallback((simulacao: VerComo) => {
-    setRascunhoPendente(null)
+    setRascunhoPendente(simulacao.edicao === undefined ? null : { pessoaId: simulacao.pessoaId, edicao: simulacao.edicao })
     setVerComo(simulacao)
     window.location.hash = '#/inicio'
   }, [])
   const sairVerComo = useCallback(() => {
     if (!verComo) return
-    setRascunhoPendente(verComo.edicao === undefined ? null : { pessoaId: verComo.pessoaId, edicao: verComo.edicao })
     setVerComo(null)
     window.location.hash = verComo.voltarPara
   }, [verComo])

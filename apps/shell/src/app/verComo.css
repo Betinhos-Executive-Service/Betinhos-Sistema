@@ -1,8 +1,5 @@
-/* Faixa "Vendo como <nome>" do AppShell: fica no topo do conteúdo, empurra a tela e não cobre nada. */
+/* Faixa "Vendo como <nome>" do AppShell: no topo do conteúdo, empurra a tela e não cobre nada (sem sticky: os cabeçalhos fixos das telas usam o topo). */
 .ver-como {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -16,3 +13,4 @@
   border-radius: var(--bt-radius-md);
 }
 .ver-como__texto { min-width: 0; overflow-wrap: anywhere; }
+.ver-como__aviso { display: block; font-size: var(--bt-font-size-sm, 0.875rem); }

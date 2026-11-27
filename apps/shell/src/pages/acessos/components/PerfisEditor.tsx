@@ -41,9 +41,10 @@ export function usePerfisEditor({ pessoa, euId, source, onGravado }: Opcoes) {
   const contexto = useAcessos()
   const viewerAdmin = acessosDe(contexto).admin
   const { rascunhoPendente, limparRascunhoPendente } = contexto
-  // Volta do "Ver como": o rascunho guardado ao entrar reaparece uma vez, só para a mesma pessoa.
+  const simulando = !!contexto.verComo
+  // Volta do "Ver como": o rascunho guardado ao entrar reaparece, só para a mesma pessoa; durante a simulação não é consumido.
   const [edicao, setEdicao] = useState<Edicao>(() => (rascunhoPendente?.pessoaId === pessoa.id && ehEdicao(rascunhoPendente.edicao) ? rascunhoPendente.edicao : LIMPA))
-  useEffect(() => { limparRascunhoPendente?.() }, [limparRascunhoPendente])
+  useEffect(() => { if (!simulando) limparRascunhoPendente?.() }, [limparRascunhoPendente, simulando])
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<ErroApi | null>(null)
   const [confirmando, setConfirmando] = useState(false)

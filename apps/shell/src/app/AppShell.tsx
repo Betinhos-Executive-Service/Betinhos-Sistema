@@ -199,6 +199,7 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, oc
           <span className="ver-como__texto">
             <strong id="ver-como-texto">Vendo como {acesso.verComo.nome}</strong>
             {acesso.verComo.amplo ? <span> · tem acesso amplo: vê todas as telas</span> : null}
+            <span className="ver-como__aviso">Só o menu e as telas mudam: o que você gravar sai em seu nome.</span>
           </span>
           <Button variant="secondary" onClick={acesso.sairVerComo}>Sair</Button>
         </div>
