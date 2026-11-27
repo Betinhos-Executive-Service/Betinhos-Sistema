@@ -43,4 +43,7 @@
 - `inicio/domain/domain.test.ts` espera "R$ 1 mil" e recebe "R$ 1,0 mil" localmente (fora do diff; conferir no CI).
 
 ## Retro
--
+- A revisão de segurança (Opus) achou 11 pontos no plugin depois de pronto; o principal (reativar sem conferir o bloqueio) era regra que a spec já pedia. Cenário de recusa vira teste antes do handler.
+- O code-review rodou no worktree errado na 1ª vez: o brief de revisão passa a levar o caminho absoluto do worktree.
+- O ux-audit pegou o Esc do diálogo fechando a gaveta: diálogo dentro de drawer precisa de teste de teclado no roteiro.
+- PR #780 aberto em 27/11/2026.
