@@ -24,6 +24,10 @@ const string TipoDefinirPerfis = "Cr40f.Acesso.Plugin.DefinirPerfisPlugin";
 const string ApiDefinirPerfis = "cr40f_AcessoDefinirPerfis";
 const string TipoPrevia = "Cr40f.Acesso.Plugin.PreviaPlugin";
 const string ApiPrevia = "cr40f_AcessoPrevia";
+const string TipoEncerrarAdministrativo = "Cr40f.Acesso.Plugin.EncerrarAdministrativoPlugin";
+const string ApiEncerrarAdministrativo = "cr40f_AcessoEncerrar";
+const string TipoReativarAdministrativo = "Cr40f.Acesso.Plugin.ReativarAdministrativoPlugin";
+const string ApiReativarAdministrativo = "cr40f_AcessoReativar";
 // Configuracao do App Motoristas (fase A): 4 Custom APIs sem configuracao no step (nao usam Entra nem segredo).
 const string TipoAppConfigEfetiva = "Cr40f.Acesso.Plugin.AppConfigEfetivaPlugin";
 const string TipoAppConfigRascunho = "Cr40f.Acesso.Plugin.AppConfigSalvarRascunhoPlugin";
@@ -70,6 +74,8 @@ var tipoEncerrar = UpsertPluginType(service, assemblyId, TipoEncerrar);
 var tipoReativar = UpsertPluginType(service, assemblyId, TipoReativar);
 var tipoDefinirPerfis = UpsertPluginType(service, assemblyId, TipoDefinirPerfis);
 var tipoPrevia = UpsertPluginType(service, assemblyId, TipoPrevia);
+var tipoEncerrarAdministrativo = UpsertPluginType(service, assemblyId, TipoEncerrarAdministrativo);
+var tipoReativarAdministrativo = UpsertPluginType(service, assemblyId, TipoReativarAdministrativo);
 var tipoAppConfigEfetiva = UpsertPluginType(service, assemblyId, TipoAppConfigEfetiva);
 var tipoAppConfigRascunho = UpsertPluginType(service, assemblyId, TipoAppConfigRascunho);
 var tipoAppConfigPublicar = UpsertPluginType(service, assemblyId, TipoAppConfigPublicar);
@@ -93,6 +99,12 @@ EnsureCustomApi(service, ApiDefinirPerfis, "Acesso | Definir perfis", "Atribui e
 EnsureCustomApi(service, ApiPrevia, "Acesso | Previa de perfis", "Mostra o que a pessoa deixa de ter com um pedido de perfis; nao grava nada.", solutionUniqueName,
     requestParams: new[] { ("Usuario", 12, false), ("Perfis", 10, false), ("RetirarAmplo", 0, true), ("Tabelas", 10, true) },
     responseProps: new[] { ("Resultado", 10) });
+EnsureCustomApi(service, ApiEncerrarAdministrativo, "Acesso | Encerrar acesso administrativo", "Tira papeis, perfis de coluna e equipes de um administrativo, grava o historico e bloqueia o usuario.", solutionUniqueName,
+    requestParams: new[] { ("Usuario", 12, false), ("Confirmacao", 10, false) },
+    responseProps: new[] { ("Etapas", 10) });
+EnsureCustomApi(service, ApiReativarAdministrativo, "Acesso | Reativar acesso administrativo", "Desbloqueia o usuario e repoe papeis, perfis de coluna e equipes do ultimo encerramento.", solutionUniqueName,
+    requestParams: new[] { ("Usuario", 12, false) },
+    responseProps: new[] { ("Etapas", 10) });
 EnsureCustomApi(service, ApiAppConfigEfetiva, "Configuracao do App | Efetiva", "Configuracao efetiva do App Motoristas (modulos e funcoes ligados) de um motorista.", solutionUniqueName,
     requestParams: new[] { ("Funcionario", 12, true) },
     responseProps: new[] { ("Resultado", 10) });
@@ -110,6 +122,8 @@ EnsureApiStep(service, tipoEncerrar, ApiEncerrar, "Cr40f.Acesso: encerrar acesso
 EnsureApiStep(service, tipoReativar, ApiReativar, "Cr40f.Acesso: reativar acesso", config, solutionUniqueName);
 EnsureApiStep(service, tipoDefinirPerfis, ApiDefinirPerfis, "Cr40f.Acesso: definir perfis", "", solutionUniqueName);
 EnsureApiStep(service, tipoPrevia, ApiPrevia, "Cr40f.Acesso: previa de perfis", "", solutionUniqueName);
+EnsureApiStep(service, tipoEncerrarAdministrativo, ApiEncerrarAdministrativo, "Cr40f.Acesso: encerrar acesso administrativo", "", solutionUniqueName);
+EnsureApiStep(service, tipoReativarAdministrativo, ApiReativarAdministrativo, "Cr40f.Acesso: reativar acesso administrativo", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigEfetiva, ApiAppConfigEfetiva, "Cr40f.Acesso: configuracao do App efetiva", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigRascunho, ApiAppConfigRascunho, "Cr40f.Acesso: configuracao do App salvar rascunho", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigPublicar, ApiAppConfigPublicar, "Cr40f.Acesso: configuracao do App publicar", "", solutionUniqueName);
