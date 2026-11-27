@@ -975,4 +975,26 @@ excludes(passengerTextareaRule, "resize: none;", "textarea de passageiro nao pod
 const importCopyPointerRule = extractCssRule(css, ".import-trecho.is-locked [data-import-copy] input[readonly]");
 excludes(importCopyPointerRule, "textarea[readonly]", "textarea importado bloqueado deve manter pointer events para resize");
 
+{
+  // Hotfix: X no passageiro removia dois quando os vínculos salvos repetiam a ordem.
+  const body = `${extractFunction(app, "normalizePassengerOrder")}
+${extractFunction(app, "removePassengerRow")}
+return { normalizePassengerOrder, removePassengerRow };`;
+  const state = {};
+  const noop = () => {};
+  const api = new Function("state", "captureGlobalHistoryBeforeMutation", "closePassengerPreview", "animatePassengerRowExit",
+    "reindexPassengers", "renderPassengers", "applyPassengerDefaults", "renderRiskPanel", "markDraftDirty",
+    "commitGlobalHistoryChange", "toast", body)(state, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+  const normalized = api.normalizePassengerOrder([
+    { rowKey: "a", ordem: 1 },
+    { rowKey: "b", ordem: 1 },
+    { rowKey: "c", ordem: 2 }
+  ]);
+  assert.deepEqual(normalized.map((item) => `${item.rowKey}${item.ordem}`), ["a1", "b2", "c3"], "ordem repetida deve virar 1..n mantendo a sequência");
+  state.selectedPassengers = [{ rowKey: "a", ordem: 1 }, { rowKey: "b", ordem: 1 }];
+  state.enderecoRascunho = [{ ordem: 1, endereco: "Rua X" }];
+  api.removePassengerRow(1, { dataset: { rowKey: "a" }, querySelector: () => null });
+  assert.deepEqual(state.selectedPassengers.map((item) => item.rowKey), ["b"], "remover deve tirar só a linha clicada");
+}
+
 console.log("formulario_operational_features: ok");

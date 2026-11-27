@@ -3253,6 +3253,7 @@
           };
         })
       : [];
+    state.selectedPassengers = normalizePassengerOrder(state.selectedPassengers);
     hydratePassengerSelectionRecencyFromRows(state.selectedPassengers);
     state.enderecoRascunho = state.selectedPassengers.map((item) => ({
       ordem: item.ordem,
@@ -3446,6 +3447,7 @@
           };
         })
       : [emptyPassenger(1)];
+    state.selectedPassengers = normalizePassengerOrder(state.selectedPassengers);
     hydratePassengerSelectionRecencyFromRows(state.selectedPassengers);
 
     state.enderecoRascunho = state.selectedPassengers.map((item) => ({
@@ -8055,7 +8057,7 @@
   }
 
   function restoreDraftPassengers(rows) {
-    return rows
+    return normalizePassengerOrder(rows
       .map((item, index) => {
         const passenger = state.passageiros.find((pax) => sameId(pax.id, item.guid));
         if (!passenger) return null;
@@ -8068,7 +8070,7 @@
           enderecoEditado: item.enderecoEditado || passenger.endereco || ""
         };
       })
-      .filter(Boolean);
+      .filter(Boolean));
   }
 
   function clearDraftSnapshot(showToast) {
@@ -8324,6 +8326,15 @@
     }
   }
 
+  // Vínculos gravados por flows (Tenaris, IA) podem repetir cr40f_ordemdeselecao.
+  // A tela usa a ordem como identidade da linha, então renumera 1..n mantendo a sequência.
+  function normalizePassengerOrder(rows) {
+    return (rows || [])
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => (Number(a.item.ordem) || 0) - (Number(b.item.ordem) || 0) || a.index - b.index)
+      .map(({ item }, index) => ({ ...item, ordem: index + 1 }));
+  }
+
   function sortPassengers() {
     state.selectedPassengers.sort((a, b) => a.ordem - b.ordem);
   }
@@ -8568,13 +8579,19 @@
   }
 
   function removePassengerRow(ordem, row = null) {
+    // Remove pela linha clicada (rowKey), não pela ordem: vínculos salvos com a mesma
+    // cr40f_ordemdeselecao faziam o X tirar dois passageiros de uma vez.
+    const rowKey = row?.dataset.rowKey || "";
+    const target = state.selectedPassengers.find((item) => (rowKey ? item.rowKey === rowKey : item.ordem === ordem));
+    if (!target) return;
     captureGlobalHistoryBeforeMutation("Remover passageiro");
     if (row) {
       closePassengerPreview(row.querySelector(".row-title-wrap"));
       animatePassengerRowExit(row);
     }
-    state.selectedPassengers = state.selectedPassengers.filter((item) => item.ordem !== ordem);
-    state.enderecoRascunho = state.enderecoRascunho.filter((item) => item.ordem !== ordem);
+    const hasSameOrder = state.selectedPassengers.some((item) => item !== target && item.ordem === target.ordem);
+    state.selectedPassengers = state.selectedPassengers.filter((item) => item !== target);
+    if (!hasSameOrder) state.enderecoRascunho = state.enderecoRascunho.filter((item) => item.ordem !== target.ordem);
     reindexPassengers();
     renderPassengers();
     applyPassengerDefaults(false);
