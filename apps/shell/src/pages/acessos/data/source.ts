@@ -128,7 +128,7 @@ const MOCK_PESSOAS: Pessoa[] = [
 ]
 
 /** Pessoa de exemplo já encerrada (fictícia); fora de `MOCK_PESSOAS` porque a lista só traz contas ativas. */
-export const MOCK_ENCERRADA: Pessoa = { id: '55555555-5555-4555-8555-555555555555', nome: 'Elisa Desligada', email: 'elisa@exemplo.test', perfis: { areas: { operacional: 'operador' }, acessos: false }, admin: false, amplo: false, alteradoEm: new Date('2026-11-10T14:00:00Z'), temFicha: false, fichaId: 'm9' }
+export const MOCK_ENCERRADA: Pessoa = { id: '66666666-6666-4666-8666-666666666666', nome: 'Joana Encerrada Teste', email: 'joana.teste@betinhos.onmicrosoft.com', perfis: { areas: { operacional: 'operador' }, acessos: false }, admin: false, amplo: false, alteradoEm: new Date('2026-11-10T14:00:00Z'), temFicha: false, fichaId: 'm9' }
 
 let seq = 0
 function createMockSource(): Source {

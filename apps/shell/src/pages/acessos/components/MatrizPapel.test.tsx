@@ -31,7 +31,7 @@ describe('Acessos por papel', () => {
     expect(window.location.hash).toBe('#/acessos?ver=22222222-2222-4222-8222-222222222222')
     window.location.hash = '#/acessos?visao=papel&filtro=encerrados'
     expect(await screen.findByText(/Encerrado em 10\/11\/2026 por Ana Exemplo/)).toBeTruthy()
-    fireEvent.click(screen.getByText('Elisa Desligada'))
+    fireEvent.click(screen.getByText('Joana Encerrada Teste'))
     expect(window.location.hash).toBe('#/funcionarios?ficha=m9&secao=acesso')
   })
 
